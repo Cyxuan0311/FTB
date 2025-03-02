@@ -21,7 +21,4 @@ extern std::mutex cache_mutex;
 extern std::unordered_map<std::string, DirectoryCache> dir_cache;
 
 
-void enterDirectory(std::stack<std::string>& pathHistory, 
-                   std::string& currentPath,
-                   std::vector<std::string>& contents,
-                   int& selected);
+void enterDirectory(std::stack<std::string>& pathHistory, std::string& currentPath,std::vector<std::string>& contents,int& selected);

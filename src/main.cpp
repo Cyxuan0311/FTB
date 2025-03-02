@@ -26,8 +26,18 @@ extern std::mutex cache_mutex;
 extern std::unordered_map<std::string, DirectoryCache> dir_cache;
 
 // 动态加载动画字符
-const std::string loadingChars = "|/-\\";
 
+const std::vector<std::string> loadingFrames = {
+    " ░▒▓ ░▒▓ ░▒▓ ░▒▓ ░▒▓",  // 第一阶段
+    "░▒▓ ░▒▓ ░▒▓ ░▒▓ ░▒▓ ",  // 第二阶段 
+    "▒▓ ░▒▓ ░▒▓ ░▒▓ ░▒▓ ░",  // 第三阶段
+    "▓ ░▒▓ ░▒▓ ░▒▓ ░▒▓ ░▒",  // 第四阶段
+    " ░▒▓ ░▒▓ ░▒▓ ░▒▓ ░▒▓"   // 重复循环
+};
+
+
+/// @brief 
+/// @return 
 int main() {
     int hovered_index = -1;
     std::stack<std::string> pathHistory;
@@ -51,7 +61,7 @@ int main() {
     ThreadGuard timerGuard(timer);
 
     std::string searchQuery;
-    auto searchInput = Input(&searchQuery, "搜索...");
+    auto searchInput = Input(&searchQuery, "🔎 搜索...");
 
     MenuOption menu_option;
     menu_option.on_enter = [&] {
@@ -213,14 +223,15 @@ int main() {
             column_boxes.push_back(vbox(std::move(column)) | flex);
         }
 
-        std::string loadingIndicator(1, loadingChars[loadingIndex % loadingChars.length()]);
+        std::string loadingIndicator = loadingFrames[loadingIndex % loadingFrames.size()];
+        loadingIndex = (loadingIndex + 1) % (loadingFrames.size() * 2);  // 控制动画速度
         loadingIndex++;
         std::ostringstream ratio_stream;
         ratio_stream << std::fixed << std::setprecision(2) << (size_ratio.load() * 100);
 
         return vbox({
             hbox({
-                text("当前路径: " + displayPath) | bold | color(Color::White) | flex,
+                text("🤖 当前路径: " + displayPath) | bold | color(Color::White) | flex,
                 filler(),
                 vbox({
                     hbox({
