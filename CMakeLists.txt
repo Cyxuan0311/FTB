@@ -8,12 +8,14 @@ include_directories(include)
 # 查找 FTXUI 库
 find_package(ftxui CONFIG REQUIRED)
 # 添加源文件
-add_executable(FileViewer
+add_executable(FTB
     src/main.cpp
     src/file_browser.cpp
+    src/thread_guard.cpp
+    src/file_operations.cpp
 )
 # 链接 FTXUI 库
-target_link_libraries(FileViewer
+target_link_libraries(FTB
     PRIVATE ftxui::screen
     PRIVATE ftxui::dom
     PRIVATE ftxui::component
