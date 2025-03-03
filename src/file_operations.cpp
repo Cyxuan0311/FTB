@@ -3,6 +3,9 @@
 #include <unordered_map>  // 添加unordered_map头文件
 #include <filesystem>     // 添加filesystem头文件
 #include <chrono>
+#include <ctime>
+#include <fstream>
+#include <ostream>
 
 namespace fs = std::filesystem;  // 定义filesystem别名
 
@@ -15,7 +18,6 @@ void enterDirectory(std::stack<std::string>& pathHistory,
                    std::vector<std::string>& contents,
                    int& selected) 
 {
-    // ... 原有函数体保持不变 ...
     std::lock_guard<std::mutex> lock(cache_mutex);
     auto& cache = dir_cache[currentPath];
     
@@ -34,4 +36,29 @@ void enterDirectory(std::stack<std::string>& pathHistory,
             selected = 0;
         }
     }
+}
+
+// 创建文件
+bool createFile(const std::string& filePath) {
+    std::ofstream file(filePath);
+    if (file.is_open()) {
+        file.close();
+        return true;
+    }
+    return false;
+}
+
+// 创建目录
+bool createDirectory(const std::string& dirPath) {
+    return fs::create_directory(dirPath);
+}
+
+// 删除文件或目录
+bool deleteFileOrDirectory(const std::string& path) {
+    if (fs::is_directory(path)) {
+        return fs::remove_all(path);
+    } else if (fs::is_regular_file(path)) {
+        return fs::remove(path);
+    }
+    return false;
 }

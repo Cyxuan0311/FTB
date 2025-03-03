@@ -61,6 +61,8 @@
         "codecvt": "cpp",
         "fstream": "cpp",
         "future": "cpp",
-        "iomanip": "cpp"
+        "iomanip": "cpp",
+        "stack": "cpp",
+        "execution": "cpp"
     }
 }

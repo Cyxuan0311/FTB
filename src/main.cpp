@@ -1,6 +1,7 @@
 #include "../include/file_browser.hpp"
 #include "../include/thread_guard.hpp"
 #include "../include/file_operations.hpp"
+#include "../include/new_file_dialog.hpp"
 #include <ftxui/component/component.hpp>
 #include <ftxui/component/screen_interactive.hpp>
 #include <ftxui/dom/elements.hpp>
@@ -17,7 +18,6 @@
 #include <iostream>     // 添加cerr支持
 #include <numeric>      // 添加reduce支持
 
-
 using namespace ftxui;
 namespace fs = std::filesystem;
 
@@ -26,7 +26,6 @@ extern std::mutex cache_mutex;
 extern std::unordered_map<std::string, DirectoryCache> dir_cache;
 
 // 动态加载动画字符
-
 const std::vector<std::string> loadingFrames = {
     " ░▒▓ ░▒▓ ░▒▓ ░▒▓ ░▒▓",  // 第一阶段
     "░▒▓ ░▒▓ ░▒▓ ░▒▓ ░▒▓ ",  // 第二阶段 
@@ -35,9 +34,6 @@ const std::vector<std::string> loadingFrames = {
     " ░▒▓ ░▒▓ ░▒▓ ░▒▓ ░▒▓"   // 重复循环
 };
 
-
-/// @brief 
-/// @return 
 int main() {
     int hovered_index = -1;
     std::stack<std::string> pathHistory;
@@ -46,11 +42,11 @@ int main() {
     std::vector<std::string> filteredContents = allContents;
     int selected = 0;
     auto&& screen = ScreenInteractive::Fullscreen();
-    
+
     std::atomic<double> size_ratio(0.0);
     std::atomic<uintmax_t> total_folder_size(0);
     std::string selected_size;
-    
+
     std::atomic<bool> refresh_ui{true};
     std::thread timer([&] {
         while (refresh_ui) {
@@ -61,7 +57,7 @@ int main() {
     ThreadGuard timerGuard(timer);
 
     std::string searchQuery;
-    auto searchInput = Input(&searchQuery, "🔎 搜索...");
+    auto searchInput = Input(&searchQuery, "搜索...");
 
     MenuOption menu_option;
     menu_option.on_enter = [&] {
@@ -102,7 +98,7 @@ int main() {
             size_future = std::async(std::launch::async, [&] {
                 std::lock_guard<std::mutex> lock(cache_mutex);
                 auto& cache = dir_cache[currentPath];
-                
+
                 if (!cache.valid) {
                     cache.contents = FileBrowser::getDirectoryContents(currentPath);
                     cache.last_update = std::chrono::system_clock::now();
@@ -114,7 +110,7 @@ int main() {
                     [&](const auto& item) {
                         sizes.push_back(FileBrowser::getFileSize((fs::path(currentPath) / item).string()));
                     });
-                
+
                 uintmax_t total = std::reduce(sizes.begin(), sizes.end());
                 total_folder_size.store(total, std::memory_order_relaxed);
 
@@ -122,7 +118,7 @@ int main() {
                     uintmax_t size = sizes[selected];
                     double ratio = total > 0 ? static_cast<double>(size) / total : 0.0;
                     size_ratio.store(ratio, std::memory_order_relaxed);
-                    
+
                     std::ostringstream stream;
                     if (size >= 1024*1024) {
                         stream << std::fixed << std::setprecision(2) 
@@ -170,15 +166,15 @@ int main() {
             bool is_dir = FileBrowser::isDirectory(fullPath);
 
             auto text_color = is_dir ? 
-                color(Color::RGB(65, 105, 225)) : 
-                color(Color::RGB(220, 20, 60));
+                color(Color::RGB(135, 206, 250)) : 
+                color(Color::RGB(255, 99, 71));
 
             ftxui::Decorator bg_style = nothing;
             if (hovered_index == (int)i) {
-                bg_style = bgcolor(Color::RGB(120, 120, 120));
+                bg_style = bgcolor(Color::RGB(120, 120, 120)) | bold;
             }
             if (selected == (int)i) {
-                bg_style = bgcolor(Color::RGB(255, 255, 0)) | color(Color::Black);
+                bg_style = bgcolor(Color::RGB(255, 255, 0)) | color(Color::Black) | bold;
             }
 
             std::string itemText = filteredContents[i];
@@ -231,7 +227,7 @@ int main() {
 
         return vbox({
             hbox({
-                text("🤖 当前路径: " + displayPath) | bold | color(Color::White) | flex,
+                text("当前路径: " + displayPath) | bold | color(Color::White) | flex,
                 filler(),
                 vbox({
                     hbox({
@@ -245,7 +241,7 @@ int main() {
                     }),
                     hbox({
                         text(" ▓ ") | color(Color::Yellow),
-                        text(ratio_stream.str() + "%") 
+                        text(ratio_stream.str() + "%") | bold
                     }) 
                 }) | border | size(WIDTH, LESS_THAN, 30),
                 vbox({
@@ -271,20 +267,105 @@ int main() {
                     pathHistory.push(currentPath);
                     currentPath = current.has_parent_path() ? 
                         current.parent_path().string() : pathHistory.top();
-                    
+    
                     currentPath = fs::canonical(currentPath).string();
                     dir_cache[currentPath].valid = false;
-                    
+    
                     std::thread([&] {
                         std::lock_guard<std::mutex> lock(cache_mutex);
                         allContents = FileBrowser::getDirectoryContents(currentPath);
                         filteredContents = allContents;
                     }).detach();
-                    
+    
                     searchQuery.clear();
                     selected = 0;
                     return true;
                 }
+            }
+            if (event == Event::Character('K')) {
+                // 新建文件
+                auto newFileName = showNewFileDialog(screen);
+                if (!newFileName.empty()) {
+                    fs::path fullPath = fs::path(currentPath) / newFileName;
+                    try {
+                        if (createFile(fullPath.string())) {  // 尝试创建文件
+                            std::lock_guard<std::mutex> lock(cache_mutex);
+                            allContents = FileBrowser::getDirectoryContents(currentPath);
+                            filteredContents = allContents;
+                            dir_cache[currentPath].valid = false;  // 使缓存无效，以便重新加载
+                        } else {
+                            std::cerr << "Failed to create file: " << fullPath.string() << std::endl;
+                        }
+                    } catch (const std::exception& e) {
+                        std::cerr << "Error creating file: " << e.what() << std::endl;
+                    }
+                }
+                return true;
+            }
+            if (event == Event::Character('F')) {
+                // 新建文件夹
+                std::string dirName;
+                auto dirNameInput = Input(&dirName, "文件夹名");
+                auto cancelButton = Button("取消", [&] {
+                    screen.Exit();
+                });
+                auto createButton = Button("创建", [&] {
+                    if (!dirName.empty()) {
+                        fs::path fullPath = fs::path(currentPath) / dirName;
+                        try {
+                            if (createDirectory(fullPath.string())) {  // 尝试创建文件夹
+                                std::lock_guard<std::mutex> lock(cache_mutex);
+                                allContents = FileBrowser::getDirectoryContents(currentPath);
+                                filteredContents = allContents;
+                                dir_cache[currentPath].valid = false;  // 使缓存无效，以便重新加载
+                            } else {
+                                std::cerr << "Failed to create directory: " << fullPath.string() << std::endl;
+                            }
+                        } catch (const std::exception& e) {
+                            std::cerr << "Error creating directory: " << e.what() << std::endl;
+                        }
+                    }
+                    screen.Exit();
+                });
+                auto container = Container::Vertical({
+                    dirNameInput,
+                    Container::Horizontal({
+                        cancelButton,
+                        createButton
+                    })
+                });
+                auto renderer = Renderer(container, [&] {
+                    return vbox({
+                        text("新建文件夹"),
+                        dirNameInput->Render(),
+                        hbox({
+                            cancelButton->Render(),
+                            createButton->Render()
+                        })
+                    }) | border;
+                });
+                screen.Loop(renderer);
+                return true;
+            }
+            if (event == Event::Character('D')) {
+                // 删除文件或文件夹
+                if (selected >= 0 && selected < filteredContents.size()) {
+                    std::string itemName = filteredContents[selected];
+                    fs::path fullPath = fs::path(currentPath) / itemName;
+                    try {
+                        if (deleteFileOrDirectory(fullPath.string())) {
+                            std::lock_guard<std::mutex> lock(cache_mutex);
+                            allContents = FileBrowser::getDirectoryContents(currentPath);
+                            filteredContents = allContents;
+                            dir_cache[currentPath].valid = false;  // 使缓存无效，以便重新加载
+                        } else {
+                            std::cerr << "Failed to delete: " << fullPath.string() << std::endl;
+                        }
+                    } catch (const std::exception& e) {
+                        std::cerr << "Error deleting: " << e.what() << std::endl;
+                    }
+                }
+                return true;
             }
         } catch (const std::exception& e) {
             refresh_ui = false;
