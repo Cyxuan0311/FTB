@@ -1,9 +1,9 @@
-# FTB - 终端文件浏览器
+# FTB(file terminal browser) - 终端文件浏览器
 
 ![C++17](https://img.shields.io/badge/C++-17-blue) ![FTXUI](https://img.shields.io/badge/FTXUI-30-orange)
 
 
-![Platform](https://img.shields.io/badge/Platform-Linux-lightgrey)
+![Platform](https://img.shields.io/badge/Platform-Linux-lightgrey) ![Tool](https://img.shields.io/badge/CMake-3.20.0-red)
 
 
 基于FTXUI库开发的终端交互式文件浏览器，提供直观的目录导航和文件查看体验。
