@@ -340,9 +340,12 @@ int main() {
                         dirNameInput->Render(),
                         hbox({
                             cancelButton->Render(),
+                            filler(),
                             createButton->Render()
-                        })
-                    }) | border;
+                        }) | hcenter  // 按钮水平居中
+                    }) | borderRounded | color(Color::Blue3Bis) 
+                      | size(WIDTH, GREATER_THAN, 40)  // 最小宽度
+                      | vcenter | hcenter;  // 同时应用水平和垂直居中
                 });
                 screen.Loop(renderer);
                 return true;

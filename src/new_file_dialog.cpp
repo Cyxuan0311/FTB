@@ -37,10 +37,14 @@ std::string showNewFileDialog(ScreenInteractive& screen) {
             fileNameInput->Render(),
             fileTypeInput->Render(),
             hbox({
+                filler(),
                 cancelButton->Render(),
-                createButton->Render()
-            })
-        }) | border;
+                createButton->Render(),
+                filler() 
+            }) | size(WIDTH, GREATER_THAN, 30)  // 统一按钮容器宽度
+        }) | borderRounded | color(Color::Green3Bis) 
+          | size(WIDTH, GREATER_THAN, 40)      // 最小宽度限制
+          | vcenter | hcenter;                // 分离垂直/水平居中
     });
 
     screen.Loop(renderer);
