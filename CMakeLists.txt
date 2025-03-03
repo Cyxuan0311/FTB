@@ -13,6 +13,7 @@ add_executable(FTB
     src/file_browser.cpp
     src/thread_guard.cpp
     src/file_operations.cpp
+    src/new_file_dialog.cpp
 )
 # 链接 FTXUI 库
 target_link_libraries(FTB
