@@ -18,6 +18,8 @@
 - 🔄 自动刷新（每100ms更新界面）
 - 🔎 文件夹搜索
 - 🧑‍🎓 计算当前选中文件或文件夹的内存占比大小
+- 🛠️ 新建文件或文件夹，删除功能。
+
 
 ## 安装依赖
 
@@ -47,17 +49,29 @@ make
 - Backspace:返回上级目录
 - ESC:退出程序
 - 搜索框:输入关键字，查询指定文件
+- K键新建文件
+- F键新建文件夹
+- D键删除文件或文件夹
 
 ## 项目结构
 
     FileBrowser/
     ├── include/            # 头文件
-    │   └── file_browser.hpp
+    │   |── file_browser.hpp
+    |   |—— file_operations.hpp
+    |   |—— new_file_dialog.hpp
+    |   └—— thread_guard.hpp
     ├── src/               # 源代码
     │   ├── file_browser.cpp
-    │   └── main.cpp
+    │   |── main.cpp
+    |   |—— file_operations.cpp
+    |   |—— new_file_dialog.cpp
+    |   └—— thread_guard.cpp
     ├── CMakeLists.txt     # 构建配置
-    └── README.md          # 说明文档
+    |── README.md          # 说明文档
+    |—— .gitignore
+    |—— build.sh
+    |__ License
 
 ## 开发环境
 
