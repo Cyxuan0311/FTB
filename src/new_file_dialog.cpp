@@ -14,11 +14,11 @@ std::string showNewFileDialog(ScreenInteractive& screen) {
     auto fileNameInput = Input(&fileName, "文件名");
     auto fileTypeInput = Input(&fileType, "文件类型");
 
-    auto cancelButton = Button("取消", [&] {
+    auto cancelButton = Button("❌ 取消", [&] {
         screen.Exit();
     });
 
-    auto createButton = Button("创建", [&] {
+    auto createButton = Button("✅ 创建", [&] {
         screen.Exit();
     });
 
@@ -43,9 +43,11 @@ std::string showNewFileDialog(ScreenInteractive& screen) {
                 filler() 
             }) | size(WIDTH, GREATER_THAN, 30)  // 统一按钮容器宽度
         }) | borderRounded | color(Color::Green3Bis) 
-          | size(WIDTH, GREATER_THAN, 40)      // 最小宽度限制
+          | size(WIDTH, GREATER_THAN, 50)      // 最小宽度限制
           | vcenter | hcenter;                // 分离垂直/水平居中
     });
+
+    
 
     screen.Loop(renderer);
 

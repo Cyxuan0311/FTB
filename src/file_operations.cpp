@@ -1,22 +1,19 @@
 #include "../include/file_operations.hpp"
-#include <mutex>          // 添加mutex头文件
-#include <unordered_map>  // 添加unordered_map头文件
-#include <filesystem>     // 添加filesystem头文件
-#include <chrono>
-#include <ctime>
 #include <fstream>
-#include <ostream>
+#include <cerrno>
+#include <cstring>
+#include <iostream>
 
-namespace fs = std::filesystem;  // 定义filesystem别名
+namespace fs = std::filesystem;
 
 // 定义全局缓存变量
 std::mutex cache_mutex;
 std::unordered_map<std::string, DirectoryCache> dir_cache;
 
 void enterDirectory(std::stack<std::string>& pathHistory,
-                   std::string& currentPath,
-                   std::vector<std::string>& contents,
-                   int& selected) 
+                    std::string& currentPath,
+                    std::vector<std::string>& contents,
+                    int& selected) 
 {
     std::lock_guard<std::mutex> lock(cache_mutex);
     auto& cache = dir_cache[currentPath];
@@ -38,27 +35,42 @@ void enterDirectory(std::stack<std::string>& pathHistory,
     }
 }
 
-// 创建文件
-bool createFile(const std::string& filePath) {
-    std::ofstream file(filePath);
-    if (file.is_open()) {
+namespace FileOperations {
+    // 创建文件
+    bool createFile(const std::string& filePath) {
+        if (!isValidName(fs::path(filePath).filename().string())) {
+            std::cerr << "Invalid file name: " << filePath << std::endl;
+            return false;
+        }
+        std::ofstream file(filePath);
+        if (!file.is_open()) {
+            std::cerr << "Failed to create file " << filePath << ". Error: " << std::strerror(errno) << std::endl;
+            return false;
+        }
         file.close();
         return true;
     }
-    return false;
-}
 
-// 创建目录
-bool createDirectory(const std::string& dirPath) {
-    return fs::create_directory(dirPath);
-}
-
-// 删除文件或目录
-bool deleteFileOrDirectory(const std::string& path) {
-    if (fs::is_directory(path)) {
-        return fs::remove_all(path);
-    } else if (fs::is_regular_file(path)) {
-        return fs::remove(path);
+    // 创建目录
+    bool createDirectory(const std::string& dirPath) {
+        if (!isValidName(fs::path(dirPath).filename().string())) {
+            std::cerr << "Invalid directory name: " << dirPath << std::endl;
+            return false;
+        }
+        if (!fs::create_directory(dirPath)) {
+            std::cerr << "Failed to create directory " << dirPath << ". Error: " << std::strerror(errno) << std::endl;
+            return false;
+        }
+        return true;
     }
-    return false;
+
+    // 删除文件或目录
+    bool deleteFileOrDirectory(const std::string& path) {
+        if (fs::is_directory(path)) {
+            return fs::remove_all(path);
+        } else if (fs::is_regular_file(path)) {
+            return fs::remove(path);
+        }
+        return false;
+    }
 }

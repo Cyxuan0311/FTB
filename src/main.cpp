@@ -13,25 +13,83 @@
 #include <iomanip>
 #include <sstream>
 #include <filesystem>
-#include <future>       // 添加future支持
-#include <execution>    // 添加并行算法支持
-#include <iostream>     // 添加cerr支持
-#include <numeric>      // 添加reduce支持
+#include <future>
+#include <execution>
+#include <iostream>
+#include <numeric>
+#include "../include/ui_initializer.hpp"
+#include "../include/event_handler.hpp"
 
 using namespace ftxui;
 namespace fs = std::filesystem;
 
-// 线程相关的全局变量声明
+// 全局线程相关变量
 extern std::mutex cache_mutex;
 extern std::unordered_map<std::string, DirectoryCache> dir_cache;
 
 // 动态加载动画字符
 const std::vector<std::string> loadingFrames = {
-    " ░▒▓ ░▒▓ ░▒▓ ░▒▓ ░▒▓",  // 第一阶段
-    "░▒▓ ░▒▓ ░▒▓ ░▒▓ ░▒▓ ",  // 第二阶段 
-    "▒▓ ░▒▓ ░▒▓ ░▒▓ ░▒▓ ░",  // 第三阶段
-    "▓ ░▒▓ ░▒▓ ░▒▓ ░▒▓ ░▒",  // 第四阶段
-    " ░▒▓ ░▒▓ ░▒▓ ░▒▓ ░▒▓"   // 重复循环
+    " ░▒▓ ░▒▓ ░▒▓ ░▒▓ ░▒▓",
+    "░▒▓ ░▒▓ ░▒▓ ░▒▓ ░▒▓ ",
+    "▒▓ ░▒▓ ░▒▓ ░▒▓ ░▒▓ ░",
+    "▓ ░▒▓ ░▒▓ ░▒▓ ░▒▓ ░▒",
+    " ░▒▓ ░▒▓ ░▒▓ ░▒▓ ░▒▓"
+};
+
+// calculateSizes lambda（所有数据均通过参数传入或为全局变量）
+auto calculateSizes = [](int& selected, std::string& currentPath, std::future<void>& size_future,
+                          std::atomic<uintmax_t>& total_folder_size, std::atomic<double>& size_ratio,
+                          std::string& selected_size) {
+    static std::string last_path;
+    static int last_selected = -1;
+
+    if (selected != last_selected || currentPath != last_path) {
+        if (size_future.valid() && 
+            size_future.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
+            return;
+        }
+
+        size_future = std::async(std::launch::async, [&]() {
+            std::lock_guard<std::mutex> lock(cache_mutex);
+            auto& cache = dir_cache[currentPath];
+
+            if (!cache.valid) {
+                cache.contents = FileBrowser::getDirectoryContents(currentPath);
+                cache.last_update = std::chrono::system_clock::now();
+                cache.valid = true;
+            }
+
+            std::vector<uintmax_t> sizes;
+            sizes.reserve(cache.contents.size());
+            for (const auto& item : cache.contents) {
+                std::string fullPath = (fs::path(currentPath) / item).string();
+                sizes.push_back(FileBrowser::getFileSize(fullPath));
+            }
+
+            uintmax_t total = std::accumulate(sizes.begin(), sizes.end(), 0ULL);
+            total_folder_size.store(total, std::memory_order_relaxed);
+
+            if (selected < static_cast<int>(cache.contents.size())) {
+                uintmax_t size = sizes[selected];
+                double ratio = total > 0 ? static_cast<double>(size) / total : 0.0;
+                size_ratio.store(ratio, std::memory_order_relaxed);
+
+                std::ostringstream stream;
+                if (size >= 1024 * 1024) {
+                    stream << std::fixed << std::setprecision(2) 
+                           << (size / (1024.0 * 1024.0)) << " MB";
+                } else if (size >= 1024) {
+                    stream << std::fixed << std::setprecision(2) 
+                           << (size / 1024.0) << " KB";
+                } else {
+                    stream << size << " B";
+                }
+                selected_size = stream.str();
+            }
+        });
+        last_selected = selected;
+        last_path = currentPath;
+    }
 };
 
 int main() {
@@ -41,11 +99,12 @@ int main() {
     auto allContents = FileBrowser::getDirectoryContents(currentPath);
     std::vector<std::string> filteredContents = allContents;
     int selected = 0;
-    auto&& screen = ScreenInteractive::Fullscreen();
+    auto screen = ScreenInteractive::Fullscreen();
 
     std::atomic<double> size_ratio(0.0);
     std::atomic<uintmax_t> total_folder_size(0);
     std::string selected_size;
+    std::future<void> size_future;
 
     std::atomic<bool> refresh_ui{true};
     std::thread timer([&] {
@@ -57,87 +116,14 @@ int main() {
     ThreadGuard timerGuard(timer);
 
     std::string searchQuery;
-    auto searchInput = Input(&searchQuery, "搜索...");
+    auto ui_pair = initializeUI(searchQuery, filteredContents, selected,
+                              pathHistory, currentPath, allContents);
+    auto& component = ui_pair.first;
+    auto& searchInput = ui_pair.second;
 
-    MenuOption menu_option;
-    menu_option.on_enter = [&] {
-        enterDirectory(pathHistory, currentPath, filteredContents, selected);
-        allContents = FileBrowser::getDirectoryContents(currentPath);
-        filteredContents = allContents;
-        searchQuery.clear();
-    };
 
-    auto selector = Menu(&filteredContents, &selected, menu_option);
-
-    auto mouse_component = CatchEvent(selector, [&](Event event) {
-        if (event.is_mouse() && event.mouse().motion == Mouse::Moved) {
-            hovered_index = selector->OnEvent(event) ? selected : -1;
-            return true;
-        }
-        if (event.is_mouse() && event.mouse().button == Mouse::Left && 
-            event.mouse().motion == Mouse::Pressed) {
-            menu_option.on_enter();
-            return true;
-        }
-        return false;
-    });
-
-    auto component = Container::Vertical({searchInput, mouse_component});
-
-    std::future<void> size_future;
-    auto calculateSizes = [&] {
-        static std::string last_path;
-        static int last_selected = -1;
-
-        if (selected != last_selected || currentPath != last_path) {
-            if (size_future.valid() && 
-                size_future.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
-                return;
-            }
-
-            size_future = std::async(std::launch::async, [&] {
-                std::lock_guard<std::mutex> lock(cache_mutex);
-                auto& cache = dir_cache[currentPath];
-
-                if (!cache.valid) {
-                    cache.contents = FileBrowser::getDirectoryContents(currentPath);
-                    cache.last_update = std::chrono::system_clock::now();
-                }
-
-                std::vector<uintmax_t> sizes;
-                sizes.reserve(cache.contents.size());
-                std::for_each(std::execution::par_unseq, cache.contents.begin(), cache.contents.end(),
-                    [&](const auto& item) {
-                        sizes.push_back(FileBrowser::getFileSize((fs::path(currentPath) / item).string()));
-                    });
-
-                uintmax_t total = std::reduce(sizes.begin(), sizes.end());
-                total_folder_size.store(total, std::memory_order_relaxed);
-
-                if (selected < cache.contents.size()) {
-                    uintmax_t size = sizes[selected];
-                    double ratio = total > 0 ? static_cast<double>(size) / total : 0.0;
-                    size_ratio.store(ratio, std::memory_order_relaxed);
-
-                    std::ostringstream stream;
-                    if (size >= 1024*1024) {
-                        stream << std::fixed << std::setprecision(2) 
-                             << (size/(1024.0*1024.0)) << " MB";
-                    } else {
-                        stream << std::fixed << std::setprecision(2) 
-                             << (size/1024.0) << " KB";
-                    }
-                    selected_size = stream.str();
-                }
-            });
-            last_selected = selected;
-            last_path = currentPath;
-        }
-    };
-
-    int loadingIndex = 0;
     auto renderer = Renderer(component, [&] {
-        calculateSizes();
+        calculateSizes(selected, currentPath, size_future, total_folder_size, size_ratio, selected_size);
         auto now = std::chrono::system_clock::now();
         std::time_t now_c = std::chrono::system_clock::to_time_t(now);
         std::tm now_tm = *std::localtime(&now_c);
@@ -159,7 +145,7 @@ int main() {
             filteredContents = allContents;
         }
 
-        // 文件项创建
+        // 构造文件项
         Elements elements;
         for (size_t i = 0; i < filteredContents.size(); ++i) {
             std::string fullPath = currentPath + "/" + filteredContents[i];
@@ -169,7 +155,7 @@ int main() {
                 color(Color::RGB(135, 206, 250)) : 
                 color(Color::RGB(255, 99, 71));
 
-            ftxui::Decorator bg_style = nothing;
+            Decorator bg_style = nothing;
             if (hovered_index == (int)i) {
                 bg_style = bgcolor(Color::RGB(120, 120, 120)) | bold;
             }
@@ -206,7 +192,7 @@ int main() {
             }
         }
 
-        // 多列布局实现
+        // 多列布局
         const int max_items_per_column = 5;
         std::vector<Elements> columns;
         for (size_t start = 0; start < elements.size(); start += max_items_per_column) {
@@ -219,20 +205,21 @@ int main() {
             column_boxes.push_back(vbox(std::move(column)) | flex);
         }
 
+        static int loadingIndex = 0;
         std::string loadingIndicator = loadingFrames[loadingIndex % loadingFrames.size()];
         loadingIndex = (loadingIndex + 1) % (loadingFrames.size() * 2);  // 控制动画速度
-        loadingIndex++;
         std::ostringstream ratio_stream;
         ratio_stream << std::fixed << std::setprecision(2) << (size_ratio.load() * 100);
 
-        return vbox({
+        // 注意：使用 Elements{ ... } 显式构造初始化列表
+        return vbox(Elements{
             hbox({
-                text("当前路径: " + displayPath) | bold | color(Color::White) | flex,
+                text("🤖当前路径: " + displayPath) | bold | color(Color::White) | flex,
                 filler(),
-                vbox({
+                vbox(Elements{
                     hbox({
                         text(" █ ") | color(Color::Cyan),
-                        text(selected_size) 
+                        text(selected_size)
                     }) | size(WIDTH, LESS_THAN, 25),
                     hbox({
                         text("["),
@@ -242,9 +229,9 @@ int main() {
                     hbox({
                         text(" ▓ ") | color(Color::Yellow),
                         text(ratio_stream.str() + "%") | bold
-                    }) 
+                    })
                 }) | border | size(WIDTH, LESS_THAN, 30),
-                vbox({
+                vbox(Elements{
                     text(time_str) | color(Color::GrayDark),
                     text(loadingIndicator) | color(Color::Green)
                 }) | border
@@ -254,128 +241,8 @@ int main() {
         });
     });
 
-    auto final_component = CatchEvent(renderer, [&](Event event) {
-        try {
-            if (event == Event::Escape) {
-                refresh_ui = false;
-                screen.Exit();
-                return true;
-            }
-            if (event == Event::Backspace || event == Event::ArrowLeft) {
-                fs::path current(currentPath);
-                if (current.has_parent_path() || !pathHistory.empty()) {
-                    pathHistory.push(currentPath);
-                    currentPath = current.has_parent_path() ? 
-                        current.parent_path().string() : pathHistory.top();
-    
-                    currentPath = fs::canonical(currentPath).string();
-                    dir_cache[currentPath].valid = false;
-    
-                    std::thread([&] {
-                        std::lock_guard<std::mutex> lock(cache_mutex);
-                        allContents = FileBrowser::getDirectoryContents(currentPath);
-                        filteredContents = allContents;
-                    }).detach();
-    
-                    searchQuery.clear();
-                    selected = 0;
-                    return true;
-                }
-            }
-            if (event == Event::Character('K')) {
-                // 新建文件
-                auto newFileName = showNewFileDialog(screen);
-                if (!newFileName.empty()) {
-                    fs::path fullPath = fs::path(currentPath) / newFileName;
-                    try {
-                        if (createFile(fullPath.string())) {  // 尝试创建文件
-                            std::lock_guard<std::mutex> lock(cache_mutex);
-                            allContents = FileBrowser::getDirectoryContents(currentPath);
-                            filteredContents = allContents;
-                            dir_cache[currentPath].valid = false;  // 使缓存无效，以便重新加载
-                        } else {
-                            std::cerr << "Failed to create file: " << fullPath.string() << std::endl;
-                        }
-                    } catch (const std::exception& e) {
-                        std::cerr << "Error creating file: " << e.what() << std::endl;
-                    }
-                }
-                return true;
-            }
-            if (event == Event::Character('F')) {
-                // 新建文件夹
-                std::string dirName;
-                auto dirNameInput = Input(&dirName, "文件夹名");
-                auto cancelButton = Button("取消", [&] {
-                    screen.Exit();
-                });
-                auto createButton = Button("创建", [&] {
-                    if (!dirName.empty()) {
-                        fs::path fullPath = fs::path(currentPath) / dirName;
-                        try {
-                            if (createDirectory(fullPath.string())) {  // 尝试创建文件夹
-                                std::lock_guard<std::mutex> lock(cache_mutex);
-                                allContents = FileBrowser::getDirectoryContents(currentPath);
-                                filteredContents = allContents;
-                                dir_cache[currentPath].valid = false;  // 使缓存无效，以便重新加载
-                            } else {
-                                std::cerr << "Failed to create directory: " << fullPath.string() << std::endl;
-                            }
-                        } catch (const std::exception& e) {
-                            std::cerr << "Error creating directory: " << e.what() << std::endl;
-                        }
-                    }
-                    screen.Exit();
-                });
-                auto container = Container::Vertical({
-                    dirNameInput,
-                    Container::Horizontal({
-                        cancelButton,
-                        createButton
-                    })
-                });
-                auto renderer = Renderer(container, [&] {
-                    return vbox({
-                        text("新建文件夹"),
-                        dirNameInput->Render(),
-                        hbox({
-                            cancelButton->Render(),
-                            filler(),
-                            createButton->Render()
-                        }) | hcenter  // 按钮水平居中
-                    }) | borderRounded | color(Color::Blue3Bis) 
-                      | size(WIDTH, GREATER_THAN, 40)  // 最小宽度
-                      | vcenter | hcenter;  // 同时应用水平和垂直居中
-                });
-                screen.Loop(renderer);
-                return true;
-            }
-            if (event == Event::Character('D')) {
-                // 删除文件或文件夹
-                if (selected >= 0 && selected < filteredContents.size()) {
-                    std::string itemName = filteredContents[selected];
-                    fs::path fullPath = fs::path(currentPath) / itemName;
-                    try {
-                        if (deleteFileOrDirectory(fullPath.string())) {
-                            std::lock_guard<std::mutex> lock(cache_mutex);
-                            allContents = FileBrowser::getDirectoryContents(currentPath);
-                            filteredContents = allContents;
-                            dir_cache[currentPath].valid = false;  // 使缓存无效，以便重新加载
-                        } else {
-                            std::cerr << "Failed to delete: " << fullPath.string() << std::endl;
-                        }
-                    } catch (const std::exception& e) {
-                        std::cerr << "Error deleting: " << e.what() << std::endl;
-                    }
-                }
-                return true;
-            }
-        } catch (const std::exception& e) {
-            refresh_ui = false;
-            screen.Exit();
-            std::cerr << "Error: " << e.what() << std::endl;
-        }
-        return false;
+    auto final_component = CatchEvent(renderer, [&](ftxui::Event event) {
+        return handleEvents(event, pathHistory, currentPath, allContents, filteredContents, selected, searchQuery, screen,refresh_ui);
     });
 
     screen.Loop(final_component);
