@@ -7,13 +7,11 @@ set(CMAKE_CXX_STANDARD 17)
 include_directories(include)
 # 查找 FTXUI 库
 find_package(ftxui CONFIG REQUIRED)
+# 更改一下文件添加方式
+file(GLOB SOURCES "src/*.cpp")
 # 添加源文件
 add_executable(FTB
-    src/main.cpp
-    src/file_browser.cpp
-    src/thread_guard.cpp
-    src/file_operations.cpp
-    src/new_file_dialog.cpp
+    ${SOURCES}
 )
 # 链接 FTXUI 库
 target_link_libraries(FTB
