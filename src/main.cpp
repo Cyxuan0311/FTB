@@ -23,6 +23,10 @@
 using namespace ftxui;
 namespace fs = std::filesystem;
 
+// 定义文件夹和文件的图标
+const std::string FOLDER_ICON = "📁 ";
+const std::string FILE_ICON = "📄 ";
+
 // 全局线程相关变量
 extern std::mutex cache_mutex;
 extern std::unordered_map<std::string, DirectoryCache> dir_cache;
@@ -121,7 +125,7 @@ int main() {
     auto& component = ui_pair.first;
     auto& searchInput = ui_pair.second;
 
-
+    //渲染器函数
     auto renderer = Renderer(component, [&] {
         calculateSizes(selected, currentPath, size_future, total_folder_size, size_ratio, selected_size);
         auto now = std::chrono::system_clock::now();
@@ -164,6 +168,7 @@ int main() {
             }
 
             std::string itemText = filteredContents[i];
+            std::string icon = is_dir ? FOLDER_ICON : FILE_ICON;
             size_t pos = itemText.find(searchQuery);
             if (pos != std::string::npos) {
                 Elements highlighted;
@@ -177,6 +182,7 @@ int main() {
                 elements.push_back(
                     hbox({
                         text(selected == (int)i ? "→ " : "  "),
+                        text(icon),
                         hbox(highlighted) | bold | text_color,
                         filler()
                     }) | border | bg_style | size(WIDTH, LESS_THAN, 50)
@@ -185,6 +191,7 @@ int main() {
                 elements.push_back(
                     hbox({
                         text(selected == (int)i ? "→ " : "  "),
+                        text(icon),
                         text(itemText) | bold | text_color,
                         filler()
                     }) | border | bg_style | size(WIDTH, LESS_THAN, 50)
@@ -214,7 +221,7 @@ int main() {
         // 注意：使用 Elements{ ... } 显式构造初始化列表
         return vbox(Elements{
             hbox({
-                text("🤖当前路径: " + displayPath) | bold | color(Color::White) | flex,
+                text("🤖当前路径: " + displayPath) | bold | color(Color::Pink1) | flex,
                 filler(),
                 vbox(Elements{
                     hbox({
@@ -231,16 +238,30 @@ int main() {
                         text(ratio_stream.str() + "%") | bold
                     })
                 }) | border | size(WIDTH, LESS_THAN, 30),
+
+                vbox(Elements{
+                    text("快捷键说明：") | color(Color::Orange4) | bold,
+                    text("↑/↓ 导航文件列表") | size(HEIGHT,LESS_THAN,1),
+                    text("Enter 进入目录") | size(HEIGHT,LESS_THAN,1),
+                    text("Backspace 返回上级") | size(HEIGHT,LESS_THAN,1),
+                    text("F键 新建文件夹/K键 新建文件") | size(HEIGHT,LESS_THAN,1),
+                    text("D键 删除文件夹或文件") | size(HEIGHT,LESS_THAN,1),
+                    text("ESC 退出程序") | color(Color::Red3) | size(HEIGHT,LESS_THAN,1)
+                }) | border | size(WIDTH, LESS_THAN, 30),
+
                 vbox(Elements{
                     text(time_str) | color(Color::GrayDark),
                     text(loadingIndicator) | color(Color::Green)
                 }) | border
-            }) | size(HEIGHT, EQUAL, 5),
+            }) | size(HEIGHT, EQUAL, 9),
+            
             searchInput->Render() | border | color(Color::Magenta),
             hbox(column_boxes) | frame | border | color(Color::Blue) | flex
+            
         });
     });
 
+    //最终的组件集成
     auto final_component = CatchEvent(renderer, [&](ftxui::Event event) {
         return handleEvents(event, pathHistory, currentPath, allContents, filteredContents, selected, searchQuery, screen,refresh_ui);
     });

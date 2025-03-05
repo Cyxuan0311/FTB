@@ -14,6 +14,7 @@ extern std::unordered_map<std::string, DirectoryCache> dir_cache;
 
 namespace fs = std::filesystem;
 
+//分离了main.cpp的对按键的事务处理。
 bool handleEvents(ftxui::Event event, std::stack<std::string>& pathHistory, std::string& currentPath, 
                   std::vector<std::string>& allContents, std::vector<std::string>& filteredContents,
                   int& selected, std::string& searchQuery, ftxui::ScreenInteractive& screen,
