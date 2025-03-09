@@ -10,30 +10,56 @@ namespace fs = std::filesystem;
 std::mutex cache_mutex;
 std::unordered_map<std::string, DirectoryCache> dir_cache;
 
-void enterDirectory(std::stack<std::string>& pathHistory,
-                    std::string& currentPath,
-                    std::vector<std::string>& contents,
-                    int& selected) 
+void enterDirectory(std::stack<std::string>& pathHistory, std::string& currentPath,
+    std::vector<std::string>& contents,
+    int& selected) 
 {
     std::lock_guard<std::mutex> lock(cache_mutex);
-    auto& cache = dir_cache[currentPath];
     
+    // 新增1：严格验证当前路径合法性
+    if (!fs::exists(currentPath) || !fs::is_directory(currentPath)) {
+        std::cerr << "非法工作路径: " << currentPath << std::endl;
+        selected = -1;
+        return;
+    }
+
+    auto& cache = dir_cache[currentPath];
     if (!cache.valid) {
         cache.contents = FileBrowser::getDirectoryContents(currentPath);
-        cache.last_update = std::chrono::system_clock::now();
         cache.valid = true;
     }
-    
-    if (!cache.contents.empty() && selected < cache.contents.size()) {
-        auto fullPath = fs::path(currentPath) / cache.contents[selected];
-        if (FileBrowser::isDirectory(fullPath.string())) {
-            pathHistory.push(currentPath);
-            currentPath = fullPath.lexically_normal().string();
-            contents = cache.contents;
-            selected = 0;
-        }
+
+    // 新增2：加强索引范围验证
+    const bool valid_selection = !cache.contents.empty() && 
+                               (selected >= 0) && 
+                               (static_cast<size_t>(selected) < cache.contents.size());
+    if (!valid_selection) {
+        selected = -1;
+        return;
     }
+
+    auto fullPath = fs::path(currentPath) / cache.contents[selected];
+    
+    // 新增3：路径双重验证
+    if (!fs::exists(fullPath) || !FileBrowser::isDirectory(fullPath.string())) {
+        std::cerr << "目标不是有效目录: " << fullPath << std::endl;
+        selected = -1;
+        return;
+    }
+
+    // 预加载目录缓存（强制更新模式）
+    auto& new_cache = dir_cache[fullPath.string()];
+    new_cache.contents = FileBrowser::getDirectoryContents(fullPath.string()); // 强制刷新
+    new_cache.valid = true;
+
+    pathHistory.push(currentPath);
+    currentPath = fullPath.lexically_normal().string();
+    contents = new_cache.contents;
+    
+    // 最终安全设置
+    selected = contents.empty() ? -1 : 0;
 }
+
 
 namespace FileOperations {
     // 创建文件
@@ -60,6 +86,17 @@ namespace FileOperations {
         if (!fs::create_directory(dirPath)) {
             std::cerr << "Failed to create directory " << dirPath << ". Error: " << std::strerror(errno) << std::endl;
             return false;
+        }
+        auto parentPath = fs::path(dirPath).parent_path().string();
+        {
+            std::lock_guard<std::mutex> lock(cache_mutex);
+            if (dir_cache.count(dirPath)) {
+                dir_cache.erase(dirPath);
+            }
+            // 原有父目录缓存失效逻辑
+            if (dir_cache.count(parentPath)) {
+                dir_cache[parentPath].valid = false;
+            }
         }
         return true;
     }
