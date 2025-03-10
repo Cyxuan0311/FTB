@@ -1,0 +1,43 @@
+# BasedOnStyle: LLVM
+# 缩进使用 4 个空格
+IndentWidth: 4
+# 制表符宽度为 4
+TabWidth: 4
+# 使用空格代替制表符
+UseTab: Never
+# 每行最大字符数
+ColumnLimit: 80
+# 类成员访问说明符（如 public、private）的缩进
+AccessModifierOffset: -4
+# 连续空行的最大数量
+MaxEmptyLinesToKeep: 1
+# 指针和引用的对齐方式
+PointerAlignment: Left
+# 控制是否在命名空间的左花括号后换行
+NamespaceIndentation: All
+# 函数调用时参数列表的换行方式
+AllowAllParametersOfDeclarationOnNextLine: true
+# 控制 if、for、while 等语句的括号风格
+BraceWrapping:
+  AfterClass: true
+  AfterControlStatement: true
+  AfterEnum: true
+  AfterFunction: true
+  AfterNamespace: true
+  AfterStruct: true
+  AfterUnion: true
+  BeforeCatch: true
+  BeforeElse: true
+  IndentBraces: false
+  SplitEmptyFunction: false
+  SplitEmptyRecord: false
+  SplitEmptyNamespace: false
+# 控制逗号和分号后的空格
+SpaceAfterCStyleCast: true
+SpaceAfterLogicalNot: true
+SpaceAfterTemplateKeyword: true
+SpaceBeforeAssignmentOperators: true
+# 控制括号前的空格，这里将其设置为在控制语句前添加空格
+SpaceBeforeParens: ControlStatements
+# 控制注释的对齐方式
+AlignTrailingComments: true
