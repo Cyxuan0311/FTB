@@ -9,5 +9,5 @@ namespace FileBrowser {
     std::vector<std::string> getDirectoryContents(const std::string& path);
     std::string formatTime(const std::tm& time);  // 添加返回类型声明
     uintmax_t getFileSize(const std::string& path);
-    uintmax_t calculateDirectorySize(const std::string& path);  
+    uintmax_t calculateDirectorySize(const std::string& path);
 }

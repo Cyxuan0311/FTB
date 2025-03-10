@@ -47,7 +47,7 @@ bool handleEvents(ftxui::Event event, std::stack<std::string>& pathHistory, std:
                 return true;
             }
         }
-        if (event == ftxui::Event::Character('K')) {
+        if (event == ftxui::Event::Character('&')) {
             auto newFileName = showNewFileDialog(screen);
             if (!newFileName.empty()) {
                 fs::path fullPath = fs::path(currentPath) / newFileName;
@@ -66,7 +66,7 @@ bool handleEvents(ftxui::Event event, std::stack<std::string>& pathHistory, std:
             }
             return true;
         }
-        if (event == ftxui::Event::Character('F')) {
+        if (event == ftxui::Event::Character('^')) {
             std::string dirName;
             auto dirNameInput = ftxui::Input(&dirName, "文件夹名");
             auto cancelButton = ftxui::Button("❌ 取消", [&] {
@@ -113,7 +113,7 @@ bool handleEvents(ftxui::Event event, std::stack<std::string>& pathHistory, std:
             screen.Loop(renderer);
             return true;
         }
-        if (event == ftxui::Event::Character('D')) {
+        if (event == ftxui::Event::Character('~')) {
             if (selected >= 0 && selected < filteredContents.size()) {
                 std::string itemName = filteredContents[selected];
                 fs::path fullPath = fs::path(currentPath) / itemName;
