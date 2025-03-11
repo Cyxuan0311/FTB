@@ -16,4 +16,5 @@ cmake .. || { echo "CMake配置失败!"; exit 1; }
 echo "正在编译项目..."
 make -j$(nproc) || { echo "编译失败！"; exit 1; }
 
-echo "构建成功!可执行文件位于:build/${PROJECT_NAME}"
+echo "构建成功! 可执行文件位于: build/${PROJECT_NAME}"
+
