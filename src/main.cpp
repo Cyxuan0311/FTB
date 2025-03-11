@@ -15,6 +15,7 @@
 #include <numeric>
 #include <filesystem>
 #include <algorithm>
+#include <cmath>
 
 using namespace ftxui;
 namespace fs = std::filesystem;
@@ -46,7 +47,23 @@ int main() {
     std::string selected_size;
     std::future<void> size_future;
 
+    std::atomic<double> wave_progress(0.0);
     std::atomic<bool> refresh_ui{true};
+
+    // 启动波浪动画的线程
+    std::thread wave_thread([&] {
+        while (refresh_ui) {
+            wave_progress.store(wave_progress.load() + 0.1, std::memory_order_relaxed);
+            if (wave_progress.load() > 2 * M_PI) { 
+                wave_progress.store(0.0, std::memory_order_relaxed);
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(100)); // 控制动画速度
+            screen.Post(Event::Custom);
+        }
+    });
+    ThreadGuard waveGuard(wave_thread);
+
+    // 启动定时器线程
     std::thread timer([&] {
         while (refresh_ui) {
             std::this_thread::sleep_for(std::chrono::milliseconds(200));
@@ -126,6 +143,19 @@ int main() {
         }
     };
 
+    auto waveGauge = [&] {
+        Elements wave_elements;
+        for (int i = 0; i < 10; ++i) { // 控制波浪的高度
+            double progress = wave_progress.load() + i * 0.4; // 让每行的波浪错开
+            double wave_value = (std::sin(progress) + 1) / 2; // 转换成 0 ~ 1 之间的值
+    
+            // 这里将 gauge 放入 vbox 形成纵向波浪
+            wave_elements.push_back(gauge(wave_value) | color(Color::BlueLight) | size(HEIGHT, LESS_THAN, 1));
+        }
+        return vbox(wave_elements) | borderDouble | color(Color::RGB(33,136,143)) | size(HEIGHT, EQUAL, 10) | size(WIDTH,EQUAL,40);
+    };
+
+    // 渲染 UI 的 Lambda
     auto renderer = Renderer(component, [&] {
         calculateSizes();
         auto now = std::chrono::system_clock::now();
@@ -203,15 +233,27 @@ int main() {
         ratio_stream << std::fixed << std::setprecision(2) << (size_ratio.load() * 100);
         return vbox({
             hbox({
-                text("FTB") | bold | borderDouble | bgcolor(Color::BlueLight) | size(WIDTH, LESS_THAN, 5) | size(HEIGHT, LESS_THAN, 1),
-                filler() | size(WIDTH, EQUAL, 2),
-                text("🤖当前路径: " + displayPath) | bold | border | color(Color::Pink1) | size(HEIGHT, LESS_THAN, 1),
+                vbox({  // 让它们成为一个整体
+                    hbox({  // ✅ 让 FTB 和当前路径框水平排列
+                        text("FTB") | bold | borderDouble | bgcolor(Color::BlueLight) | size(WIDTH, LESS_THAN, 5),
+                        
+                        filler() | size(WIDTH, EQUAL, 2),  // FTB 和路径框之间的间距
+                        
+                        text("🤖当前路径: " + displayPath) | bold | border | color(Color::Pink1) | size(HEIGHT, LESS_THAN, 1) | flex  
+                    }),
+                    
+                    waveGauge() | size(HEIGHT, EQUAL, 10) | size(WIDTH, LESS_THAN, 75)  // ✅ 波浪框放在下方
+                }) | size(WIDTH, EQUAL, 80)  ,// 限制整体宽度，确保美观
+                
+                
                 filler(),
+                
                 vbox({
                     hbox({text(" █ ") | color(Color::Cyan), text(selected_size)}) | size(WIDTH, LESS_THAN, 25),
                     hbox({text("[") | color(Color::Yellow3), gauge(size_ratio.load()) | flex | color(Color::Green) | size(WIDTH, EQUAL, 20), text("]") | color(Color::Yellow3)}),
                     hbox({text(" ▓ ") | color(Color::Yellow), text(ratio_stream.str() + "%") | bold})
                 }) | border | color(Color::Purple3) | size(HEIGHT, EQUAL, 3),
+        
                 vbox({
                     text("快捷键说明：") | color(Color::Orange4) | bold,
                     text("↑/↓ 导航文件列表") | color(Color::GrayDark) | size(HEIGHT, LESS_THAN, 1),
@@ -221,16 +263,19 @@ int main() {
                     text("~键 删除文件夹或文件") | color(Color::GrayDark) | size(HEIGHT, LESS_THAN, 1),
                     text("ESC 退出程序") | color(Color::Red3) | size(HEIGHT, LESS_THAN, 1)
                 }) | border | color(Color::Purple3) | size(WIDTH, LESS_THAN, 30) | size(HEIGHT, EQUAL, 15),
+        
                 vbox({
                     text(time_str) | color(Color::GrayDark),
                     text(loadingIndicator) | color(Color::Green)
-                }) | border | color(Color::Purple3) | size(HEIGHT, EQUAL, 3)
+                }) | borderDouble | color(Color::Purple3) | size(HEIGHT, EQUAL, 5)    
             }),
-            filler(),
+        
             searchInput->Render() | border | color(Color::Magenta) | size(WIDTH, LESS_THAN, 100),
-            hbox(column_boxes) | color(Color::Blue) | frame | border | color(Color::GrayDark) | flex ,
-            gauge(1) | color(Color::RGB(158,160,161)) | size(WIDTH, EQUAL, 180)
-        });
+        
+            hbox(column_boxes) | color(Color::Blue) | frame | border | color(Color::GrayDark) | flex,
+        
+            gauge(1) | color(Color::RGB(158,160,161)) | size(WIDTH, EQUAL, 190)
+        });        
     });
 
     auto final_component = CatchEvent(renderer, [&](Event event) {
