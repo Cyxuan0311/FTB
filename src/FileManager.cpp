@@ -158,4 +158,21 @@ namespace FileManager {
         contents = new_cache.contents;
         selected = contents.empty() ? -1 : 0;
     }
+
+    void calculation_current_folder_files_number(const std::string & path, int &file_count, int &folder_count) {
+        file_count = 0;
+        folder_count = 0;
+        try {
+            for (const auto & entry : fs::directory_iterator(path)) {
+                if (entry.is_directory()) {
+                    folder_count++;
+                } else if (entry.is_regular_file()) {
+                    file_count++;
+                }
+            }
+        } catch (const std::exception & e) {
+            std::cerr << "Error counting entries in " << path << ": " << e.what() << std::endl;
+        }
+    }
+    
 }

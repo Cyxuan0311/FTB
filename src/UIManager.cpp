@@ -30,7 +30,71 @@ namespace UIManager {
                 screen.Exit();
                 return true;
             }
+
+            if (event == Event::Character(' ')) {
+                // 如果当前选中的项目存在，则判断其是否为目录，否则不处理空格事件
+                std::string targetPath;
+                if (selected >= 0 && selected < static_cast<int>(filteredContents.size())) {
+                    fs::path fullPath = fs::path(currentPath) / filteredContents[selected];
+                    if (FileManager::isDirectory(fullPath.string())) {
+                        targetPath = fullPath.string();
+                    } else {
+                        // 如果选中项不是目录，则不做任何处理
+                        return false;
+                    }
+                } else {
+                    // 如果没有有效选中项，则不处理
+                    return false;
+                }
+                int fileCount = 0;
+                int folderCount = 0;
+                // 调用 FileManager 中实现的函数，计算目标目录中的文件数和文件夹数
+                FileManager::calculation_current_folder_files_number(targetPath, fileCount, folderCount);
+                
+                // 定义一个退出按钮，点击后退出信息窗口
+                auto exitButton = Button("退出", [&] {
+                    screen.Exit();
+                });
+                // 将退出按钮放入一个容器中，以便使其具备交互能力
+                auto infoContainer = Container::Vertical({ exitButton });
+                // 创建 Renderer 渲染整个统计信息窗口
+                auto infoComponent = Renderer(infoContainer, [&] {
+                    return vbox({
+                        text("文件夹统计") | bold | center | color(Color::Green3),
+                        hbox({
+                            text("目标路径: ") | bold | color(Color::GrayLight),
+                            text(targetPath) | underlined | color(Color::Orange1)
+                        }),
+                        hbox({
+                            text("文件夹数: ") | bold | color(Color::GrayLight),
+                            text(std::to_string(folderCount)) | color(Color::Orange1)
+                        }),
+                        hbox({
+                            text("文件数: ") | bold | color(Color::GrayLight),
+                            text(std::to_string(fileCount)) | color(Color::Orange1)
+                        }),
+                        hbox({
+                            filler(), exitButton->Render(), filler()
+                        }) | center,
+                        text("按下ENTER退出") | bold | color(Color::Red3Bis)
+                    }) | borderDouble | center | color(Color::RGB(185,185,168));
+                });
+                screen.Loop(infoComponent);
+                return true;
+            }            
+            
+            // 修改后的返回上一级目录逻辑：
             if (event == Event::Backspace || event == Event::ArrowLeft) {
+                // 1. 当搜索框中有关键字时，不触发返回上一级目录，交由搜索输入处理删除字符
+                if (!searchQuery.empty()) {
+                    return false;
+                }
+                // 2. 如果当前选中的不是第一个文件/文件夹，则只将选中项重置为第一个
+                if (selected != 0) {
+                    selected = 0;
+                    return true;
+                }
+                // 3. 当选中第一个文件/文件夹时，尝试返回上一级目录
                 fs::path current(currentPath);
                 if (current.has_parent_path() || !pathHistory.empty()) {
                     pathHistory.push(currentPath);
@@ -47,7 +111,8 @@ namespace UIManager {
                     return true;
                 }
             }
-            if (event == Event::Character('&')) {
+
+            if (event == Event::CtrlF) {
                 std::string newFileName = showNewFileDialog(screen);
                 if (!newFileName.empty()) {
                     fs::path fullPath = fs::path(currentPath) / newFileName;
@@ -66,7 +131,8 @@ namespace UIManager {
                 }
                 return true;
             }
-            if (event == Event::Character('^')) {
+
+            if (event == Event::CtrlK) {
                 std::string dirName;
                 auto dirNameInput = Input(&dirName, "文件夹名");
                 auto cancelButton = Button("❌ 取消", [&] {
@@ -90,6 +156,7 @@ namespace UIManager {
                     }
                     screen.Exit();
                 });
+
                 auto container = Container::Vertical({
                     dirNameInput,
                     Container::Horizontal({
@@ -113,7 +180,7 @@ namespace UIManager {
                 screen.Loop(renderer);
                 return true;
             }
-            if (event == Event::Character('~')) {
+            if (event == Event::Delete) {
                 if (selected >= 0 && selected < static_cast<int>(filteredContents.size())) {
                     std::string itemName = filteredContents[selected];
                     fs::path fullPath = fs::path(currentPath) / itemName;

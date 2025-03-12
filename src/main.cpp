@@ -143,6 +143,7 @@ int main() {
         }
     };
 
+    // 波浪动画的 Lambda
     auto waveGauge = [&] {
         Elements wave_elements;
         for (int i = 0; i < 10; ++i) { // 控制波浪的高度
@@ -206,14 +207,14 @@ int main() {
                     text(icon),
                     hbox(highlighted) | bold | text_color | (selected == (int)i ? underlined : nothing),
                     filler()
-                }) | border | bg_style | size(WIDTH, LESS_THAN, 50));
+                }) | borderHeavy | bg_style | size(WIDTH, LESS_THAN, 50));
             } else {
                 elements.push_back(hbox({
                     text(selected == (int)i ? "→ " : "  "),
                     text(icon),
                     text(itemText) | bold | text_color | (selected == (int)i ? underlined : nothing),
                     filler()
-                }) | border | bg_style | size(WIDTH, LESS_THAN, 50));
+                }) | borderHeavy | bg_style | size(WIDTH, LESS_THAN, 50));
             }
         }
         const int max_items_per_column = 5;
@@ -239,7 +240,7 @@ int main() {
                         
                         filler() | size(WIDTH, EQUAL, 2),  // FTB 和路径框之间的间距
                         
-                        text("🤖当前路径: " + displayPath) | bold | border | color(Color::Pink1) | size(HEIGHT, LESS_THAN, 1) | flex  
+                        text("🤖当前路径: " + displayPath) | bold | borderHeavy | color(Color::Pink1) | size(HEIGHT, LESS_THAN, 1) | flex  
                     }),
                     
                     waveGauge() | size(HEIGHT, EQUAL, 10) | size(WIDTH, LESS_THAN, 75)  // ✅ 波浪框放在下方
@@ -259,10 +260,12 @@ int main() {
                     text("↑/↓ 导航文件列表") | color(Color::GrayDark) | size(HEIGHT, LESS_THAN, 1),
                     text("Enter 进入目录") | color(Color::GrayDark) | size(HEIGHT, LESS_THAN, 1),
                     text("Backspace 返回上级") | color(Color::GrayDark) | size(HEIGHT, LESS_THAN, 1),
-                    text("^键 新建文件夹/&键 新建文件") | color(Color::GrayDark) | size(HEIGHT, LESS_THAN, 1),
-                    text("~键 删除文件夹或文件") | color(Color::GrayDark) | size(HEIGHT, LESS_THAN, 1),
+                    text("Ctrl+k键 新建文件夹") | color(Color::GrayDark) | size(HEIGHT, LESS_THAN, 1),
+                    text("Ctrl+f键 新建文件") | color(Color::GrayDark) | size(HEIGHT, LESS_THAN, 1),
+                    text("空格键查看选中文件夹细节") | color(Color::GrayDark) | size(HEIGHT, LESS_THAN, 1),
+                    text("Delete键 删除文件夹或文件") | color(Color::GrayDark) | size(HEIGHT, LESS_THAN, 1),
                     text("ESC 退出程序") | color(Color::Red3) | size(HEIGHT, LESS_THAN, 1)
-                }) | border | color(Color::Purple3) | size(WIDTH, LESS_THAN, 30) | size(HEIGHT, EQUAL, 15),
+                }) | border | color(Color::Purple3) | size(WIDTH, LESS_THAN, 35) | size(HEIGHT, EQUAL, 15),
         
                 vbox({
                     text(time_str) | color(Color::GrayDark),
@@ -272,7 +275,7 @@ int main() {
         
             searchInput->Render() | border | color(Color::Magenta) | size(WIDTH, LESS_THAN, 100),
         
-            hbox(column_boxes) | color(Color::Blue) | frame | border | color(Color::GrayDark) | flex,
+            hbox(column_boxes) | color(Color::Blue) | frame | borderDashed | color(Color::GrayDark) | flex,
         
             gauge(1) | color(Color::RGB(158,160,161)) | size(WIDTH, EQUAL, 190)
         });        
