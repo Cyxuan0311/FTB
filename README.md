@@ -10,7 +10,7 @@
 
 ## 效果展示
 
-[!效果](https://yt3.ggpht.com/iHL64dUd3WQpbat--V-mzE1PKBu6CLeUyliucuFYF2J8oSZXk3Fn2-aS2v0aQBdrd4CwjP8YWeAh=s1600-rw-nd-v1)
+![效果](https://yt3.ggpht.com/iHL64dUd3WQpbat--V-mzE1PKBu6CLeUyliucuFYF2J8oSZXk3Fn2-aS2v0aQBdrd4CwjP8YWeAh=s1600-rw-nd-v1)
 
 
 ## 功能特性
