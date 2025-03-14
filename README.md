@@ -8,6 +8,11 @@
 
 基于FTXUI库开发的终端交互式文件浏览器，提供直观的目录导航和文件查看体验。
 
+## 效果展示
+
+[!效果](https://yt3.ggpht.com/iHL64dUd3WQpbat--V-mzE1PKBu6CLeUyliucuFYF2J8oSZXk3Fn2-aS2v0aQBdrd4CwjP8YWeAh=s1600-rw-nd-v1)
+
+
 ## 功能特性
 
 - 🗂️ 实时目录内容展示A
