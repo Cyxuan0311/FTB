@@ -1,9 +1,13 @@
+
+# folder
 **/build/**
+
+# executable
 *.exe
 *.bin
+main
 
+# some files
 Some_fixs.md
 useway.cpp
 sometest.cpp
-
-main
