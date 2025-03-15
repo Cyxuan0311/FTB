@@ -159,18 +159,34 @@ namespace FileManager {
         selected = contents.empty() ? -1 : 0;
     }
 
-    void calculation_current_folder_files_number(const std::string & path, int &file_count, int &folder_count) {
+    void calculation_current_folder_files_number(
+        const std::string &path,
+        int &file_count,
+        int &folder_count,
+        std::vector<std::tuple<std::string, mode_t>> &folder_permissions) {
+    
         file_count = 0;
         folder_count = 0;
+        folder_permissions.clear(); // 清空之前的记录
+    
         try {
-            for (const auto & entry : fs::directory_iterator(path)) {
+            for (const auto &entry : fs::directory_iterator(path)) {
                 if (entry.is_directory()) {
                     folder_count++;
+                    
+                    // 获取文件夹权限
+                    struct stat fileStat;
+                    if (stat(entry.path().c_str(), &fileStat) == 0) {
+                        folder_permissions.emplace_back(entry.path().string(), fileStat.st_mode);
+                    } else {
+                        std::cerr << "Error getting permissions for " << entry.path() << std::endl;
+                    }
+    
                 } else if (entry.is_regular_file()) {
                     file_count++;
                 }
             }
-        } catch (const std::exception & e) {
+        } catch (const std::exception &e) {
             std::cerr << "Error counting entries in " << path << ": " << e.what() << std::endl;
         }
     }

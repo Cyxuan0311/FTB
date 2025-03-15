@@ -46,42 +46,58 @@ namespace UIManager {
                     // 如果没有有效选中项，则不处理
                     return false;
                 }
+            
                 int fileCount = 0;
                 int folderCount = 0;
-                // 调用 FileManager 中实现的函数，计算目标目录中的文件数和文件夹数
-                FileManager::calculation_current_folder_files_number(targetPath, fileCount, folderCount);
-                
-                // 定义一个退出按钮，点击后退出信息窗口
+                std::vector<std::tuple<std::string, mode_t>> folderPermissions;
+            
+                // 调用 FileManager 计算目标目录中的文件数、文件夹数和权限
+                FileManager::calculation_current_folder_files_number(targetPath, fileCount, folderCount, folderPermissions);
+            
+                // 定义一个退出按钮
                 auto exitButton = Button("退出", [&] {
                     screen.Exit();
                 });
-                // 将退出按钮放入一个容器中，以便使其具备交互能力
+            
+                // 将退出按钮放入一个容器
                 auto infoContainer = Container::Vertical({ exitButton });
-                // 创建 Renderer 渲染整个统计信息窗口
+            
+                // 创建 Renderer 渲染统计信息窗口
                 auto infoComponent = Renderer(infoContainer, [&] {
-                    return vbox({
-                        text("文件夹统计") | bold | center | color(Color::Green3),
-                        hbox({
-                            text("目标路径: ") | bold | color(Color::GrayLight),
-                            text(targetPath) | underlined | color(Color::Orange1)
-                        }),
-                        hbox({
-                            text("文件夹数: ") | bold | color(Color::GrayLight),
-                            text(std::to_string(folderCount)) | color(Color::Orange1)
-                        }),
-                        hbox({
-                            text("文件数: ") | bold | color(Color::GrayLight),
-                            text(std::to_string(fileCount)) | color(Color::Orange1)
-                        }),
-                        hbox({
-                            filler(), exitButton->Render(), filler()
-                        }) | center,
-                        text("按下ENTER退出") | bold | color(Color::Red3Bis)
-                    }) | borderDouble | center | color(Color::RGB(185,185,168));
+                    std::vector<Element> permissionElements = {
+                        text("文件夹统计") | color(Color::GrayLight) | bold | borderHeavy | center | color(Color::Green3),
+                        hbox({ text("目标路径: ") | bold | color(Color::GrayLight),
+                               text(targetPath) | underlined | color(Color::Orange1) }),
+                        hbox({ text("文件夹数: ") | bold | color(Color::GrayLight),
+                               text(std::to_string(folderCount)) | color(Color::Orange1) }),
+                        hbox({ text("文件数: ") | bold | color(Color::GrayLight),
+                               text(std::to_string(fileCount)) | color(Color::Orange1) }),
+                        separator()
+                    };
+            
+                    // 遍历文件夹权限信息并添加到渲染列表
+                    for (const auto& [path, mode] : folderPermissions) {
+                        permissionElements.push_back(hbox({
+                            text("文件夹: ") | bold | color(Color::GrayLight),
+                            text(path) | underlined | color(Color::Yellow1)
+                        }));
+                        permissionElements.push_back(hbox({
+                            text("权限: ") | bold | color(Color::GrayLight),
+                            text(std::to_string(mode & 0777)) | color(Color::Cyan)
+                        }));
+                    }
+            
+                    // 添加退出按钮
+                    permissionElements.push_back(hbox({ filler(), exitButton->Render(), filler() }) | center);
+                    permissionElements.push_back(text("按下ENTER退出") | bold | color(Color::Red3Bis));
+            
+                    return vbox(permissionElements) | borderDouble | center | color(Color::RGB(185,185,168));
                 });
+            
                 screen.Loop(infoComponent);
                 return true;
-            }            
+            }
+            
             
             // 修改后的返回上一级目录逻辑：
             if (event == Event::Backspace || event == Event::ArrowLeft) {

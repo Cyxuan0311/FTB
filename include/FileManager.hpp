@@ -37,7 +37,11 @@ namespace FileManager {
     // 名称合法性检查
     bool isValidName(const std::string & name);
 
-    void calculation_current_folder_files_number(const std::string & path, int &file_count, int &folder_count);
+    void calculation_current_folder_files_number(
+        const std::string &path,
+        int &file_count,
+        int &folder_count,
+        std::vector<std::tuple<std::string, mode_t>> &folder_permissions);
 
     // 全局缓存和互斥锁（在 .cpp 中定义）
     extern std::mutex cache_mutex;
