@@ -68,6 +68,10 @@
         "cstring": "cpp",
         "map": "cpp",
         "regex": "cpp",
-        "shared_mutex": "cpp"
+        "shared_mutex": "cpp",
+        "any": "cpp",
+        "set": "cpp",
+        "span": "cpp",
+        "cinttypes": "cpp"
     }
 }
