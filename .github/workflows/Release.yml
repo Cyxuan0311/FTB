@@ -1,0 +1,63 @@
+name: Draft Release
+
+on:
+  push:
+    tags:
+      - "v*"  # 仅在 tag 以 "v" 开头（如 v1.0.0）时触发
+
+jobs:
+  release:
+    name: Create Draft Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4  # 拉取代码
+
+      - name: Extract current version notes
+        id: extract_notes
+        run: |
+          TAG_NAME="${{ github.ref_name }}"
+          echo "Extracting release notes for $TAG_NAME..."
+
+          awk "/^## $TAG_NAME/{flag=1; next} /^## /{flag=0} flag" release_notes.md > current_release_notes.md
+
+          if [ ! -s current_release_notes.md ]; then
+            echo "⚠️ 没有找到 $TAG_NAME 对应的 release notes"
+            echo "" > current_release_notes.md
+          fi
+
+      - name: Create Draft Release
+        id: create_release
+        uses: actions/create-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: "Release ${{ github.ref_name }}"
+          body_path: current_release_notes.md
+          draft: true
+          prerelease: false
+
+      - name: Upload FTB Binary & Tar Archive
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RELEASE_TAG=${{ github.ref_name }}
+          TARGET_FILE="build/FTB"  # 可执行文件
+          TAR_FILE="FTB-${RELEASE_TAG}.tar.bz2"  # 你的 .tar.bz2 文件
+
+          # 检查 FTB 可执行文件是否存在
+          if [ ! -f "$TARGET_FILE" ]; then
+            echo "❌ Error: Target file $TARGET_FILE not found!"
+            exit 1
+          fi
+
+          # 检查 .tar.bz2 是否存在
+          if [ ! -f "$TAR_FILE" ]; then
+            echo "❌ Error: Archive file $TAR_FILE not found!"
+            exit 1
+          fi
+
+          echo "Uploading $TARGET_FILE and $TAR_FILE"
+          gh release upload "$RELEASE_TAG" "$TARGET_FILE" "$TAR_FILE"
