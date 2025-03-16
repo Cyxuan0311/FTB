@@ -53,3 +53,13 @@ target_link_libraries(FTB_tests
 # 启用测试
 enable_testing()
 add_test(NAME FTB_tests COMMAND FTB_tests)
+
+# 安装规则（不包括 FTB_tests）
+install(TARGETS FTB FTB_core
+    RUNTIME DESTINATION bin
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+)
+
+# 安装头文件
+install(DIRECTORY include/ DESTINATION include)
