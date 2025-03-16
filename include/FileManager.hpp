@@ -22,6 +22,7 @@ namespace FileManager {
     std::string formatTime(const std::tm & time);
     uintmax_t getFileSize(const std::string & path);
     uintmax_t calculateDirectorySize(const std::string & path);
+    std::string readFileContent(const std::string &filePath, size_t startLine, size_t endLine);
 
     // 文件操作接口
     bool createFile(const std::string & filePath);
@@ -41,7 +42,8 @@ namespace FileManager {
         const std::string &path,
         int &file_count,
         int &folder_count,
-        std::vector<std::tuple<std::string, mode_t>> &folder_permissions);
+        std::vector<std::tuple<std::string, mode_t>> &folder_permissions,
+        std::vector<std::string> &fileNames);
 
     // 全局缓存和互斥锁（在 .cpp 中定义）
     extern std::mutex cache_mutex;

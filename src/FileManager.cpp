@@ -13,6 +13,8 @@ namespace FileManager {
 
     std::mutex cache_mutex;
     std::unordered_map<std::string, DirectoryCache> dir_cache;
+    // 禁止创建的文件扩展名
+    constexpr std::array<const char*, 9> forbiddenExtensions = {".a", ".o", ".bin", ".exe", ".dll", ".so", ".dat", ".tmp", ".swp"};
 
     bool isDirectory(const std::string & path) {
         struct stat statbuf;
@@ -122,6 +124,19 @@ namespace FileManager {
         }
         return false;
     }
+    // 检查文件是否是禁止预览的类型
+    bool isForbiddenFile(const std::string &filePath) {
+        size_t dotPos = filePath.find_last_of('.');
+        if (dotPos != std::string::npos) {
+            std::string ext = filePath.substr(dotPos);
+            for (const auto& forbiddenExt : forbiddenExtensions) {
+                if (ext == forbiddenExt) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
 
     void enterDirectory(std::stack<std::string>& pathHistory,
                         std::string& currentPath,
@@ -163,25 +178,28 @@ namespace FileManager {
         const std::string &path,
         int &file_count,
         int &folder_count,
-        std::vector<std::tuple<std::string, mode_t>> &folder_permissions) {
+        std::vector<std::tuple<std::string, mode_t>> &folder_permissions,
+        std::vector<std::string> &fileNames) {
     
         file_count = 0;
         folder_count = 0;
-        folder_permissions.clear(); // 清空之前的记录
+        folder_permissions.clear();
+        fileNames.clear(); // 确保文件名列表为空
     
         try {
             for (const auto &entry : fs::directory_iterator(path)) {
+                std::string name = entry.path().filename().string();
+                fileNames.push_back(name);  // 添加到文件名列表
+                
                 if (entry.is_directory()) {
                     folder_count++;
                     
-                    // 获取文件夹权限
                     struct stat fileStat;
                     if (stat(entry.path().c_str(), &fileStat) == 0) {
-                        folder_permissions.emplace_back(entry.path().string(), fileStat.st_mode);
+                        folder_permissions.emplace_back(name, fileStat.st_mode);
                     } else {
                         std::cerr << "Error getting permissions for " << entry.path() << std::endl;
                     }
-    
                 } else if (entry.is_regular_file()) {
                     file_count++;
                 }
@@ -189,6 +207,32 @@ namespace FileManager {
         } catch (const std::exception &e) {
             std::cerr << "Error counting entries in " << path << ": " << e.what() << std::endl;
         }
-    }
+    }    
+    // 读取文件内容
+    std::string readFileContent(const std::string &filePath, size_t startLine, size_t endLine) {
+        if (isForbiddenFile(filePath)) {
+            return "错误: 禁止预览此类型的文件。";
+        }
+    
+        std::ifstream file(filePath);
+        if (!file.is_open()) {
+            return "错误: 无法打开文件。";
+        }
+    
+        std::string line;
+        std::string content;
+        size_t lineCount = 0;
+        
+        while (std::getline(file, line)) {
+            lineCount++;
+            if (lineCount >= startLine && lineCount <= endLine) {
+                content += line + "\n";
+            }
+            if (lineCount > endLine) break;
+        }
+    
+        file.close();
+        return content.empty() ? "选定的范围内没有内容。" : content;
+    }    
     
 }
