@@ -1,86 +1,81 @@
-# FTB(terminal file browser) - 终端文件浏览器
+# FTB (Terminal File Browser)
 
 ![C++17](https://img.shields.io/badge/C++-17-blue) ![FTXUI](https://img.shields.io/badge/FTXUI-5.0.0-orange)
 
-
 ![Platform](https://img.shields.io/badge/Platform-Linux-lightgrey) ![Tool](https://img.shields.io/badge/CMake-3.20.0-red)
 
+A terminal-based interactive file browser developed using FTXUI library, providing intuitive directory navigation and file viewing experience.
 
-基于FTXUI库开发的终端交互式文件浏览器，提供直观的目录导航和文件查看体验。
+## Demo
 
-## 效果展示
+![Demo](https://yt3.ggpht.com/iHL64dUd3WQpbat--V-mzE1PKBu6CLeUyliucuFYF2J8oSZXk3Fn2-aS2v0aQBdrd4CwjP8YWeAh=s1600-rw-nd-v1)
 
-![效果](https://yt3.ggpht.com/iHL64dUd3WQpbat--V-mzE1PKBu6CLeUyliucuFYF2J8oSZXk3Fn2-aS2v0aQBdrd4CwjP8YWeAh=s1600-rw-nd-v1)
+## Features
 
+- 🗂️ Real-time directory content display
+- 🎨 Color-coded items (blue for directories/red for files)
+- ⏰ Top status bar with current time
+- 📁 Path history stack (support backward navigation)
+- ↕️ Keyboard navigation (↑↓ keys for selection, Enter to enter directories)
+- 🔄 Auto-refresh (100ms UI update interval)
+- 🔎 Directory search functionality
+- 🧑🎓 Memory usage calculation for selected items
+- 🛠️ File/folder creation and deletion
+- 👌 Attribute preview and file content inspection
 
-## 功能特性
-
-- 🗂️ 实时目录内容展示A
-- 🎨 彩色显示（文件夹蓝色/文件红色）
-- ⏰ 顶部状态栏显示当前时间
-- 📁 路径历史栈（支持返回上级目录）
-- ↕️ 键盘导航（↑↓键选择，Enter进入目录）
-- 🔄 自动刷新（每100ms更新界面）
-- 🔎 文件夹搜索
-- 🧑‍🎓 计算当前选中文件或文件夹的内存占比大小
-- 🛠️ 新建文件或文件夹，删除功能
-- 👌 预览文件夹的属性与文件内容
-
-
-## 安装依赖
+## Dependencies
 
 ```bash
-# 安装FTXUI库
+# Install FTXUI library
 sudo apt-get install libftxui-dev
+
 ```
 
-## 编译、运行、安装
+## Build & Run
 ```bash
- chmod +x ./build.sh
-./build.sh      # 自动化运行脚本即可
-FTB             # 运行即可
+chmod +x ./build.sh
+./build.sh      # Run build script
+FTB             # Launch application
 ```
 
-## 使用说明 
-- ↑/↓:导航文件列表
-- Enter:进入选中目录
-- Backspace:返回上级目录
-- ESC:退出程序
-- 搜索框:输入关键字，查询指定文件
-- Ctrl+f键 新建文件
-- Ctrl+k键新建文件夹
-- Delete键 删除文件夹或文件
-- 空格键查看选取文件夹的细节
-- Ctrl+p预览选取文件的部分内容(**beside** .so\\.o\\.a等二进制文件)
+## Usage
+- ↑/↓: Navigate file list
+- Enter: Open selected directory
+- Backspace: Return to parent directory
+- ESC: Exit program
+- Search box: Filter files by keyword
+- Ctrl+f: Create new file
+- Ctrl+k: Create new directory
+- Delete: Remove selected item
+- Space: View item attributes
+- Ctrl+p: Preview file content (excluding binary files like .so, .o, .a)
 
-## 项目结构
+## Project Structure
 
     FileBrowser/
-    ├── include/            # 头文件
-    │   |── FileManager.hpp
-    |   |—— ThreadGuard.hpp
-    |   └—— UIManager.hpp
-    ├── src/               # 源代码
+    ├── include/            # Header files
+    │   ├── FileManager.hpp
+    │   ├── ThreadGuard.hpp
+    │   └── UIManager.hpp
+    ├── src/                # Source code
     │   ├── FileManager.cpp
-    │   |── main.cpp
-    |   |—— ThreadGuard.cpp
-    |   └—— UIManager.cpp
-    |—— tests/             # 测试文件
-    |   |__ /UIManagerTest.cpp
-    ├── CMakeLists.txt     # 构建配置
-    |── README.md          # 说明文档
-    |—— .gitignore
-    |—— build.sh           # 自动化构建脚本
-    |—— .clang-format      # 格式化文件
-    |__ License
+    │   ├── main.cpp
+    │   ├── ThreadGuard.cpp
+    │   └── UIManager.cpp
+    ├── tests/              # Test cases
+    │   └── UIManagerTest.cpp
+    ├── CMakeLists.txt      # Build configuration
+    ├── README.md           # Documentation
+    ├── .gitignore
+    ├── build.sh            # Build script
+    ├── .clang-format       # Code style
+    └── License
 
-## 开发环境
+## Development Environment
+- Compiler: g++ 11.0+
+- Build tool: CMake 3.20+
+- Dependency: FTXUI 5.0+
 
-- 编译器：g++ 11.0+
-- 构建工具：CMake 3.20+
-- 依赖库：FTXUI 5.0+
+## License
 
-## 许可协议
-
-**MIT License**
-
+MIT License
