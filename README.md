@@ -34,7 +34,7 @@ sudo apt-get install libftxui-dev
 ## Build & Run
 ```bash
 chmod +x ./build.sh
-./build.sh      # Run build script
+source ./build.sh      # Run build script
 FTB             # Launch application
 ```
 

@@ -1,43 +1,95 @@
-# BasedOnStyle: LLVM
+# 基于 LLVM 风格进行配置
+BasedOnStyle: LLVM
+
+# 缩进设置
 # 缩进使用 4 个空格
 IndentWidth: 4
 # 制表符宽度为 4
 TabWidth: 4
 # 使用空格代替制表符
 UseTab: Never
+
 # 每行最大字符数
 ColumnLimit: 80
+
 # 类成员访问说明符（如 public、private）的缩进
 AccessModifierOffset: -4
+
 # 连续空行的最大数量
 MaxEmptyLinesToKeep: 1
+
 # 指针和引用的对齐方式
 PointerAlignment: Left
+
+# 命名空间缩进设置
 # 控制是否在命名空间的左花括号后换行
 NamespaceIndentation: All
+
 # 函数调用时参数列表的换行方式
 AllowAllParametersOfDeclarationOnNextLine: true
-# 控制 if、for、while 等语句的括号风格
+
+# 括号包裹风格设置
 BraceWrapping:
+  # 类定义后换行
   AfterClass: true
+  # 控制语句（if、for、while 等）后换行
   AfterControlStatement: true
+  # 枚举定义后换行
   AfterEnum: true
+  # 函数定义后换行
   AfterFunction: true
+  # 命名空间定义后换行
   AfterNamespace: true
+  # 结构体定义后换行
   AfterStruct: true
+  # 联合体定义后换行
   AfterUnion: true
+  # catch 语句前换行
   BeforeCatch: true
+  # else 语句前换行
   BeforeElse: true
+  # 不缩进括号内内容
   IndentBraces: false
+  # 空函数不拆分换行
   SplitEmptyFunction: false
+  # 空记录（类、结构体等）不拆分换行
   SplitEmptyRecord: false
+  # 空命名空间不拆分换行
   SplitEmptyNamespace: false
-# 控制逗号和分号后的空格
+
+# 空格设置
+# C 风格强制类型转换后添加空格
 SpaceAfterCStyleCast: true
+# 逻辑非运算符后添加空格
 SpaceAfterLogicalNot: true
+# template 关键字后添加空格
 SpaceAfterTemplateKeyword: true
+# 赋值运算符前添加空格
 SpaceBeforeAssignmentOperators: true
-# 控制括号前的空格，这里将其设置为在控制语句前添加空格
+# 控制语句（if、for、while 等）括号前添加空格
 SpaceBeforeParens: ControlStatements
-# 控制注释的对齐方式
+
+# 注释对齐设置
 AlignTrailingComments: true
+
+# 额外优化配置
+
+# 逗号和分号后是否添加空格
+SpaceAfterComma: true
+SpaceAfterSemicolon: true
+
+# 二元运算符前后添加空格
+SpaceAroundOperators: true
+
+# 函数参数列表中逗号后添加空格
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+SpacesInAngles: false
+
+# 初始化列表冒号后添加空格
+SpaceBeforeColon: false
+SpaceAfterColon: true
+
+# 函数调用和定义时，参数列表换行后是否缩进
+IndentWrappedFunctionNames: false
+IndentCaseLabels: true    
