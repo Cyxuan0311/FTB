@@ -8,7 +8,7 @@ A terminal-based interactive file browser developed using FTXUI library, providi
 
 ## Demo
 
-![Demo](https://yt3.ggpht.com/iHL64dUd3WQpbat--V-mzE1PKBu6CLeUyliucuFYF2J8oSZXk3Fn2-aS2v0aQBdrd4CwjP8YWeAh=s1600-rw-nd-v1)
+[![Demo](https://img.youtube.com/vi/ziJkd5a-gq8/0.jpg)](https://youtu.be/ziJkd5a-gq8?t=17)
 
 ## Features
 
