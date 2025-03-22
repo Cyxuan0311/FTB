@@ -207,95 +207,73 @@ void calculation_current_folder_files_number(
         std::cerr << "Error counting entries in " << path << ": " << e.what() << std::endl;
     }
 }
-// 读取文件内容，使用分块加载
+// 读取文件内容
 std::string readFileContent(const std::string & filePath, size_t startLine, size_t endLine) {
-    const std::chrono::seconds expiry(60); // 缓存有效期60秒
+    const std::chrono::seconds expiry(60); // 缓存有效期 60 秒
 
-    // 尝试从缓存中查找文件分块数据
-    {
-        std::lock_guard<std::mutex> lock(cache_mutex);
-        auto it = fileChunkCache.find(filePath);
-        if (it != fileChunkCache.end()) {
-            auto now = std::chrono::system_clock::now();
-            if (now - it->second.last_update < expiry) {
-                // 缓存命中，合并所有块数据
-                std::ostringstream oss;
-                for (const auto &chunkPair : it->second.chunks) {
-                    oss << chunkPair.second;
-                }
-                std::string fullContent = oss.str();
-                // 提取指定行
-                std::istringstream iss(fullContent);
-                std::string line, result;
-                size_t lineCount = 0;
-                while (std::getline(iss, line)) {
-                    lineCount++;
-                    if (lineCount >= startLine && lineCount <= endLine)
-                        result += line + "\n";
-                    if (lineCount > endLine)
-                        break;
-                }
-                return result;
-            }
+    // **强制刷新缓存：如果 `writeFileContent` 修改了文件，就重新读取**
+    std::lock_guard<std::mutex> lock(cache_mutex);
+    auto it = fileChunkCache.find(filePath);
+    if (it != fileChunkCache.end()) {
+        auto now = std::chrono::system_clock::now();
+        if (now - it->second.last_update < expiry) {
+            std::cerr << "[DEBUG] Using cached content for: " << filePath << std::endl;
+        } else {
+            //std::cerr << "[DEBUG] Cache expired for: " << filePath << ", reloading..." << std::endl;
+            fileChunkCache.erase(it);
         }
     }
 
-    // 缓存中不存在或已过期，进行分块读取
-    if (isForbiddenFile(filePath))
-        return "错误: 禁止预览此类型的文件。";
-    std::ifstream file(filePath, std::ios::binary);
-    if (!file.is_open())
-        return "错误: 无法打开文件。";
+    // **从磁盘强制读取最新数据**
+    std::ifstream file(filePath);
+    if (!file.is_open()) {
+        std::cerr << "[ERROR] Cannot open file: " << filePath << std::endl;
+        return "错误: 无法打开文件";
+    }
 
-    // 使用 map 存储每个块数据，键为块编号（0开始）
-    std::map<size_t, std::string> chunks;
-    size_t chunkIndex = 0;
-    char buffer[CHUNK_SIZE];
-
-    file.seekg(0, std::ios::beg);
-    while (file.read(buffer, CHUNK_SIZE) || file.gcount() > 0) {
-        chunks[chunkIndex++] = std::string(buffer, file.gcount());
+    std::string line, result;
+    size_t currentLine = 0;
+    while (std::getline(file, line)) {
+        currentLine++;
+        if (currentLine >= startLine && currentLine <= endLine) {
+            result += line + "\n";
+        }
+        if (currentLine > endLine) break;
     }
     file.close();
 
-    // 更新缓存
-    {
-        std::lock_guard<std::mutex> lock(cache_mutex);
-        fileChunkCache[filePath] = FileChunkCache{chunks, std::chrono::system_clock::now()};
-    }
-
-    // 合并所有块数据
-    std::ostringstream oss;
-    for (const auto &chunkPair : chunks) {
-        oss << chunkPair.second;
-    }
-    std::string fullContent = oss.str();
-
-    // 提取需要返回的行
-    std::istringstream iss(fullContent);
-    std::string line, result;
-    size_t lineCount = 0;
-    while (std::getline(iss, line)) {
-        lineCount++;
-        if (lineCount >= startLine && lineCount <= endLine)
-            result += line + "\n";
-        if (lineCount > endLine)
-            break;
-    }
+    // **更新缓存**
+    fileChunkCache[filePath] = FileChunkCache{{ {0, result} }, std::chrono::system_clock::now()};
     return result;
 }
-
 // 写入文件内容
 bool writeFileContent(const std::string & filePath, const std::string & content) {
-    std::ofstream ofs(filePath);
+    std::ofstream ofs(filePath, std::ios::trunc);  // 覆盖写入
     if (!ofs) {
-        std::cerr << "Error opening file for writing: " << filePath << std::endl;
+        std::cerr << "[ERROR] Cannot open file for writing: " << filePath << std::endl;
         return false;
     }
     ofs << content;
     ofs.close();
+
+    // **清除缓存，确保下次读取新数据**
+    {
+        std::lock_guard<std::mutex> lock(cache_mutex);
+        if (fileChunkCache.count(filePath)) {
+            fileChunkCache.erase(filePath);
+            //std::cerr << "[DEBUG] Cache cleared for file: " << filePath << std::endl;
+        }
+
+        std::string parentDir = fs::path(filePath).parent_path().string();
+        if (dir_cache.count(parentDir)) {
+            dir_cache[parentDir].valid = false;
+            //std::cerr << "[DEBUG] Cache cleared for directory: " << parentDir << std::endl;
+        }
+    }
+
     return true;
 }
+
 // 清理过期缓存
 void clearFileChunkCache(const std::chrono::seconds& expiry) {
     std::lock_guard<std::mutex> lock(cache_mutex);

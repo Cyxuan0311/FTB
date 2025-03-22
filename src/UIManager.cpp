@@ -328,17 +328,33 @@ namespace UIManager {
                         vimEditor->SetContent(lines);
                         vimEditor->EnterEditMode();
                         // 设置退出回调：按 Ctrl+D 退出编辑模式后写回文件
-                        vimEditor->SetOnExit(
-                            [&, fullPath](
-                                const std::vector<std::string>& new_content) {
-                                std::ostringstream oss;
-                                for (const auto& l : new_content)
-                                    oss << l << "\n";
-                                std::string updatedContent = oss.str();
-                                FileManager::writeFileContent(fullPath.string(),
-                                                              updatedContent);
-                                vim_mode_active = false;
-                            });
+                        vimEditor->SetOnExit([&, fullPath](const std::vector<std::string>& new_content) {
+                            std::ostringstream oss;
+                            for (const auto& l : new_content)
+                                oss << l << "\n";
+                            std::string updatedContent = oss.str();
+                        
+                            //std::cerr << "[DEBUG] Writing to file: " << fullPath.string() << std::endl;
+                            //std::cerr << "[DEBUG] Content:\n" << updatedContent << std::endl;
+                        
+                            if (!FileManager::writeFileContent(fullPath.string(), updatedContent)) {
+                                //std::cerr << "[ERROR] Failed to write file: " << fullPath.string() << std::endl;
+                            } else {
+                                //std::cerr << "[DEBUG] File successfully saved!" << std::endl;
+                        
+                                // **清除缓存，确保 Vim 重新打开时加载新内容**
+                                FileManager::dir_cache[fullPath.string()].valid = false;
+                                //std::cerr << "[DEBUG] Cleared cache for: " << fullPath.string() << std::endl;
+                            }
+                        
+                            vim_mode_active = false;
+                        
+                            // **销毁 Vim 编辑器，防止缓存旧内容**
+                            if (vimEditor) {
+                                delete vimEditor;
+                                vimEditor = nullptr;
+                            }
+                        });                        
                         vim_mode_active = true;
                         return true;
                     }
