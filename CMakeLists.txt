@@ -16,50 +16,52 @@ include_directories(include)
 
 # 查找依赖库
 find_package(ftxui CONFIG REQUIRED)
-find_package(GTest REQUIRED)
-include_directories(${GTEST_INCLUDE_DIRS})
 
 # 构建核心库
 add_library(FTB_core
     src/FileManager.cpp
     src/ThreadGuard.cpp
     src/UIManager.cpp
+    src/FileSizeCalculator.cpp
+    src/DirectoryHistory.cpp
+    src/Vim_Like.cpp
+    src/detail_element.cpp
 )
 
-# 链接UI库
+# 链接 FTXUI 库
 target_link_libraries(FTB_core PRIVATE ftxui::screen ftxui::dom ftxui::component)
 
 # 构建主程序
 add_executable(FTB src/main.cpp)
 target_link_libraries(FTB PRIVATE FTB_core)
 
-# 假设的测试源文件列表，你需要根据实际情况修改
-set(TEST_SOURCES
-    tests/UIManagerTest.cpp
-)
+# 添加子目录 tests，但不将其包含在安装中
+add_subdirectory(tests EXCLUDE_FROM_ALL)
 
-# 构建测试程序
-add_executable(FTB_tests ${TEST_SOURCES})
-
-# 链接测试依赖
-target_link_libraries(FTB_tests
-    PRIVATE gtest
-    PRIVATE gtest_main
-    PRIVATE ${GTEST_BOTH_LIBRARIES}
-    PRIVATE pthread
-    PRIVATE FTB_core
-)
-
-# 启用测试
-enable_testing()
-add_test(NAME FTB_tests COMMAND FTB_tests)
-
-# 安装规则（不包括 FTB_tests）
+# 安装规则（仅安装 FTB 和 FTB_core）
 install(TARGETS FTB FTB_core
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
 )
 
-# 安装头文件
-install(DIRECTORY include/ DESTINATION include)
+# 安装头文件（假设你的头文件实际在 include/FTB/ 中）
+install(DIRECTORY include/FTB/ DESTINATION include/FTB)
+
+# --- 添加卸载目标 ---
+
+# 设置一个变量 INSTALL_MANIFEST 指定安装清单文件路径
+set(INSTALL_MANIFEST "${CMAKE_CURRENT_BINARY_DIR}/install_manifest.txt")
+
+# 配置卸载脚本模板，生成 cmake_uninstall.cmake 文件
+configure_file(
+  "${CMAKE_CURRENT_SOURCE_DIR}/cmake_uninstall.cmake.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
+  @ONLY
+)
+
+# 添加自定义卸载目标
+add_custom_target(uninstall
+  COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake
+  COMMENT "卸载所有由 CMake 安装的文件"
+)

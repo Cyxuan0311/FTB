@@ -1,0 +1,29 @@
+# cmake_uninstall.cmake.in
+
+if(NOT EXISTS "@INSTALL_MANIFEST@")
+  message(FATAL_ERROR "没有找到安装清单文件: @INSTALL_MANIFEST@。请先执行 'make install' (或等效命令) 生成安装清单。")
+endif()
+
+file(READ "@INSTALL_MANIFEST@" files)
+string(REPLACE "\n" ";" file_list "${files}")
+
+foreach(file ${file_list})
+  if(EXISTS "${file}")
+    message(STATUS "正在删除: ${file}")
+    file(REMOVE "${file}")
+  else()
+    message(WARNING "文件不存在: ${file}")
+  endif()
+endforeach()
+
+# 额外删除可执行文件（需要 root 权限才能删除系统目录下的文件）
+if(NOT DEFINED CMAKE_INSTALL_PREFIX)
+  set(CMAKE_INSTALL_PREFIX "/usr/local")
+endif()
+set(EXECUTABLE_PATH "${CMAKE_INSTALL_PREFIX}/bin/FTB")
+if(EXISTS "${EXECUTABLE_PATH}")
+  message(STATUS "正在删除可执行文件: ${EXECUTABLE_PATH}")
+  file(REMOVE "${EXECUTABLE_PATH}")
+endif()
+
+message(STATUS "如果有权限问题，请以 root 身份运行该卸载命令。")
