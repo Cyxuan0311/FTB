@@ -2,7 +2,7 @@
 
 ![C++17](https://img.shields.io/badge/C++-17-blue) ![FTXUI](https://img.shields.io/badge/FTXUI-5.0.0-orange)
 
-![Platform](https://img.shields.io/badge/Platform-Linux-lightgrey) ![Tool](https://img.shields.io/badge/CMake-3.20.0-red)
+![Platform](https://img.shields.io/badge/Platform-Linux-lightgrey) ![Tool](https://img.shields.io/badge/CMake-3.20.0-red)   <a href="#"><img src="https://img.shields.io/github/repo-size/Cyxuan0311/FTB"></img></a>
 
 A terminal-based interactive file browser developed using FTXUI library, providing intuitive directory navigation and file viewing experience.
 
@@ -22,6 +22,7 @@ A terminal-based interactive file browser developed using FTXUI library, providi
 - 🧑🎓 Memory usage calculation for selected items
 - 🛠️ File/folder creation and deletion
 - 👌 Attribute preview and file content inspection
+- 🗒️ Vim-Like editing mode
 
 ## Dependencies
 
@@ -36,6 +37,12 @@ sudo apt-get install libftxui-dev
 chmod +x ./build.sh
 source ./build.sh      # Run build script
 FTB             # Launch application
+```
+
+## Uninstall(Local)
+```bash
+./uninstall.sh
+
 ```
 
 ## Usage
@@ -53,21 +60,42 @@ FTB             # Launch application
 ## Project Structure
 
     FileBrowser/
-    ├── include/            # Header files
+    ├── include/FTB         # Header files
     │   ├── FileManager.hpp
     │   ├── ThreadGuard.hpp
+    |   |—— FileSizeCalculator.hpp
+    |   |—— Vim_Like.hpp
+    |   |—— DirectoryHistory.hpp
+    |   |—— detail_element.hpp
     │   └── UIManager.hpp
     ├── src/                # Source code
     │   ├── FileManager.cpp
+    |   |—— DirectoryHistory.cpp
+    |   |—— detail_element.cpp
     │   ├── main.cpp
     │   ├── ThreadGuard.cpp
+    |   |—— Vim_Like.cpp
+    |   |—— FileSizeCalculator.cpp
     │   └── UIManager.cpp
     ├── tests/              # Test cases
-    │   └── UIManagerTest.cpp
+    │   |── UIManagerTest.cpp
+    |   |—— FileManagerTest.cpp
+    |   |—— main.cpp
+    |   |—— Vim_like_Test.cpp
+    |   |—— CMakeLists.txt
+    |   └── FileSizeCaculatorTest.cpp
+    |—— bash_tool/
+    |   |—— build.sh
+    |   |—— package_build.sh
+    |   |__ uninstall.sh
+    | 
+    |—— .github/workflows/
+    |   |__ Release.yml
     ├── CMakeLists.txt      # Build configuration
     ├── README.md           # Documentation
     ├── .gitignore
-    ├── build.sh            # Build script
+    |—— Release_notes.md
+    |—— cmake_uninstall.cmake.in
     ├── .clang-format       # Code style
     └── License
 
