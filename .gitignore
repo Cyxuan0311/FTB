@@ -1,6 +1,7 @@
 
 # folder
 **/build/**
+**/auto_tool_python/**
 
 # executable
 *.exe
@@ -11,3 +12,4 @@ main
 Some_fixs.md
 useway.cpp
 sometest.cpp
+Speed_file_loading.md
