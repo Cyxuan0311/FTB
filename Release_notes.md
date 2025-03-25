@@ -7,4 +7,13 @@ The software just suit the Linux now
 
 # v2.0.0
 
-## Describe:
+## Fix: 
+Fixed program crashes caused by mouse clicks during program execution
+
+## What's new: 
+1-Added a sidebar to improve the scalability of the program. 
+2-Added an editor similar to Vim to provide online editing. 
+3-Add an online calendar for viewing time.
+
+## Suggestion: 
+Use v2.0.0 to optimize some features.
