@@ -72,6 +72,7 @@
         "any": "cpp",
         "set": "cpp",
         "span": "cpp",
-        "cinttypes": "cpp"
+        "cinttypes": "cpp",
+        "filesystem": "cpp"
     }
 }
