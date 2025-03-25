@@ -8,9 +8,61 @@
 #include <string>
 #include <ftxui/dom/elements.hpp>
 #include "../include/FTB/FileManager.hpp"
+#include "ClipboardManager.hpp"
 
 using namespace ftxui;
 using namespace FileManager;
+
+Element RenderPendingFiles() {
+  auto& clipboard = ClipboardManager::getInstance();
+  const auto& items = clipboard.getItems();
+  
+  Elements pendingElements;
+  Elements headerElements;
+  headerElements.push_back(text("📋 待处理项目：") | bold | color(Color::BlueLight));
+  
+  // 只有在设置了模式且有待处理项目时才显示模式状态
+  if (!items.empty() && clipboard.hasModeSelected()) {  // 使用新的判断方法
+      headerElements.push_back(
+          text(clipboard.isCutMode() ? "✂️ 剪切模式" : "📑 复制模式") |
+          (clipboard.isCutMode() ? color(Color::Red) : color(Color::Green3))
+      );
+  }
+  
+  pendingElements.push_back(hbox(headerElements) | center);
+  
+  if (items.empty()) {
+      pendingElements.push_back(text("(无)") | dim);
+  } else {
+      for (const auto& path : items) {
+          fs::path p(path);
+          auto filename = p.filename().string();
+          auto fileElement = text(fs::is_directory(p) ? "📁 " + filename : "📄 " + filename);
+          
+          // 只有在设置了模式后才显示颜色
+          if (clipboard.hasModeSelected()) {  // 使用新的判断方法
+              if (clipboard.isCutMode()) {
+                  fileElement = fileElement | color(Color::Red);
+              } else {
+                  fileElement = fileElement | color(Color::Green3);
+              }
+          }
+          pendingElements.push_back(fileElement);
+      }
+  }
+
+  pendingElements.push_back(separator());
+  pendingElements.push_back(text("Alt+C: 添加") | dim | color(Color::GrayLight));
+  pendingElements.push_back(text("Alt+G: 清空") | dim | color(Color::GrayLight));
+  pendingElements.push_back(text("Ctrl+T: 复制") | dim | color(Color::GrayLight));
+  pendingElements.push_back(text("Ctrl+X: 剪切") | dim | color(Color::GrayLight));
+  pendingElements.push_back(text("Ctrl+N: 粘贴") | dim | color(Color::GrayLight));
+
+  return vbox(std::move(pendingElements)) 
+         | borderHeavy 
+         | color(Color::RGB(77, 153, 0))
+         | flex;
+}
 
 // 生成当前月份的日历，返回一个 Element 列表，每个 Element 表示一行
 std::vector<Element> GenerateCalendarElements() {
@@ -27,7 +79,7 @@ std::vector<Element> GenerateCalendarElements() {
   lines.push_back(text(header.str()) | bold);
 
   // 星期标题行
-  lines.push_back(text("Sun Mon Tue Wed Thu Fri Sat"));
+  lines.push_back(text("Sun Mon Tue Wed Thu Fri Sat") | color(Color::Red3));
 
   // 将 tm 调整为本月第一天
   tm.tm_mday = 1;
@@ -54,7 +106,7 @@ std::vector<Element> GenerateCalendarElements() {
     if (day == today) {
       day_elem = day_elem | color(Color::Blue3Bis) | bold;
     } else {
-      day_elem = day_elem | color(Color::White);
+      day_elem = day_elem | color(Color::Black);
     }
     // 每个日期后添加一个空格
     current_week.push_back(hbox({day_elem, text(" ")}));
@@ -97,8 +149,8 @@ inline Element CreateDetailElement(const std::vector<std::string>& filteredConte
     window(text("当前选中") | color(Color::Cyan1),
            text(icon + selectedName) | color(Color::Yellow3) | borderHeavy),
     // 日历区域：固定尺寸，边框圆角，背景颜色为 RGB(53,53,115)
-    vbox(calendar_elements) | borderDouble | bgcolor(Color::RGB(255, 223, 128)) | size(WIDTH, EQUAL, 30) | size(HEIGHT, EQUAL, 10)
-
+    vbox(calendar_elements) | borderDouble | bgcolor(Color::RGB(255, 223, 128)) | size(WIDTH, EQUAL, 30) | size(HEIGHT, EQUAL, 10),
+    RenderPendingFiles()
   }) | borderHeavy | color(Color::GrayDark) | flex;
 }
 
