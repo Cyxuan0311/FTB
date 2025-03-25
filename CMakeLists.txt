@@ -26,6 +26,7 @@ add_library(FTB_core
     src/DirectoryHistory.cpp
     src/Vim_Like.cpp
     src/detail_element.cpp
+    src/ClipboardManager.cpp
 )
 
 # 链接 FTXUI 库
