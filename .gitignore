@@ -7,9 +7,12 @@
 *.exe
 *.bin
 main
+*.tar.bz2
+*.mp4
 
 # some files
 Some_fixs.md
 useway.cpp
 sometest.cpp
 Speed_file_loading.md
+Video_and_Photo.md
