@@ -24,7 +24,7 @@ Element RenderPendingFiles() {
   // 只有在设置了模式且有待处理项目时才显示模式状态
   if (!items.empty() && clipboard.hasModeSelected()) {  // 使用新的判断方法
       headerElements.push_back(
-          text(clipboard.isCutMode() ? "✂️ 剪切模式" : "📑 复制模式") |
+          text(clipboard.isCutMode() ?  "✂️ 剪切模式" : "📑 复制模式") |
           (clipboard.isCutMode() ? color(Color::Red) : color(Color::Green3))
       );
   }
@@ -79,7 +79,7 @@ std::vector<Element> GenerateCalendarElements() {
   lines.push_back(text(header.str()) | bold);
 
   // 星期标题行
-  lines.push_back(text("Sun Mon Tue Wed Thu Fri Sat") | color(Color::Red3));
+  lines.push_back(text("Sun Mon Tue Wed Thu Fri Sat") | color(Color::Green3));
 
   // 将 tm 调整为本月第一天
   tm.tm_mday = 1;
@@ -148,8 +148,8 @@ inline Element CreateDetailElement(const std::vector<std::string>& filteredConte
     text("侧边栏") | bold | borderLight | color(Color::SkyBlue2) | center,
     window(text("当前选中") | color(Color::Cyan1),
            text(icon + selectedName) | color(Color::Yellow3) | borderHeavy),
-    // 日历区域：固定尺寸，边框圆角，背景颜色为 RGB(53,53,115)
-    vbox(calendar_elements) | borderDouble | bgcolor(Color::RGB(255, 223, 128)) | size(WIDTH, EQUAL, 30) | size(HEIGHT, EQUAL, 10),
+    // 日历区域
+    vbox(calendar_elements) | borderDouble | bgcolor(Color::GrayLight) | size(WIDTH, EQUAL, 30) | size(HEIGHT, EQUAL, 10),
     RenderPendingFiles()
   }) | borderHeavy | color(Color::GrayDark) | flex;
 }
