@@ -16,53 +16,88 @@ include_directories(include)
 
 # 查找依赖库
 find_package(ftxui CONFIG REQUIRED)
-
-# 构建核心库
-add_library(FTB_core
-    src/FileManager.cpp
-    src/ThreadGuard.cpp
-    src/UIManager.cpp
-    src/FileSizeCalculator.cpp
-    src/DirectoryHistory.cpp
-    src/Vim_Like.cpp
-    src/detail_element.cpp
-    src/ClipboardManager.cpp
+find_package(nlohmann_json REQUIRED)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
+    libavcodec
+    libavformat
+    libavutil
+    libswscale
 )
 
+# 查找X11库
+find_package(X11 REQUIRED)
+
+# 构建图片预览库
+add_library(image_viewer
+    src/Video_and_Photo/ImageViewer.cpp
+    src/Video_and_Photo/VideoPlayer.cpp
+    src/Video_and_Photo/CommonMedia.cpp
+    src/Video_and_Photo/FFmpegUtils.cpp
+)
+
+target_link_libraries(image_viewer
+    PRIVATE
+    PkgConfig::FFMPEG
+    ftxui::screen
+    ftxui::dom
+    ftxui::component
+    ${X11_LIBRARIES}  # 添加X11库链接
+)
+
+# 使用通配符匹配所有 .cpp 文件
+file(GLOB FTB_CORE_SOURCES
+    src/*.cpp
+    src/UI/*.cpp
+    src/FTB/*.cpp
+    src/FTB/HandleManager/*.cpp
+)
+
+# 构建核心库
+add_library(FTB_core ${FTB_CORE_SOURCES})
+
 # 链接 FTXUI 库
-target_link_libraries(FTB_core PRIVATE ftxui::screen ftxui::dom ftxui::component)
+target_link_libraries(FTB_core 
+    PRIVATE 
+    ftxui::screen 
+    ftxui::dom 
+    ftxui::component
+    image_viewer
+    nlohmann_json::nlohmann_json
+)
 
 # 构建主程序
-add_executable(FTB src/main.cpp)
-target_link_libraries(FTB PRIVATE FTB_core)
+add_executable(FTB src/FTB/main.cpp)
+target_link_libraries(FTB 
+    PRIVATE 
+    FTB_core
+    image_viewer
+)
 
 # 添加子目录 tests，但不将其包含在安装中
 add_subdirectory(tests EXCLUDE_FROM_ALL)
 
-# 安装规则（仅安装 FTB 和 FTB_core）
-install(TARGETS FTB FTB_core
+# 安装规则
+install(TARGETS FTB FTB_core image_viewer
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
 )
 
-# 安装头文件（假设你的头文件实际在 include/FTB/ 中）
+# 安装头文件
 install(DIRECTORY include/FTB/ DESTINATION include/FTB)
+install(DIRECTORY include/Video_and_Photo/ DESTINATION include/Video_and_Photo)
 
 # --- 添加卸载目标 ---
-
-# 设置一个变量 INSTALL_MANIFEST 指定安装清单文件路径
 set(INSTALL_MANIFEST "${CMAKE_CURRENT_BINARY_DIR}/install_manifest.txt")
 
-# 配置卸载脚本模板，生成 cmake_uninstall.cmake 文件
 configure_file(
-  "${CMAKE_CURRENT_SOURCE_DIR}/cmake_uninstall.cmake.in"
-  "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
-  @ONLY
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake_uninstall.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
+    @ONLY
 )
 
-# 添加自定义卸载目标
 add_custom_target(uninstall
-  COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake
-  COMMENT "卸载所有由 CMake 安装的文件"
+    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake
+    COMMENT "卸载所有由 CMake 安装的文件"
 )
