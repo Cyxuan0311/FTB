@@ -2,6 +2,7 @@
 # folder
 **/build/**
 **/auto_tool_python/**
+/.vscode
 
 # executable
 *.exe
@@ -19,3 +20,4 @@ sometest.cpp
 Speed_file_loading.md
 *.mp4
 Video_and_Photo.md
+VideoPlayer_one.cpp
