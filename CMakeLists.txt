@@ -13,11 +13,16 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0 -Wall -Wextra -Wpedan
 
 # 设置包含目录
 include_directories(include)
+include_directories(${LIBSSH2_INCLUDE_DIRS})
 
 # 查找依赖库
 find_package(ftxui CONFIG REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(PkgConfig REQUIRED)
+
+# 查找libssh2
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(LIBSSH2 REQUIRED libssh2)
 pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
     libavcodec
     libavformat
@@ -51,6 +56,7 @@ file(GLOB FTB_CORE_SOURCES
     src/UI/*.cpp
     src/FTB/*.cpp
     src/FTB/HandleManager/*.cpp
+    src/Connection/*.cpp
 )
 
 # 构建核心库
@@ -64,6 +70,7 @@ target_link_libraries(FTB_core
     ftxui::component
     image_viewer
     nlohmann_json::nlohmann_json
+    ${LIBSSH2_LIBRARIES}
 )
 
 # 构建主程序
