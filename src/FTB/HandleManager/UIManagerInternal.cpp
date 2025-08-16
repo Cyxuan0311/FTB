@@ -743,4 +743,77 @@ bool handleVideoPlay(
     return false;
 }
 
+// --------------------------------------------------
+// 处理SSH连接操作（Ctrl+S）
+// 功能：监听 Ctrl+S 键，弹出SSH连接对话框，建立SSH连接
+// 参数：
+//   event            - 当前捕获的键盘事件
+//   screen           - FTXUI 交互式屏幕引用
+// 返回值：
+//   true 表示事件已处理；false 表示与本操作无关
+// --------------------------------------------------
+bool handleSSHConnection(
+    ftxui::Event event,
+    ftxui::ScreenInteractive& screen) 
+{
+    // 仅在 Ctrl+S 键时触发
+    if (event == ftxui::Event::CtrlS) {
+        try {
+            // 创建SSH对话框
+            UI::SSHDialog ssh_dialog;
+            
+            // 显示对话框并获取连接参数
+            auto params = ssh_dialog.showDialog(screen);
+            
+            // 如果用户确认了连接参数
+            if (!params.hostname.empty()) {
+                // 创建SSH连接对象
+                Connection::SSHConnection ssh_connection;
+                
+                // 设置状态回调
+                ssh_connection.setStatusCallback([](Connection::SSHConnectionStatus status) {
+                    switch (status) {
+                        case Connection::SSHConnectionStatus::CONNECTING:
+                            std::cout << "🔗 正在连接SSH服务器..." << std::endl;
+                            break;
+                        case Connection::SSHConnectionStatus::CONNECTED:
+                            std::cout << "✅ SSH连接成功！" << std::endl;
+                            break;
+                        case Connection::SSHConnectionStatus::ERROR:
+                            std::cout << "❌ SSH连接失败！" << std::endl;
+                            break;
+                        case Connection::SSHConnectionStatus::DISCONNECTED:
+                            std::cout << "🔌 SSH连接已断开" << std::endl;
+                            break;
+                    }
+                });
+                
+                // 尝试连接
+                if (ssh_connection.connect(params)) {
+                    std::cout << "🎉 成功连接到 " << params.hostname << ":" << params.port << std::endl;
+                    std::cout << "📁 远程目录: " << params.remote_directory << std::endl;
+                    
+                    // 执行一个简单的命令来验证连接
+                    std::string result = ssh_connection.executeCommand("pwd");
+                    if (!result.empty()) {
+                        std::cout << "📍 当前工作目录: " << result;
+                    }
+                    
+                    // 这里可以添加更多的远程操作逻辑
+                    // 例如：列出远程目录内容、文件传输等
+                    
+                    // 断开连接
+                    ssh_connection.disconnect();
+                } else {
+                    std::cout << "❌ 连接失败: " << ssh_connection.getLastError() << std::endl;
+                }
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "❌ SSH连接错误: " << e.what() << std::endl;
+        }
+        return true;
+    }
+    return false;
+}
+
 } // namespace UIManagerInternal

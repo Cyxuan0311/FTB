@@ -56,6 +56,8 @@ bool handleEvents(ftxui::Event event, DirectoryHistory& directoryHistory,
             return true;
         if (UIManagerInternal::handleVideoPlay(event, currentPath, filteredContents, selected, screen))
             return true;
+        if (UIManagerInternal::handleSSHConnection(event, screen))
+            return true;
     } catch (const std::exception& e) {
         std::cerr << "❗ Error: " << e.what() << std::endl;
     }
