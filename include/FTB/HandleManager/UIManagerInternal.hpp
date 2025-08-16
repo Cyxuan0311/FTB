@@ -13,6 +13,7 @@
 #include "UI/NewFolderDialog.hpp"
 #include "UI/FilePreviewDialog.hpp"
 #include "UI/FolderDetailsDialog.hpp"
+#include "UI/SSHDialog.hpp"
 
 #include "FTB/ClipboardManager.hpp"
 #include "FTB/DirectoryHistory.hpp"
@@ -91,6 +92,8 @@ bool handleVideoPlay(ftxui::Event event,
                 int selected,
                 ftxui::ScreenInteractive& screen);
 
+bool handleSSHConnection(ftxui::Event event,
+                        ftxui::ScreenInteractive& screen);
 
 } // namespace UIManagerInternal
 
