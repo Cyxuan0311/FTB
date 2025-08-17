@@ -33,15 +33,15 @@ SSHDialog::SSHDialog()
     use_key_auth_checkbox_ = Checkbox("使用密钥认证", &use_key_auth_);
     
     // 创建按钮组件
-    confirm_button_ = Button("确定", [this] { onConfirm(); });
-    cancel_button_ = Button("取消", [this] { onCancel(); });
+    confirm_button_ = Button("✅ 确定", [this] { onConfirm(); });
+    cancel_button_ = Button("❌ 取消", [this] { onCancel(); });
     
-    // 创建状态文本组件
-    status_text_ = Text("") | color(Color::Yellow);
+    // 初始化状态文本
+    status_text_ = "";
 }
 
 ftxui::Component SSHDialog::createDialogComponent() {
-    // 创建表单组件
+    // 创建表单组件 - 使用Container::Vertical确保正确的焦点管理
     auto form = Container::Vertical({
         hostname_input_,
         port_input_,
@@ -58,14 +58,13 @@ ftxui::Component SSHDialog::createDialogComponent() {
         cancel_button_
     });
     
-    // 创建主容器
+    // 创建主容器 - 垂直排列表单和按钮
     auto main_container = Container::Vertical({
         form,
-        buttons,
-        status_text_
+        buttons
     });
     
-    // 设置焦点
+    // 设置焦点顺序 - 这是关键步骤
     main_container->Add(hostname_input_);
     main_container->Add(port_input_);
     main_container->Add(username_input_);
@@ -92,41 +91,49 @@ Connection::SSHConnectionParams SSHDialog::showDialog(ftxui::ScreenInteractive& 
     remote_directory_ = "/home";
     private_key_path_ = "";
     use_key_auth_ = false;
+    status_text_ = "";
     
     // 创建对话框组件
     auto dialog_component = createDialogComponent();
     
     // 创建对话框渲染函数
-    auto dialog_renderer = Renderer(dialog_component, [this, dialog_component] {
-        auto title = text("SSH 连接配置") | bold | center;
+    auto dialog_renderer = Renderer(dialog_component, [this] {
+        auto title = text("🔗 SSH 连接配置") | bold | center;
         
-        auto hostname_label = text("主机名/IP地址:");
-        auto hostname_field = hostname_input_->Render() | border;
+        auto hostname_label = text("🌐 主机名/IP地址:");
+        auto hostname_field = hostname_input_->Render() | border | size(WIDTH, GREATER_THAN, 40);
         
-        auto port_label = text("端口:");
-        auto port_field = port_input_->Render() | border;
+        auto port_label = text("🔌 端口:");
+        auto port_field = port_input_->Render() | border | size(WIDTH, GREATER_THAN, 40);
         
-        auto username_label = text("用户名:");
-        auto username_field = username_input_->Render() | border;
+        auto username_label = text("👤 用户名:");
+        auto username_field = username_input_->Render() | border | size(WIDTH, GREATER_THAN, 40);
         
-        auto password_label = text("密码:");
-        auto password_field = password_input_->Render() | border;
+        auto password_label = text("🔒 密码:");
+        auto password_field = password_input_->Render() | border | size(WIDTH, GREATER_THAN, 40);
         
-        auto remote_dir_label = text("远程目录:");
-        auto remote_dir_field = remote_dir_input_->Render() | border;
+        auto remote_dir_label = text("📁 远程目录:");
+        auto remote_dir_field = remote_dir_input_->Render() | border | size(WIDTH, GREATER_THAN, 40);
         
-        auto auth_label = text("认证方式:");
+        auto auth_label = text("🔐 认证方式:");
         auto auth_checkbox = use_key_auth_checkbox_->Render();
         
-        auto key_label = text("私钥文件路径:");
-        auto key_field = private_key_input_->Render() | border;
+        auto key_label = text("🗝️ 私钥文件路径:");
+        auto key_field = private_key_input_->Render() | border | size(WIDTH, GREATER_THAN, 40);
         
-        auto buttons = Container::Horizontal({
-            confirm_button_->Render() | bgcolor(Color::Green),
-            cancel_button_->Render() | bgcolor(Color::Red)
+        auto buttons = hbox({
+            confirm_button_->Render() | bgcolor(Color::Green) | size(WIDTH, GREATER_THAN, 15),
+            cancel_button_->Render() | bgcolor(Color::Red) | size(WIDTH, GREATER_THAN, 15)
         }) | center;
         
-        auto status = status_text_->Render();
+        // 根据状态文本内容设置颜色
+        auto status_color = Color::Yellow;
+        if (status_text_.find("错误:") != std::string::npos) {
+            status_color = Color::Red;
+        } else if (status_text_.find("验证通过") != std::string::npos) {
+            status_color = Color::Green;
+        }
+        auto status = text(status_text_) | color(status_color);
         
         // 根据认证方式显示/隐藏相关字段
         Elements form_elements = {
@@ -159,17 +166,22 @@ Connection::SSHConnectionParams SSHDialog::showDialog(ftxui::ScreenInteractive& 
             separator(),
             buttons,
             status
-        }) | border | bgcolor(Color::Black) | color(Color::White);
+        }) | border | bgcolor(Color::Black) | color(Color::Blue) | size(WIDTH, GREATER_THAN, 60) | size(HEIGHT, GREATER_THAN, 20);
         
         return content | center;
     });
     
-    // 设置事件处理
+    // 设置事件处理 - 只处理ESC键，禁用鼠标，其他事件传递给子组件
     auto event_handler = CatchEvent([this](Event event) {
         if (event == Event::Escape) {
             onCancel();
             return true;
         }
+        // 禁用所有鼠标事件
+        if (event.is_mouse()) {
+            return true; // 拦截所有鼠标事件
+        }
+        // 允许其他事件传递给子组件
         return false;
     });
     
@@ -215,7 +227,7 @@ void SSHDialog::onCancel() {
 bool SSHDialog::validateInput() {
     // 验证主机名
     if (hostname_.empty()) {
-        status_text_ = Text("错误: 主机名不能为空") | color(Color::Red);
+        status_text_ = "错误: 主机名不能为空";
         return false;
     }
     
@@ -223,40 +235,40 @@ bool SSHDialog::validateInput() {
     try {
         int port = std::stoi(port_);
         if (port <= 0 || port > 65535) {
-            status_text_ = Text("错误: 端口号必须在1-65535之间") | color(Color::Red);
+            status_text_ = "错误: 端口号必须在1-65535之间";
             return false;
         }
     } catch (const std::exception&) {
-        status_text_ = Text("错误: 端口号必须是有效的数字") | color(Color::Red);
+        status_text_ = "错误: 端口号必须是有效的数字";
         return false;
     }
     
     // 验证用户名
     if (username_.empty()) {
-        status_text_ = Text("错误: 用户名不能为空") | color(Color::Red);
+        status_text_ = "错误: 用户名不能为空";
         return false;
     }
     
     // 验证认证信息
     if (use_key_auth_) {
         if (private_key_path_.empty()) {
-            status_text_ = Text("错误: 使用密钥认证时私钥路径不能为空") | color(Color::Red);
+            status_text_ = "错误: 使用密钥认证时私钥路径不能为空";
             return false;
         }
     } else {
         if (password_.empty()) {
-            status_text_ = Text("错误: 使用密码认证时密码不能为空") | color(Color::Red);
+            status_text_ = "错误: 使用密码认证时密码不能为空";
             return false;
         }
     }
     
     // 验证远程目录
     if (remote_directory_.empty()) {
-        status_text_ = Text("错误: 远程目录不能为空") | color(Color::Red);
+        status_text_ = "错误: 远程目录不能为空";
         return false;
     }
     
-    status_text_ = Text("验证通过，正在连接...") | color(Color::Green);
+    status_text_ = "验证通过，正在连接...";
     return true;
 }
 
