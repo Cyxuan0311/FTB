@@ -20,6 +20,9 @@ find_package(ftxui CONFIG REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(PkgConfig REQUIRED)
 
+# 查找TBB库
+find_package(TBB REQUIRED)
+
 # 查找libssh2
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(LIBSSH2 REQUIRED libssh2)
@@ -71,6 +74,7 @@ target_link_libraries(FTB_core
     image_viewer
     nlohmann_json::nlohmann_json
     ${LIBSSH2_LIBRARIES}
+    TBB::tbb
 )
 
 # 构建主程序
