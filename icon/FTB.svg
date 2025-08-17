@@ -1,23 +1,73 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100" width="200" height="100">
-  <!-- 背景形状 - 采用渐变色增强视觉效果 -->
-  <rect x="5" y="5" width="190" height="90" rx="12" ry="12" fill="url(#bgGradient)" />
+  <!-- 背景形状 - 现代终端窗口设计 -->
+  <rect x="5" y="5" width="190" height="90" rx="15" ry="15" fill="url(#bgGradient)" />
   <defs>
     <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#34495e" />
-      <stop offset="100%" stop-color="#2c3e50" />
+      <stop offset="0%" stop-color="#2c3e50" />
+      <stop offset="100%" stop-color="#1a252f" />
     </linearGradient>
+    <linearGradient id="terminalGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3498db" />
+      <stop offset="100%" stop-color="#2980b9" />
+    </linearGradient>
+    <linearGradient id="glowGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3498db" stop-opacity="0.5" />
+      <stop offset="100%" stop-color="#3498db" stop-opacity="0" />
+    </linearGradient>
+    <linearGradient id="grayGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#95a5a6" />
+      <stop offset="100%" stop-color="#7f8c8d" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge> 
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
   </defs>
   
-  <!-- 装饰元素 - 增加了几何感 -->
-  <circle cx="30" cy="30" r="4" fill="#3498db" />
-  <circle cx="170" cy="70" r="4" fill="#3498db" />
-  <path d="M25,80 C60,85 140,55 175,65" stroke="#3498db" stroke-width="2" fill="none" />
-  <rect x="155" y="20" width="8" height="8" rx="2" fill="#3498db" transform="rotate(45, 159, 24)" />
+  <!-- 主终端窗口 - 现代设计 -->
+  <rect x="15" y="15" width="170" height="70" rx="10" ry="10" fill="none" stroke="url(#terminalGradient)" stroke-width="2.5" opacity="0.9" filter="url(#glow)" />
   
-  <!-- FTB文本 - 调整了字体和位置 -->
-  <text x="100" y="63" font-family="'Segoe UI', Arial, sans-serif" font-size="38" font-weight="bold" text-anchor="middle" fill="white" letter-spacing="1">FTB</text>
+  <!-- 终端标题栏 - 渐变设计 -->
+  <rect x="15" y="15" width="170" height="15" rx="10" ry="10" fill="url(#terminalGradient)" opacity="0.3" />
   
-  <!-- 底部装饰线 -->
-  <line x1="60" y1="80" x2="140" y2="80" stroke="#3498db" stroke-width="1.5" stroke-opacity="0.7" />
+  <!-- 现代终端控制按钮 -->
+  <circle cx="28" cy="22.5" r="2.5" fill="#ff5f56" />
+  <circle cx="36" cy="22.5" r="2.5" fill="#ffbd2e" />
+  <circle cx="44" cy="22.5" r="2.5" fill="#27ca3f" />
+  
+  <!-- 动态代码行 - 抽象化设计 -->
+  <rect x="25" y="38" width="35" height="2" fill="url(#grayGradient)" opacity="0.8" />
+  <rect x="25" y="43" width="50" height="2" fill="url(#grayGradient)" opacity="0.6" />
+  <rect x="25" y="48" width="30" height="2" fill="url(#grayGradient)" opacity="0.8" />
+  <rect x="25" y="53" width="45" height="2" fill="url(#grayGradient)" opacity="0.4" />
+  
+  <!-- 智能光标 - 动态效果 -->
+  <rect x="25" y="58" width="3" height="10" fill="url(#terminalGradient)" opacity="0.9">
+    <animate attributeName="opacity" values="0.9;0.3;0.9" dur="2s" repeatCount="indefinite" />
+  </rect>
+  
+  <!-- 数据流可视化 -->
+  <path d="M130,38 Q150,28 170,38 T210,38" stroke="url(#terminalGradient)" stroke-width="2" fill="none" opacity="0.7" />
+  <path d="M130,48 Q150,58 170,48 T210,48" stroke="url(#terminalGradient)" stroke-width="2" fill="none" opacity="0.5" />
+  
+  <!-- 技术装饰元素 -->
+  <circle cx="145" cy="25" r="4" fill="url(#terminalGradient)" opacity="0.8" />
+  <rect x="155" y="21" width="8" height="8" rx="2" fill="url(#terminalGradient)" opacity="0.6" transform="rotate(45, 159, 25)" />
+  
+  <!-- FTB文字 - Times New Roman斜体设计 -->
+  <text x="100" y="78" font-family="'Times New Roman', serif" font-size="32" font-weight="bold" font-style="italic" text-anchor="middle" fill="url(#terminalGradient)" letter-spacing="4" opacity="0.95" filter="url(#glow)">FTB</text>
+  
+  <!-- 文字发光效果 -->
+  <text x="100" y="78" font-family="'Times New Roman', serif" font-size="32" font-weight="bold" font-style="italic" text-anchor="middle" fill="url(#glowGradient)" letter-spacing="4" opacity="0.6">FTB</text>
+  
+  <!-- 底部状态栏 - 现代设计 -->
+  <rect x="60" y="85" width="80" height="4" rx="2" fill="url(#grayGradient)" opacity="0.4" />
+  <rect x="60" y="85" width="55" height="4" rx="2" fill="url(#terminalGradient)" opacity="0.9" />
+  
+  <!-- 装饰性连接线 -->
+  <line x1="25" y1="35" x2="175" y2="35" stroke="url(#terminalGradient)" stroke-width="1" opacity="0.3" />
 </svg>
     
