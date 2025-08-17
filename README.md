@@ -1,4 +1,8 @@
+<div align="center">
+
 # FTB (Terminal File Browser)
+
+</div>
 
 <div align="center">
   <img src="icon/FTB.svg" alt="FTB Logo" width="200" height="100">
