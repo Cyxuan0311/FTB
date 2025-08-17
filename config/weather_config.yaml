@@ -1,0 +1,63 @@
+# FTB 天气服务配置文件
+# 配置文件路径: config/weather_config.yaml
+
+weather_service:
+  # Python脚本配置
+  python_script:
+    path: "/mnt/f/My__StudyStack/My_Project/FTB_PART/fetch_weather.py"
+    enabled: true
+  
+  # 数据文件配置
+  data_file:
+    path: "/mnt/f/My__StudyStack/My_Project/FTB_PART/data/weather.json"
+    auto_create: true
+  
+  # 更新配置
+  update:
+    interval_minutes: 30
+    auto_start: true
+    max_retry_attempts: 3
+    retry_delay_seconds: 60
+  
+  # 日志配置
+  logging:
+    enabled: true
+    level: "info"  # debug, info, warning, error
+    output_to_console: true
+    output_to_file: false
+    log_file_path: "logs/weather_service.log"
+  
+  # 错误处理配置
+  error_handling:
+    continue_on_error: true
+    notify_on_error: true
+    error_callback_enabled: true
+
+# 应用全局配置
+application:
+  name: "FTB (Terminal File Browser)"
+  version: "1.0.0"
+  config_version: "1.0"
+  
+  # 路径配置
+  paths:
+    base_dir: "/mnt/f/My__StudyStack/My_Project/FTB"
+    config_dir: "config"
+    data_dir: "data"
+    logs_dir: "logs"
+    temp_dir: "temp"
+  
+  # 功能开关
+  features:
+    weather_display: true
+    ssh_connection: true
+    file_preview: true
+    vim_editor: true
+    image_viewer: true
+    video_player: true
+
+# 开发环境配置
+development:
+  debug_mode: false
+  verbose_logging: false
+  test_mode: false
