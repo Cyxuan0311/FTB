@@ -53,7 +53,7 @@ private:
     ftxui::Component cancel_button_;
     
     // 状态文本
-    ftxui::Component status_text_;
+    std::string status_text_;
     
     // 输入值
     std::string hostname_;
