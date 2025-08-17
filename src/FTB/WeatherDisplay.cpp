@@ -1,35 +1,47 @@
 #include "../include/FTB/WeatherDisplay.hpp"
-#include <fstream>
+#include "../include/FTB/WeatherService.hpp"
 #include <iostream>
-#include <cstdlib>  
-#include <thread>
 
-WeatherDisplay::WeatherDisplay(){
-    startWeatherScript(); // 启动天气更新脚本
+// 静态成员初始化
+std::shared_ptr<WeatherService> WeatherDisplay::weather_service_ = nullptr;
+bool WeatherDisplay::initialized_ = false;
+
+WeatherDisplay::WeatherDisplay() {
+    initialize();
 }
 
-WeatherInfo WeatherDisplay::loadWeatherData() {
-    try {
-        std::ifstream file("/mnt/f/My__StudyStack/My_Project/FTB_PART/data/weather.json");
-        if (!file.is_open()) {
-            return {"未知", "N/A", "未知", "N/A", "N/A", "未更新"};
-        }
-
-        nlohmann::json j;
-        file >> j;
-
-        WeatherInfo info;
-        info.city = j["city"];
-        info.temperature = j["temperature"];
-        info.weather = j["weather"];
-        info.high = j["high"];
-        info.low = j["low"];
-        info.update_time = j["update_time"];
-        return info;
-    } catch (const std::exception& e) {
-        std::cerr << "读取天气数据失败: " << e.what() << std::endl;
-        return {"未知", "N/A", "未知", "N/A", "N/A", "未更新"};
+void WeatherDisplay::initialize() {
+    if (initialized_) {
+        return;
     }
+    
+    try {
+        // 获取WeatherService实例
+        weather_service_ = WeatherService::GetInstance();
+        
+        // 设置回调函数
+        weather_service_->SetUpdateCallback(onWeatherUpdate);
+        weather_service_->SetErrorCallback(onWeatherError);
+        
+        // 从配置文件启动天气服务
+        if (weather_service_->StartFromConfig()) {
+            std::cout << "WeatherDisplay初始化成功" << std::endl;
+            initialized_ = true;
+        } else {
+            std::cerr << "WeatherDisplay初始化失败" << std::endl;
+        }
+        
+    } catch (const std::exception& e) {
+        std::cerr << "WeatherDisplay初始化异常: " << e.what() << std::endl;
+    }
+}
+
+void WeatherDisplay::cleanup() {
+    if (weather_service_) {
+        weather_service_->Stop();
+        weather_service_ = nullptr;
+    }
+    initialized_ = false;
 }
 
 std::string WeatherDisplay::getWeatherEmoji(const std::string& weather) {
@@ -54,11 +66,32 @@ ftxui::Color WeatherDisplay::getTemperatureColor(int temp) {
 }
 
 ftxui::Element WeatherDisplay::render() {
-    auto info = loadWeatherData();
+    // 确保天气服务已初始化
+    if (!initialized_ || !weather_service_) {
+        initialize();
+    }
+    
+    // 获取天气数据
+    auto info = weather_service_->GetWeatherInfo();
     
     using namespace ftxui;
     
-    int temp = std::stoi(info.temperature);
+    // 检查数据有效性
+    if (!weather_service_->IsDataValid()) {
+        return vbox({
+            text("🌍 天气状况") | bold | color(Color::Orange4),
+            text("数据加载中...") | color(Color::GrayLight) | center,
+            text("🕒 请稍候") | color(Color::GrayDark) | center
+        }) | frame | borderHeavy | color(Color::RGB(35,124,148)) | size(WIDTH, LESS_THAN, 30);
+    }
+    
+    int temp = 0;
+    try {
+        temp = std::stoi(info.temperature);
+    } catch (const std::exception&) {
+        temp = 20; // 默认温度
+    }
+    
     auto tempColor = getTemperatureColor(temp);
     
     return vbox({
@@ -76,7 +109,6 @@ ftxui::Element WeatherDisplay::render() {
                 text(" " + info.weather) | color(Color::Cyan)
             }) | center,
             hbox({
-                //text("🫤 "),
                 text(info.temperature) | bold | color(tempColor)
             }) | center,
             hbox({
@@ -90,21 +122,10 @@ ftxui::Element WeatherDisplay::render() {
     }) | frame | borderHeavy | color(Color::RGB(35,124,148)) | size(WIDTH, LESS_THAN, 30);
 }
 
-void WeatherDisplay::startWeatherScript() {
-    static bool started = false;
-    if (started) return;
-    started = true;
+void WeatherDisplay::onWeatherUpdate(const WeatherInfo& info) {
+    std::cout << "天气数据已更新: " << info.city << " " << info.temperature << "°C" << std::endl;
+}
 
-    std::string weather_file = "/mnt/f/My__StudyStack/My_Project/FTB_PART/data/weather.json";
-    if (!std::filesystem::exists(weather_file)) {
-        std::ofstream(weather_file).close();
-    }
-
-    std::thread([]() {
-        std::cout << "正在获取最新天气信息..." << std::endl;
-        int result = std::system("python3 /mnt/f/My__StudyStack/My_Project/FTB_PART/fetch_weather.py &");
-        if (result != 0) {
-            std::cerr << "天气脚本启动失败!" << std::endl;
-        }
-    }).detach();
+void WeatherDisplay::onWeatherError(const std::string& error) {
+    std::cerr << "天气数据更新错误: " << error << std::endl;
 }
