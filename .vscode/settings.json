@@ -73,6 +73,9 @@
         "set": "cpp",
         "span": "cpp",
         "cinttypes": "cpp",
-        "filesystem": "cpp"
+        "filesystem": "cpp",
+        "forward_list": "cpp",
+        "cfenv": "cpp",
+        "valarray": "cpp"
     }
 }
