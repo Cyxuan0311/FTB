@@ -1,5 +1,10 @@
 # FTB (Terminal File Browser)
 
+<div align="center">
+  <img src="icon/FTB.svg" alt="FTB Logo" width="200" height="100">
+</div>
+
+    
 ![C++17](https://img.shields.io/badge/C++-17-blue) ![FTXUI](https://img.shields.io/badge/FTXUI-5.0.0-orange)
 
 ![Platform](https://img.shields.io/badge/Platform-Linux-lightgrey) ![Tool](https://img.shields.io/badge/CMake-3.20.0-red) ![SSH](https://img.shields.io/badge/SSH-Supported-green) <a href="#"><img src="https://img.shields.io/github/repo-size/Cyxuan0311/FTB"></img></a>
