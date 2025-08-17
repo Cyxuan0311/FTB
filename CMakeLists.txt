@@ -14,11 +14,16 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0 -Wall -Wextra -Wpedan
 # 设置包含目录
 include_directories(include)
 include_directories(${LIBSSH2_INCLUDE_DIRS})
+include_directories(${YAML_CPP_INCLUDE_DIRS})
 
 # 查找依赖库
 find_package(ftxui CONFIG REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(PkgConfig REQUIRED)
+
+# 查找yaml-cpp库
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(YAML_CPP REQUIRED yaml-cpp)
 
 # 查找TBB库
 find_package(TBB REQUIRED)
@@ -73,9 +78,13 @@ target_link_libraries(FTB_core
     ftxui::component
     image_viewer
     nlohmann_json::nlohmann_json
+    ${YAML_CPP_LIBRARIES}
     ${LIBSSH2_LIBRARIES}
     TBB::tbb
 )
+
+# 添加编译标志
+target_compile_options(FTB_core PRIVATE ${YAML_CPP_CFLAGS_OTHER})
 
 # 构建主程序
 add_executable(FTB src/FTB/main.cpp)
