@@ -95,6 +95,15 @@ bool handleVideoPlay(ftxui::Event event,
 bool handleSSHConnection(ftxui::Event event,
                         ftxui::ScreenInteractive& screen);
 
+bool handleMySQLConnection(ftxui::Event event,
+                          ftxui::ScreenInteractive& screen);
+
+bool handleConfigReload(ftxui::Event event,
+                        ftxui::ScreenInteractive& screen);
+
+bool handleThemeSwitch(ftxui::Event event,
+                       ftxui::ScreenInteractive& screen);
+
 } // namespace UIManagerInternal
 
 #endif // UI_MANAGER_INTERNAL_HPP
