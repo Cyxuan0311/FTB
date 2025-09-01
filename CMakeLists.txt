@@ -15,6 +15,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0 -Wall -Wextra -Wpedan
 include_directories(include)
 include_directories(${LIBSSH2_INCLUDE_DIRS})
 include_directories(${YAML_CPP_INCLUDE_DIRS})
+include_directories(${MYSQL_INCLUDE_DIRS})
 
 # 查找依赖库
 find_package(ftxui CONFIG REQUIRED)
@@ -31,6 +32,10 @@ find_package(TBB REQUIRED)
 # 查找libssh2
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(LIBSSH2 REQUIRED libssh2)
+
+# 查找MySQL库
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(MYSQL REQUIRED mysqlclient)
 pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
     libavcodec
     libavformat
@@ -80,6 +85,7 @@ target_link_libraries(FTB_core
     nlohmann_json::nlohmann_json
     ${YAML_CPP_LIBRARIES}
     ${LIBSSH2_LIBRARIES}
+    ${MYSQL_LIBRARIES}
     TBB::tbb
 )
 
