@@ -1,5 +1,6 @@
 #include "FTB/HandleManager/UIManager.hpp"
 #include "FTB/HandleManager/UIManagerInternal.hpp"  // 包含内部辅助函数声明
+#include "UI/MySQLDialog.hpp"  // 包含MySQL对话框
 
 #include <ftxui/component/component.hpp>
 #include <ftxui/component/screen_interactive.hpp>
@@ -57,6 +58,12 @@ bool handleEvents(ftxui::Event event, DirectoryHistory& directoryHistory,
         if (UIManagerInternal::handleVideoPlay(event, currentPath, filteredContents, selected, screen))
             return true;
         if (UIManagerInternal::handleSSHConnection(event, screen))
+            return true;
+        if (UIManagerInternal::handleMySQLConnection(event, screen))
+            return true;
+        if (UIManagerInternal::handleConfigReload(event, screen))
+            return true;
+        if (UIManagerInternal::handleThemeSwitch(event, screen))
             return true;
     } catch (const std::exception& e) {
         std::cerr << "❗ Error: " << e.what() << std::endl;

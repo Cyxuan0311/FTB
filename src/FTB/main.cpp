@@ -24,6 +24,8 @@
 #include "../include/FTB/WeatherDisplay.hpp"
 #include "../include/FTB/WeatherService.hpp"
 #include "../include/FTB/detail_element.hpp"
+#include "../include/FTB/ConfigManager.hpp"
+#include "../include/FTB/ThemeManager.hpp"
 
 using namespace ftxui;
 namespace fs = std::filesystem;
@@ -46,12 +48,22 @@ int main()
     // ---------- 变量声明与初始化部分 ----------
     
     // 初始化配置管理器
-    auto config_manager = ConfigManager::GetInstance();
+    auto config_manager = FTB::ConfigManager::GetInstance();
     if (!config_manager->LoadConfig()) {
         std::cerr << "警告: 配置文件加载失败，使用默认配置" << std::endl;
     } else {
         std::cout << "配置文件加载成功" << std::endl;
     }
+    
+    // 初始化主题管理器
+    auto theme_manager = FTB::ThemeManager::GetInstance();
+    std::cout << "主题管理器初始化完成，当前主题: " << theme_manager->GetCurrentTheme() << std::endl;
+    
+    // 应用主题配置到布局设置
+    const auto& config = config_manager->GetConfig();
+    items_per_page = config.layout.items_per_page;
+    items_per_row = config.layout.items_per_row;
+    detail_width = static_cast<int>(config.layout.detail_panel_ratio * 100);
     
     // 初始化天气服务
     auto weather_service = WeatherService::GetInstance();

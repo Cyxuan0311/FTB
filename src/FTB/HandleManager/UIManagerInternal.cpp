@@ -17,6 +17,7 @@
 #include "FTB/Vim_Like.hpp"
 #include "Video_and_Photo/ImageViewer.hpp"
 #include "FTB/BinaryFileHandler.hpp"
+#include "UI/MySQLDialog.hpp"
 
 namespace fs = std::filesystem;
 using namespace ftxui;
@@ -810,6 +811,116 @@ bool handleSSHConnection(
             }
         } catch (const std::exception& e) {
             std::cerr << "❌ SSH连接错误: " << e.what() << std::endl;
+        }
+        return true;
+    }
+    return false;
+}
+
+// --------------------------------------------------
+// 处理MySQL连接操作（Alt+D）
+// 功能：监听 Alt+D 键，弹出MySQL数据库管理对话框
+// 参数：
+//   event            - 当前捕获的键盘事件
+//   screen           - FTXUI 交互式屏幕引用
+// 返回值：
+//   true 表示事件已处理；false 表示与本操作无关
+// --------------------------------------------------
+bool handleMySQLConnection(
+    ftxui::Event event,
+    ftxui::ScreenInteractive& screen) 
+{
+    // 仅在 Alt+D 键时触发
+    if (event == ftxui::Event::AltD) {
+        try {
+            // 创建MySQL对话框
+            UI::MySQLDialog mysql_dialog;
+            
+            // 设置连接回调
+            mysql_dialog.setConnectionCallback([](const Connection::MySQLConnectionParams& params) {
+                std::cout << "🎉 成功连接到MySQL数据库！" << std::endl;
+                std::cout << "📍 主机: " << params.hostname << ":" << params.port << std::endl;
+                std::cout << "👤 用户: " << params.username << std::endl;
+                std::cout << "🗄️ 数据库: " << (params.database.empty() ? "未指定" : params.database) << std::endl;
+                std::cout << "🌐 连接类型: " << (params.is_local ? "本地" : "远程") << std::endl;
+            });
+            
+            // 显示对话框
+            mysql_dialog.showDialog(screen);
+            
+        } catch (const std::exception& e) {
+            std::cerr << "❌ MySQL连接错误: " << e.what() << std::endl;
+        }
+        return true;
+    }
+    return false;
+}
+
+// --------------------------------------------------
+// 处理配置重载操作（Ctrl+R）
+// 功能：监听 Ctrl+R 键，重新加载配置文件
+// 参数：
+//   event            - 当前捕获的键盘事件
+//   screen           - FTXUI 交互式屏幕引用
+// 返回值：
+//   true 表示事件已处理；false 表示与本操作无关
+// --------------------------------------------------
+bool handleConfigReload(
+    ftxui::Event event,
+    ftxui::ScreenInteractive& screen) 
+{
+    // 仅在 Ctrl+R 键时触发
+    if (event == ftxui::Event::CtrlR) {
+        try {
+            auto config_manager = FTB::ConfigManager::GetInstance();
+            if (config_manager->ReloadConfig()) {
+                std::cout << "✅ 配置文件重新加载成功" << std::endl;
+            } else {
+                std::cout << "❌ 配置文件重新加载失败" << std::endl;
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "❌ 配置重载错误: " << e.what() << std::endl;
+        }
+        return true;
+    }
+    return false;
+}
+
+// --------------------------------------------------
+// 处理主题切换操作（Ctrl+T）
+// 功能：监听 Ctrl+T 键，循环切换可用主题
+// 参数：
+//   event            - 当前捕获的键盘事件
+//   screen           - FTXUI 交互式屏幕引用
+// 返回值：
+//   true 表示事件已处理；false 表示与本操作无关
+// --------------------------------------------------
+bool handleThemeSwitch(
+    ftxui::Event event,
+    ftxui::ScreenInteractive& screen) 
+{
+    // 仅在 Ctrl+T 键时触发
+    if (event == ftxui::Event::CtrlT) {
+        try {
+            auto theme_manager = FTB::ThemeManager::GetInstance();
+            auto available_themes = theme_manager->GetAvailableThemes();
+            
+            if (available_themes.size() > 1) {
+                // 找到当前主题的下一个主题
+                std::string current_theme = theme_manager->GetCurrentTheme();
+                auto it = std::find(available_themes.begin(), available_themes.end(), current_theme);
+                
+                if (it != available_themes.end()) {
+                    ++it;
+                    if (it == available_themes.end()) {
+                        it = available_themes.begin(); // 循环到第一个
+                    }
+                    theme_manager->ApplyTheme(*it);
+                    std::cout << "🎨 主题已切换到: " << *it << std::endl;
+                }
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "❌ 主题切换错误: " << e.what() << std::endl;
         }
         return true;
     }
