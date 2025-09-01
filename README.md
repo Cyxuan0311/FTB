@@ -11,9 +11,9 @@
     
 ![C++17](https://img.shields.io/badge/C++-17-blue) ![FTXUI](https://img.shields.io/badge/FTXUI-5.0.0-orange)
 
-![Platform](https://img.shields.io/badge/Platform-Linux-lightgrey) ![Tool](https://img.shields.io/badge/CMake-3.20.0-red) ![SSH](https://img.shields.io/badge/SSH-Supported-green) <a href="#"><img src="https://img.shields.io/github/repo-size/Cyxuan0311/FTB"></img></a>
+![Platform](https://img.shields.io/badge/Platform-Linux-lightgrey) ![Tool](https://img.shields.io/badge/CMake-3.20.0-red) ![SSH](https://img.shields.io/badge/SSH-Supported-green) ![MySQL](https://img.shields.io/badge/MySQL-Supported-blue) <a href="#"><img src="https://img.shields.io/github/repo-size/Cyxuan0311/FTB"></img></a>
 
-A powerful terminal-based interactive file browser developed using FTXUI library, providing intuitive directory navigation, file management, and **SSH remote connection** capabilities.
+A powerful terminal-based interactive file browser developed using FTXUI library, providing intuitive directory navigation, file management, **SSH remote connection**, and **MySQL database management** capabilities.
 
 ## Demo
 
@@ -52,6 +52,25 @@ A powerful terminal-based interactive file browser developed using FTXUI library
 - **Connection status monitoring**
 - **Easy-to-use connection dialog**
 
+### 🗄️ **MySQL Database Management** ✨
+- **Local and remote MySQL connections** with easy configuration
+- **Graphical CRUD operations** through intuitive button interface
+- **Database management** - create, delete, and select databases
+- **Table operations** - create, delete, and view table structures
+- **Data manipulation** - insert, update, delete, and query data
+- **SQL query executor** - direct SQL execution with result display
+- **Connection status monitoring** and error handling
+- **Tabbed interface** for organized database management
+
+### 🎨 **Customizable Theme System** ✨
+- **Multiple built-in themes**: default, dark, light, colorful, minimal
+- **Customizable colors** for all interface elements
+- **Real-time theme switching** with hotkeys
+- **Configuration file support** (.ftb) for persistent customization
+- **Color schemes** for files, directories, status bars, and dialogs
+- **Layout customization** including panel ratios and item counts
+- **Style options** for icons, animations, and mouse support
+
 ### 🎨 User Experience
 - Modern terminal UI with FTXUI
 - Responsive design and smooth animations
@@ -64,8 +83,53 @@ A powerful terminal-based interactive file browser developed using FTXUI library
 # Install required libraries
 sudo apt-get install libftxui-dev libssh2-1-dev
 
+# Install MySQL development library
+sudo apt-get install libmysqlclient-dev
+
 # For video/image support (optional)
 sudo apt-get install libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libx11-dev
+```
+
+## Configuration
+
+FTB uses a `.ftb` configuration file located in your home directory (`~/.ftb`) to customize the interface appearance and behavior.
+
+### Quick Setup
+
+1. **Copy the template**: `cp config/.ftb.template ~/.ftb`
+2. **Edit the file**: Customize colors, themes, and settings
+3. **Restart FTB**: Changes take effect immediately
+
+### Available Themes
+
+- **default**: Classic blue and white theme
+- **dark**: Dark background with high contrast
+- **light**: Light background for bright environments
+- **colorful**: Vibrant colors for visual appeal
+- **minimal**: Clean, monochrome design
+
+### Configuration Sections
+
+- **Colors**: Customize all interface colors
+- **Layout**: Adjust panel sizes and item counts
+- **Style**: Toggle icons, animations, and features
+- **Themes**: Switch between predefined themes
+- **MySQL/SSH**: Set default connection parameters
+
+See [Configuration Guide](docs/CONFIGURATION.md) for detailed options.
+
+### Alternative Installation Methods
+
+**CentOS/RHEL/Fedora:**
+```bash
+sudo yum install mysql-devel mysql
+# or
+sudo dnf install mysql-devel mysql
+```
+
+**Arch Linux:**
+```bash
+sudo pacman -S mysql
 ```
 
 ## Build & Run
@@ -115,6 +179,19 @@ FTB             # Launch application
   - Specify remote directory
   - Connect and browse remote files
 
+### 🗄️ **MySQL Database Management**
+- **Alt+d**: Open MySQL database management dialog
+  - Configure local or remote MySQL connection
+  - Manage databases and tables
+  - Execute SQL queries with visual results
+  - Perform CRUD operations through buttons
+
+### 🎨 **Theme and Configuration**
+- **Ctrl+t**: Switch between available themes
+- **Ctrl+r**: Reload configuration file
+- **~/.ftb**: Customize colors, layout, and behavior
+- **Multiple themes**: default, dark, light, colorful, minimal
+
 ### 🎯 Advanced Features
 - **Ctrl+E**: Enter Vim editing mode for text files
 - **Mouse support**: Click to select and navigate
@@ -142,6 +219,37 @@ FTB             # Launch application
 - Key-based authentication support
 - Connection status monitoring
 
+## MySQL Database Management Example
+
+### Quick Start
+1. Press `Alt+D` to open the MySQL database management dialog
+2. Configure connection settings:
+   - **Local Connection**: Use `localhost` or `127.0.0.1` as hostname
+   - **Remote Connection**: Enter remote server IP or hostname
+   - **Port**: Default `3306` (MySQL standard port)
+   - **Username/Password**: Your MySQL credentials
+   - **Database**: Optional, can be selected after connection
+3. Click "连接" to establish the connection
+4. Use the tabbed interface for different operations:
+   - **连接设置**: Configure and manage connections
+   - **数据库操作**: Create, delete, and select databases
+   - **表操作**: Manage tables and perform CRUD operations
+   - **查询执行**: Execute custom SQL queries
+
+### Supported Operations
+- **Database Management**: Create, delete, and switch databases
+- **Table Operations**: Create, delete, and view table structures
+- **Data Manipulation**: Insert, update, delete, and query data
+- **SQL Execution**: Run custom SQL statements with result display
+- **Connection Monitoring**: Real-time connection status and error handling
+
+### Features
+- **Smart Connection Detection**: Automatically identifies local vs remote connections
+- **Visual CRUD Interface**: Button-based operations for common database tasks
+- **Real-time Results**: Immediate display of query results and affected rows
+- **Error Handling**: Comprehensive error messages and connection status
+- **Tabbed Interface**: Organized workflow for different database operations
+
 ## Project Structure
 
 ```
@@ -154,6 +262,8 @@ FTB/
 │   │   ├── Vim_Like.hpp
 │   │   ├── DirectoryHistory.hpp
 │   │   ├── detail_element.hpp
+│   │   ├── ConfigManager.hpp  # Configuration management
+│   │   ├── ThemeManager.hpp   # Theme management
 │   │   └── HandleManager/
 │   │       ├── UIManager.hpp
 │   │       └── UIManagerInternal.hpp
@@ -163,9 +273,11 @@ FTB/
 │   │   ├── NewFolderDialog.hpp
 │   │   ├── FilePreviewDialog.hpp
 │   │   ├── FolderDetailsDialog.hpp
-│   │   └── SSHDialog.hpp      # SSH connection dialog
-│   ├── Connection/            # SSH connection backend
-│   │   └── SSHConnection.hpp
+│   │   ├── SSHDialog.hpp      # SSH connection dialog
+│   │   └── MySQLDialog.hpp    # MySQL database management dialog
+│   ├── Connection/            # Connection backends
+│   │   ├── SSHConnection.hpp  # SSH connection backend
+│   │   └── MySQLConnection.hpp # MySQL connection backend
 │   └── Video_and_Photo/       # Media handling
 │       ├── ImageViewer.hpp
 │       └── VideoPlayer.hpp
@@ -178,6 +290,8 @@ FTB/
 │   │   ├── ThreadGuard.cpp
 │   │   ├── Vim_Like.cpp
 │   │   ├── FileSizeCalculator.cpp
+│   │   ├── ConfigManager.cpp  # Configuration management
+│   │   ├── ThemeManager.cpp   # Theme management
 │   │   └── HandleManager/
 │   │       ├── UIManager.cpp
 │   │       └── UIManagerInternal.cpp
@@ -187,9 +301,11 @@ FTB/
 │   │   ├── NewFolderDialog.cpp
 │   │   ├── FilePreviewDialog.cpp
 │   │   ├── FolderDetailsDialog.cpp
-│   │   └── SSHDialog.cpp      # SSH dialog implementation
-│   ├── Connection/            # SSH backend
-│   │   └── SSHConnection.cpp  # SSH connection logic
+│   │   ├── SSHDialog.cpp      # SSH dialog implementation
+│   │   └── MySQLDialog.cpp    # MySQL dialog implementation
+│   ├── Connection/            # Connection backends
+│   │   ├── SSHConnection.cpp  # SSH connection logic
+│   │   └── MySQLConnection.cpp # MySQL connection logic
 │   └── Video_and_Photo/       # Media handling
 │       ├── ImageViewer.cpp
 │       ├── VideoPlayer.cpp
@@ -202,6 +318,10 @@ FTB/
 │   ├── Vim_like_Test.cpp
 │   ├── CMakeLists.txt
 │   └── FileSizeCaculatorTest.cpp
+├── config/                    # Configuration files
+│   └── .ftb.template         # Configuration template
+├── docs/                      # Documentation
+│   └── CONFIGURATION.md      # Configuration guide
 ├── bash_tool/                 # Build scripts
 │   ├── build.sh
 │   ├── package_build.sh
@@ -210,6 +330,8 @@ FTB/
 │   └── Release.yml
 ├── CMakeLists.txt            # Build configuration
 ├── README.md                 # Documentation
+├── QUICK_CONFIG.md           # Quick configuration guide
+├── test_config.sh            # Configuration test script
 ├── .gitignore
 ├── Release_notes.md
 ├── cmake_uninstall.cmake.in
@@ -220,7 +342,7 @@ FTB/
 ## Development Environment
 - Compiler: g++ 11.0+
 - Build tool: CMake 3.20+
-- Dependencies: FTXUI 5.0+, libssh2
+- Dependencies: FTXUI 5.0+, libssh2, libmysqlclient
 
 ## License
 
