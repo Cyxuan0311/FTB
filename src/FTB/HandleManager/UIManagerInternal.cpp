@@ -18,6 +18,8 @@
 #include "Video_and_Photo/ImageViewer.hpp"
 #include "FTB/BinaryFileHandler.hpp"
 #include "UI/MySQLDialog.hpp"
+#include "FTB/ConfigManager.hpp"
+#include "FTB/ThemeManager.hpp"
 
 namespace fs = std::filesystem;
 using namespace ftxui;
@@ -832,6 +834,7 @@ bool handleMySQLConnection(
 {
     // 仅在 Alt+D 键时触发
     if (event == ftxui::Event::AltD) {
+        std::cout << "🔍 Alt+D 键被按下，正在打开MySQL数据库管理器..." << std::endl;
         try {
             // 创建MySQL对话框
             UI::MySQLDialog mysql_dialog;
@@ -845,8 +848,10 @@ bool handleMySQLConnection(
                 std::cout << "🌐 连接类型: " << (params.is_local ? "本地" : "远程") << std::endl;
             });
             
+            std::cout << "📱 正在显示MySQL数据库管理器界面..." << std::endl;
             // 显示对话框
             mysql_dialog.showDialog(screen);
+            std::cout << "✅ MySQL数据库管理器已关闭" << std::endl;
             
         } catch (const std::exception& e) {
             std::cerr << "❌ MySQL连接错误: " << e.what() << std::endl;
@@ -867,7 +872,7 @@ bool handleMySQLConnection(
 // --------------------------------------------------
 bool handleConfigReload(
     ftxui::Event event,
-    ftxui::ScreenInteractive& screen) 
+    [[maybe_unused]] ftxui::ScreenInteractive& screen) 
 {
     // 仅在 Ctrl+R 键时触发
     if (event == ftxui::Event::CtrlR) {
@@ -897,7 +902,7 @@ bool handleConfigReload(
 // --------------------------------------------------
 bool handleThemeSwitch(
     ftxui::Event event,
-    ftxui::ScreenInteractive& screen) 
+    [[maybe_unused]] ftxui::ScreenInteractive& screen) 
 {
     // 仅在 Ctrl+T 键时触发
     if (event == ftxui::Event::CtrlT) {
