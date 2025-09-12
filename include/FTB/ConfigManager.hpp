@@ -5,7 +5,6 @@
 #include <map>
 #include <memory>
 #include <ftxui/dom/elements.hpp>
-#include <ftxui/dom/color.hpp>
 
 namespace FTB {
 

@@ -29,8 +29,8 @@ struct WeatherInfo {
  * @brief 天气服务配置结构
  */
 struct WeatherServiceConfig {
-    std::string python_script_path = "/mnt/f/My__StudyStack/My_Project/FTB_PART/fetch_weather.py";
-    std::string weather_data_path = "/mnt/f/My__StudyStack/My_Project/FTB_PART/data/weather.json";
+    std::string python_script_path = "/mnt/f/My__StudyStack/My_Project/FTB/data/Get_weather_information.py";
+    std::string weather_data_path = "/mnt/f/My__StudyStack/My_Project/FTB/data/weather.json";
     std::chrono::minutes update_interval = std::chrono::minutes(30);
     bool auto_start = true;
     bool enable_logging = true;
@@ -156,6 +156,7 @@ private:
     std::function<void(const std::string&)> error_callback_;
     
     // 私有方法
+    bool StartInternal();
     void UpdateLoop();
     bool ExecutePythonScript();
     bool ReadWeatherData();
