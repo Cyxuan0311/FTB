@@ -31,7 +31,7 @@ bool MySQLConnection::initializeConnection() {
     return true;
 }
 
-bool MySQLConnection::setConnectionParams(const MySQLConnectionParams& params) {
+bool MySQLConnection::setConnectionParams(const MySQLConnectionParams& /* params */) {
     if (!mysql_) {
         return false;
     }
