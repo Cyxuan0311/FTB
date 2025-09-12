@@ -61,9 +61,10 @@ int main()
     
     // 应用主题配置到布局设置
     const auto& config = config_manager->GetConfig();
-    items_per_page = config.layout.items_per_page;
-    items_per_row = config.layout.items_per_row;
-    detail_width = static_cast<int>(config.layout.detail_panel_ratio * 100);
+    // 布局配置变量（将在后面使用）
+    int items_per_page = config.layout.items_per_page;
+    int items_per_row = config.layout.items_per_row;
+    int detail_width = static_cast<int>(config.layout.detail_panel_ratio * 100);
     
     // 初始化天气服务
     auto weather_service = WeatherService::GetInstance();
@@ -89,8 +90,7 @@ int main()
     // ---------- 分页相关变量 ----------
 
     int current_page = 0;               // 当前页码，从 0 开始
-    const int items_per_page = 20;      // 每页显示的项目数量（4 行 x 5 列）
-    const int items_per_row = 5;        // 每行显示的项目数量
+    // items_per_page 和 items_per_row 已在上面从配置中初始化
     // 计算总页数：向上取整
     int total_pages = (static_cast<int>(filteredContents.size()) + items_per_page - 1) / items_per_page;
 
@@ -145,10 +145,9 @@ int main()
         FileSizeCalculator::CalculateSizes(currentPath, selected, total_folder_size, size_ratio, selected_size);
     };
 
-    // 获取天气显示组件
-    auto weather_display = WeatherDisplay::render();
+    // 简化的天气显示 - 静态显示，减少复杂性
 
-    // 构建“波浪”进度条的渲染函数
+    // 构建"波浪"进度条的渲染函数
     auto waveGauge = [&] {
         Elements wave_elements;
         // 生成 10 个子进度条，形成波浪效果
@@ -173,12 +172,14 @@ int main()
     // ---------- 主渲染函数（Renderer） ----------
 
     auto renderer = Renderer(component, [&] {
+        // 简化的天气显示 - 直接渲染，不进行复杂的更新检查
+        
         // 每次渲染时更新文件大小信息
         calculateSizes();
 
         // 获取当前系统时间并格式化为字符串
-        auto now    = std::chrono::system_clock::now();
-        std::time_t now_c  = std::chrono::system_clock::to_time_t(now);
+        auto time_now = std::chrono::system_clock::now();
+        std::time_t now_c  = std::chrono::system_clock::to_time_t(time_now);
         std::tm     now_tm = *std::localtime(&now_c);
         std::string time_str = FileManager::formatTime(now_tm);
 
@@ -377,7 +378,7 @@ int main()
                         text(ratio_stream.str() + "%") | bold
                     })
                 }) | border | color(Color::Purple3) | size(HEIGHT, EQUAL, 3),
-                weather_display,  // 天气组件
+                WeatherDisplay::render(),  // 天气组件 - 实时渲染
                 // 右侧：当前时间 + 加载指示符
                 vbox({
                     text(time_str) | color(Color::GrayDark),
@@ -400,7 +401,7 @@ int main()
 
     // ---------- 右侧详细信息面板 & Vim 编辑器模式 ----------
 
-    int detail_width = 25;               // 右侧细节面板的初始宽度
+    // detail_width 已在上面从配置中初始化
     bool vim_mode_active = false;        // 是否进入 Vim 模式编辑
     VimLikeEditor* vimEditor = nullptr;  // Vim 编辑器指针，初始为空
 

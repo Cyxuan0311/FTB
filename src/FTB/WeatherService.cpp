@@ -5,6 +5,8 @@
 #include <cstdlib>
 #include <sstream>
 #include <algorithm>
+#include <future>
+#include <chrono>
 
 namespace {
     // 全局单例实例
@@ -47,20 +49,18 @@ bool WeatherService::StartFromConfig() {
     }
     
     // 从配置文件读取配置
-    auto config_manager = ConfigManager::GetInstance();
-    if (!config_manager->LoadConfig()) {
-        LogError("无法加载配置文件");
+    auto config_manager = FTB::ConfigManager::GetInstance();
+    config_manager->LoadConfig(); // 尝试加载配置，但不依赖返回值
+    
+    // 检查配置是否有效
+    if (!config_manager->IsConfigValid()) {
+        LogError("配置管理器初始化失败");
         return false;
     }
     
-    // 从配置文件构建WeatherServiceConfig
-    config_.python_script_path = config_manager->GetString("weather_service.python_script.path");
-    config_.weather_data_path = config_manager->GetString("weather_service.data_file.path");
-    config_.update_interval = std::chrono::minutes(config_manager->GetInt("weather_service.update.interval_minutes", 30));
-    config_.auto_start = config_manager->GetBool("weather_service.update.auto_start", true);
-    config_.enable_logging = config_manager->GetBool("weather_service.logging.enabled", true);
-    config_.max_retry_attempts = config_manager->GetInt("weather_service.update.max_retry_attempts", 3);
-    config_.retry_delay = std::chrono::seconds(config_manager->GetInt("weather_service.update.retry_delay_seconds", 60));
+    // 使用默认配置（ConfigManager 当前不支持动态配置访问）
+    // 保持默认的 WeatherServiceConfig 值
+    LogMessage("使用默认天气服务配置");
     
     return StartInternal();
 }
@@ -116,9 +116,19 @@ void WeatherService::Stop() {
     // 通知更新线程退出
     update_cv_.notify_all();
     
-    // 等待线程结束
+    // 等待线程结束，设置超时避免无限等待
     if (update_thread_.joinable()) {
-        update_thread_.join();
+        // 使用超时等待，避免无限阻塞
+        auto future = std::async(std::launch::async, [this]() {
+            update_thread_.join();
+        });
+        
+        if (future.wait_for(std::chrono::seconds(2)) == std::future_status::timeout) {
+            LogMessage("天气线程停止超时，强制退出");
+            // 如果超时，不等待线程结束，让程序继续
+        } else {
+            LogMessage("天气线程已正常停止");
+        }
     }
     
     LogMessage("WeatherService已停止");
@@ -131,17 +141,29 @@ bool WeatherService::UpdateWeather() {
     }
     
     status_.store(WeatherServiceStatus::UPDATING);
-    LogMessage("开始更新天气数据...");
+    // LogMessage("开始更新天气数据..."); // 减少日志输出
     
     bool success = false;
     int attempts = 0;
     
-    while (attempts < config_.max_retry_attempts && !success) {
+    while (attempts < config_.max_retry_attempts && !success && running_.load()) {
         attempts++;
         
+        // 检查是否应该停止
+        if (!running_.load()) {
+            break;
+        }
+        
         if (attempts > 1) {
-            LogMessage("重试第 " + std::to_string(attempts) + " 次...");
-            std::this_thread::sleep_for(config_.retry_delay);
+            // LogMessage("重试第 " + std::to_string(attempts) + " 次..."); // 减少日志输出
+            // 使用更短的等待时间，更频繁地检查停止信号
+            auto wait_time = std::min(config_.retry_delay, std::chrono::seconds(5));
+            std::this_thread::sleep_for(wait_time);
+        }
+        
+        // 再次检查停止信号
+        if (!running_.load()) {
+            break;
         }
         
         success = ExecutePythonScript();
@@ -152,7 +174,7 @@ bool WeatherService::UpdateWeather() {
     
     if (success) {
         status_.store(WeatherServiceStatus::RUNNING);
-        LogMessage("天气数据更新成功");
+        // LogMessage("天气数据更新成功"); // 减少日志输出
         NotifyUpdate(current_weather_);
     } else {
         status_.store(WeatherServiceStatus::ERROR);
@@ -197,12 +219,19 @@ void WeatherService::UpdateLoop() {
     LogMessage("天气更新线程已启动");
     
     while (running_.load()) {
+        // 检查是否应该停止
+        if (!running_.load()) {
+            break;
+        }
+        
         // 执行天气更新
         UpdateWeather();
         
-        // 等待下一次更新
+        // 使用更短的等待时间，更频繁地检查停止信号
         std::unique_lock<std::mutex> lock(config_mutex_);
-        if (update_cv_.wait_for(lock, config_.update_interval, [this] { return !running_.load(); })) {
+        auto wait_time = std::min(config_.update_interval, std::chrono::minutes(1));
+        
+        if (update_cv_.wait_for(lock, wait_time, [this] { return !running_.load(); })) {
             break; // 收到停止信号
         }
     }
@@ -215,17 +244,28 @@ bool WeatherService::ExecutePythonScript() {
         // 构建命令
         std::string command = "python3 \"" + config_.python_script_path + "\"";
         
-        LogMessage("执行Python脚本: " + command);
+        // LogMessage("执行Python脚本: " + command); // 减少日志输出
         
-        // 执行Python脚本
-        int result = std::system(command.c_str());
+        // 使用异步执行Python脚本，避免阻塞
+        auto future = std::async(std::launch::async, [command]() {
+            return std::system(command.c_str());
+        });
         
+        // 等待脚本执行完成，设置超时
+        auto status = future.wait_for(std::chrono::seconds(10));
+        
+        if (status == std::future_status::timeout) {
+            LogError("Python脚本执行超时");
+            return false;
+        }
+        
+        int result = future.get();
         if (result != 0) {
             LogError("Python脚本执行失败，返回码: " + std::to_string(result));
             return false;
         }
         
-        LogMessage("Python脚本执行成功");
+        // LogMessage("Python脚本执行成功"); // 减少日志输出
         return true;
         
     } catch (const std::exception& e) {
@@ -331,6 +371,13 @@ bool WeatherService::ValidateWeatherData(const WeatherInfo& info) const {
 }
 
 void WeatherService::NotifyUpdate(const WeatherInfo& info) {
+    // 更新数据有效性标志
+    {
+        std::lock_guard<std::mutex> lock(data_mutex_);
+        current_weather_.is_valid = true;
+        current_weather_.last_update = std::chrono::system_clock::now();
+    }
+    
     if (update_callback_) {
         try {
             update_callback_(info);

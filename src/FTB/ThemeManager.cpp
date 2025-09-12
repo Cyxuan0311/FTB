@@ -67,7 +67,7 @@ ftxui::Element ThemeManager::CreateColoredText(const std::string& text, const st
 }
 
 ftxui::Element ThemeManager::CreateColoredBorder(ftxui::Element element, const std::string& color_name) const {
-    return ftxui::border(ftxui::BorderStyle::Rounded, GetThemeColor(color_name), element);
+    return ftxui::borderRounded(element) | ftxui::color(GetThemeColor(color_name));
 }
 
 ftxui::Element ThemeManager::CreateColoredBackground(ftxui::Element element, const std::string& color_name) const {
@@ -85,15 +85,17 @@ ftxui::Element ThemeManager::CreateStatusBarStyle(ftxui::Element element) const 
 }
 
 ftxui::Element ThemeManager::CreateSearchBoxStyle(ftxui::Element element) const {
-    return ftxui::border(ftxui::BorderStyle::Rounded, GetThemeColor("search_border"), 
+    return ftxui::borderRounded(
            ftxui::bgcolor(GetThemeColor("search_bg"), 
-           ftxui::color(GetThemeColor("search_fg"), element)));
+           ftxui::color(GetThemeColor("search_fg"), element))) | 
+           ftxui::color(GetThemeColor("search_border"));
 }
 
 ftxui::Element ThemeManager::CreateDialogStyle(ftxui::Element element) const {
-    return ftxui::border(ftxui::BorderStyle::Rounded, GetThemeColor("dialog_border"), 
+    return ftxui::borderRounded(
            ftxui::bgcolor(GetThemeColor("dialog_bg"), 
-           ftxui::color(GetThemeColor("dialog_fg"), element)));
+           ftxui::color(GetThemeColor("dialog_fg"), element))) | 
+           ftxui::color(GetThemeColor("dialog_border"));
 }
 
 ftxui::Element ThemeManager::CreateButtonStyle(ftxui::Element element) const {
@@ -132,21 +134,14 @@ void ThemeManager::InitializePredefinedThemes() {
     
     default_theme.colors_status.background = "blue";
     default_theme.colors_status.foreground = "white";
-    default_theme.colors_status.time = "yellow";
-    default_theme.colors_status.path = "cyan";
     
     default_theme.colors_search.background = "black";
     default_theme.colors_search.foreground = "white";
     default_theme.colors_search.border = "green";
-    default_theme.colors_search.highlight = "yellow";
     
     default_theme.colors_dialog.background = "black";
     default_theme.colors_dialog.foreground = "white";
     default_theme.colors_dialog.border = "blue";
-    default_theme.colors_dialog.button_bg = "blue";
-    default_theme.colors_dialog.button_fg = "white";
-    default_theme.colors_dialog.input_bg = "black";
-    default_theme.colors_dialog.input_fg = "white";
     
     predefined_themes_["default"] = default_theme;
     
@@ -201,13 +196,10 @@ void ThemeManager::InitializePredefinedThemes() {
     
     colorful_theme.colors_status.background = "magenta";
     colorful_theme.colors_status.foreground = "white";
-    colorful_theme.colors_status.time = "yellow";
-    colorful_theme.colors_status.path = "cyan";
     
     colorful_theme.colors_search.background = "black";
     colorful_theme.colors_search.foreground = "white";
     colorful_theme.colors_search.border = "magenta";
-    colorful_theme.colors_search.highlight = "yellow";
     
     predefined_themes_["colorful"] = colorful_theme;
     
