@@ -28,6 +28,20 @@ private:
     // 创建主对话框组件
     ftxui::Component createMainDialog();
     
+    // 创建现代化标签页界面
+    ftxui::Component createModernTabbedInterface();
+    
+    // 创建标签页组件
+    ftxui::Component createConnectionTab();
+    ftxui::Component createSettingsTab();
+    
+    // 创建现代化面板组件
+    ftxui::Component createLeftNavigationPanel();
+    ftxui::Component createCenterWorkPanel();
+    ftxui::Component createRightPropertiesPanel();
+    ftxui::Component createTopToolbar();
+    ftxui::Component createBottomStatusBar();
+    
     // 创建连接设置组件
     ftxui::Component createConnectionSettings();
     
@@ -40,8 +54,26 @@ private:
     // 创建查询执行组件
     ftxui::Component createQueryExecutor();
     
+    // 创建增强的SQL编辑器
+    ftxui::Component createEnhancedSQLEditor();
+    
+    // 创建数据表格视图
+    ftxui::Component createDataTableView();
+    
+    // 创建连接管理器
+    ftxui::Component createConnectionManager();
+    
+    // 创建表结构查看器
+    ftxui::Component createTableStructureViewer();
+    
+    // 创建性能分析器
+    ftxui::Component createPerformanceAnalyzer();
+    
     // 处理连接按钮点击
     void onConnect();
+    
+    // 处理测试连接按钮点击
+    void onTestConnection();
     
     // 处理断开连接按钮点击
     void onDisconnect();
@@ -115,6 +147,10 @@ private:
     std::string selected_database_;
     std::string selected_table_;
     
+    // 选择索引（用于Menu组件）
+    int selected_database_index_;
+    int selected_table_index_;
+    
     // 列表数据
     std::vector<std::string> databases_;
     std::vector<std::string> tables_;
@@ -134,6 +170,47 @@ private:
     
     // 当前活动标签页
     int active_tab_;
+    
+    // 现代化界面相关变量
+    int selected_connection_index_;
+    int selected_database_tree_index_;
+    int selected_table_tree_index_;
+    std::vector<std::string> connection_history_;
+    std::vector<std::string> query_history_;
+    std::string current_sql_query_;
+    bool show_query_history_;
+    bool show_connection_manager_;
+    
+    // 数据表格相关
+    std::vector<std::vector<std::string>> current_table_data_;
+    std::vector<std::string> current_table_columns_;
+    int current_page_;
+    int page_size_;
+    int total_rows_;
+    
+    // 连接管理相关
+    struct ConnectionConfig {
+        std::string name;
+        std::string hostname;
+        std::string port;
+        std::string username;
+        std::string password;
+        std::string database;
+        bool is_active;
+    };
+    std::vector<ConnectionConfig> saved_connections_;
+    int selected_connection_config_index_;
+    
+    // 表结构相关
+    struct TableColumn {
+        std::string name;
+        std::string type;
+        std::string null;
+        std::string key;
+        std::string default_value;
+        std::string extra;
+    };
+    std::vector<TableColumn> current_table_structure_;
 };
 
 } // namespace UI
