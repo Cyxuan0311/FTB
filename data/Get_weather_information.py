@@ -50,7 +50,7 @@ def fetch_weather():
             }
             
             # 保存到文件
-            with open('/mnt/f/My__StudyStack/My_Project/FTB_PART/data/weather.json', 'w', encoding='utf-8') as f:
+            with open('/mnt/f/My__StudyStack/My_Project/FTB/data/weather.json', 'w', encoding='utf-8') as f:
                 json.dump(weather_info, f, ensure_ascii=False, indent=2)
             print("天气更新成功：", weather_info)
         else:
@@ -60,7 +60,7 @@ def fetch_weather():
 
 if __name__ == "__main__":
     # 创建数据目录
-    os.makedirs('/mnt/f/My__StudyStack/My_Project/FTB_PART/data', exist_ok=True)
+    os.makedirs('/mnt/f/My__StudyStack/My_Project/FTB/data', exist_ok=True)
     
     # 首次运行立即获取
     fetch_weather()
