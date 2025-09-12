@@ -4,12 +4,12 @@
 weather_service:
   # Python脚本配置
   python_script:
-    path: "/mnt/f/My__StudyStack/My_Project/FTB_PART/fetch_weather.py"
+    path: "/mnt/f/My__StudyStack/My_Project/FTB/data/Get_weather_information.py"
     enabled: true
   
   # 数据文件配置
   data_file:
-    path: "/mnt/f/My__StudyStack/My_Project/FTB_PART/data/weather.json"
+    path: "/mnt/f/My__StudyStack/My_Project/FTB/data/weather.json"
     auto_create: true
   
   # 更新配置

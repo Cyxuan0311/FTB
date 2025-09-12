@@ -1,164 +1,70 @@
-# FTB (Terminal File Browser) 配置文件
-# 复制此文件到用户主目录并重命名为 .ftb 来自定义界面样式
+# FTB 配置文件模板
+# 这是FTB (Terminal File Browser) 的配置文件模板
+# 复制此文件到用户主目录下的 .ftb 文件来自定义配置
 
-# ========================================
-# 界面颜色配置
-# ========================================
+[colors]
+# 主界面颜色配置
+main_background = black
+main_foreground = white
+main_border = blue
 
-# 主界面颜色
-[colors.main]
-# 背景色 (支持: black, red, green, yellow, blue, magenta, cyan, white)
-background = black
-# 前景色 (文字颜色)
-foreground = white
-# 边框颜色
-border = blue
-# 选中项背景色
-selection_bg = blue
-# 选中项前景色
-selection_fg = white
+# 状态栏颜色配置
+status_background = blue
+status_foreground = white
+status_time = yellow
+status_path = cyan
 
-# 文件类型颜色
-[colors.files]
-# 文件夹颜色
-directory = blue
-# 普通文件颜色
-file = white
-# 可执行文件颜色
-executable = green
-# 链接文件颜色
-link = cyan
-# 隐藏文件颜色
-hidden = yellow
-# 系统文件颜色
-system = red
+# 搜索框颜色配置
+search_background = black
+search_foreground = white
+search_border = green
+search_highlight = yellow
 
-# 状态栏颜色
-[colors.status]
-# 状态栏背景色
-background = blue
-# 状态栏前景色
-foreground = white
-# 时间显示颜色
-time = yellow
-# 路径显示颜色
-path = cyan
+# 对话框颜色配置
+dialog_background = black
+dialog_foreground = white
+dialog_border = magenta
 
-# 搜索框颜色
-[colors.search]
-# 搜索框背景色
-background = black
-# 搜索框前景色
-foreground = white
-# 搜索框边框颜色
-border = green
-# 搜索高亮颜色
-highlight = yellow
-
-# 对话框颜色
-[colors.dialog]
-# 对话框背景色
-background = black
-# 对话框前景色
-foreground = white
-# 对话框边框颜色
-border = blue
-# 按钮背景色
-button_bg = blue
-# 按钮前景色
-button_fg = white
-# 输入框背景色
-input_bg = black
-# 输入框前景色
-input_fg = white
-
-# ========================================
-# 界面样式配置
-# ========================================
-
-[style]
-# 是否显示图标
-show_icons = true
-# 是否显示文件大小
-show_file_size = true
-# 是否显示修改时间
-show_modified_time = true
-# 是否显示权限信息
-show_permissions = true
-# 是否启用鼠标支持
-enable_mouse = true
-# 是否启用动画效果
-enable_animations = true
-
-# 布局配置
 [layout]
-# 每页显示的项目数量
+# 布局配置
 items_per_page = 20
-# 每行显示的项目数量
-items_per_row = 5
-# 详情面板宽度比例 (0.0-1.0)
+items_per_row = 1
 detail_panel_ratio = 0.3
-# 是否显示详情面板
-show_detail_panel = true
 
-# 刷新配置
 [refresh]
-# UI刷新间隔 (毫秒)
+# 刷新配置
 ui_refresh_interval = 100
-# 目录内容刷新间隔 (毫秒)
 content_refresh_interval = 1000
-# 是否自动刷新
-auto_refresh = true
 
-# 快捷键配置
-[shortcuts]
-# 是否启用自定义快捷键
-enable_custom_shortcuts = false
-# 自定义快捷键映射 (格式: action = key)
-# 例如: create_file = Ctrl+F
-
-# 主题配置
 [theme]
-# 主题名称 (支持: default, dark, light, colorful, minimal)
-name = default
-# 是否使用彩色输出
-use_colors = true
-# 是否使用粗体文字
-use_bold = false
-# 是否使用下划线
-use_underline = false
+# 主题配置
+current_theme = default
+auto_switch = false
 
-# MySQL连接配置
 [mysql]
-# 默认主机
+# MySQL连接配置
 default_host = localhost
-# 默认端口
 default_port = 3306
-# 默认用户名
 default_username = root
-# 默认数据库
+default_password = 
 default_database = 
-# 连接超时时间 (秒)
-connection_timeout = 10
 
-# SSH连接配置
 [ssh]
-# 默认端口
+# SSH连接配置
+default_host = localhost
 default_port = 22
-# 连接超时时间 (秒)
-connection_timeout = 30
-# 是否保存连接历史
-save_connection_history = true
-# 最大连接历史数量
-max_connection_history = 10
+default_username = 
+default_password = 
 
-# 日志配置
 [logging]
-# 日志级别 (debug, info, warning, error)
-level = info
-# 是否输出到文件
-output_to_file = false
-# 日志文件路径
-log_file = ~/.ftb.log
-# 是否显示时间戳
-show_timestamp = true 
+# 日志配置
+log_level = info
+log_to_file = false
+log_file_path = ~/.ftb.log
+
+[weather]
+# 天气服务配置
+enabled = true
+update_interval = 1800
+python_script_path = /mnt/f/My__StudyStack/My_Project/FTB/data/Get_weather_information.py
+data_file_path = /mnt/f/My__StudyStack/My_Project/FTB/data/weather.json
