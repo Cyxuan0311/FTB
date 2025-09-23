@@ -16,31 +16,37 @@
 #include <thread>                             // 线程支持
 #include <atomic>                             // 原子操作
 #include <sstream>                            // 字符串流
+#include <unordered_map>                      // 哈希表
+#include <set>                                // 集合容器
 
 namespace fs = std::filesystem;               // 为 std::filesystem 设置简短别名
 
 namespace FileManager {
 
 // ---------------------------- 全局缓存变量 ----------------------------
-// 用于保护缓存操作的读写锁
+// 用于保护缓存操作的互斥锁
 std::mutex cache_mutex;
-// 目录缓存：键为目录路径，值为对应的目录缓存结构
-std::map<std::string, DirectoryCache> dir_cache;
-// 文件内容缓存：键为文件路径，值为对应的文件内容块缓存
-std::map<std::string, FileChunkCache> fileChunkCache;
 
-// 优化的LRU缓存
+// 优化的LRU缓存 - 根据系统内存动态调整大小
+// 目录缓存：较大容量，较长TTL（目录结构变化较少）
 std::unique_ptr<FTB::LRUCache<std::string, DirectoryCache>> lru_dir_cache = 
-    std::make_unique<FTB::LRUCache<std::string, DirectoryCache>>(1000, std::chrono::seconds(300));
+    std::make_unique<FTB::LRUCache<std::string, DirectoryCache>>(2000, std::chrono::seconds(600));
+// 大小缓存：最大容量，中等TTL（文件大小相对稳定）
 std::unique_ptr<FTB::LRUCache<std::string, uintmax_t>> lru_size_cache = 
-    std::make_unique<FTB::LRUCache<std::string, uintmax_t>>(5000, std::chrono::seconds(600));
+    std::make_unique<FTB::LRUCache<std::string, uintmax_t>>(10000, std::chrono::seconds(900));
+// 内容缓存：较小容量，较短TTL（文件内容可能频繁变化）
 std::unique_ptr<FTB::LRUCache<std::string, std::string>> lru_content_cache = 
-    std::make_unique<FTB::LRUCache<std::string, std::string>>(2000, std::chrono::seconds(180));
+    std::make_unique<FTB::LRUCache<std::string, std::string>>(1000, std::chrono::seconds(120));
 
 // 缓存统计信息
 std::atomic<size_t> cache_hits{0};
 std::atomic<size_t> cache_misses{0};
 std::atomic<size_t> cache_evictions{0};
+std::atomic<size_t> preload_hits{0};
+
+// 热点路径跟踪（用于智能预加载）
+std::unordered_map<std::string, std::atomic<uint32_t>> path_access_count;
+std::mutex path_tracking_mutex;
 
 // 缓存清理线程
 std::thread cache_cleanup_thread;
@@ -64,6 +70,9 @@ bool isDirectory(const std::string & path) {
  * @return 返回包含目录中所有条目名称的字符串向量
  */
 std::vector<std::string> getDirectoryContents(const std::string & path) {
+    // 跟踪路径访问
+    trackPathAccess(path);
+    
     // 首先尝试从LRU缓存获取
     auto cached_result = lru_dir_cache->get(path);
     if (cached_result.has_value()) {
@@ -295,12 +304,10 @@ bool createDirectory(const std::string & dirPath) {
         std::lock_guard<std::mutex> lock(cache_mutex);
         
         // 如果新目录已在缓存中，则清除
-        if (dir_cache.count(dirPath))
-            dir_cache.erase(dirPath);
+        lru_dir_cache->erase(dirPath);
             
         // 标记父目录缓存为无效，下次访问时会重新加载
-        if (dir_cache.count(parentPath))
-            dir_cache[parentPath].valid = false;
+        lru_dir_cache->erase(parentPath);
     }
     
     // 返回操作成功
@@ -366,23 +373,23 @@ void enterDirectory(DirectoryHistory & history,
     }
     
     // 获取当前路径缓存，若无效则重新加载
-    auto &cache = dir_cache[currentPath];
-    if (!cache.valid) {
-        cache.contents = getDirectoryContents(currentPath);
-        cache.valid = true;
-        cache.last_update = std::chrono::system_clock::now();
+    auto cached_result = lru_dir_cache->get(currentPath);
+    if (cached_result.has_value()) {
+        contents = cached_result->contents;
+    } else {
+        contents = getDirectoryContents(currentPath);
     }
     
     // 验证选中项是否在有效范围内
-    bool valid_selection = !cache.contents.empty() && (selected >= 0) &&
-                         (static_cast<size_t>(selected) < cache.contents.size());
+    bool valid_selection = !contents.empty() && (selected >= 0) &&
+                         (static_cast<size_t>(selected) < contents.size());
     if (!valid_selection) {
         selected = -1;
         return;
     }
     
     // 构建目标目录完整路径
-    fs::path fullPath = fs::path(currentPath) / cache.contents[selected];
+    fs::path fullPath = fs::path(currentPath) / contents[selected];
     if (!fs::exists(fullPath) || !isDirectory(fullPath.string())) {
         std::cerr << "Target is not a valid directory: " << fullPath << std::endl;
         selected = -1;
@@ -390,17 +397,14 @@ void enterDirectory(DirectoryHistory & history,
     }
     
     // 预加载目标目录内容到缓存
-    auto &new_cache = dir_cache[fullPath.string()];
-    new_cache.contents = getDirectoryContents(fullPath.string());
-    new_cache.valid = true;
-    new_cache.last_update = std::chrono::system_clock::now();
+    getDirectoryContents(fullPath.string());
     
     // 更新历史记录和当前路径
     history.push(currentPath);
     currentPath = fullPath.lexically_normal().string();
     
     // 设置返回参数
-    contents = new_cache.contents;
+    contents = getDirectoryContents(fullPath.string());
     selected = contents.empty() ? -1 : 0;  // 空目录设为-1，否则选中第一项
 }
 
@@ -537,15 +541,11 @@ bool writeFileContent(const std::string & filePath, const std::string & content)
         std::lock_guard<std::mutex> lock(cache_mutex);
         
         // 清除该文件的缓存内容
-        if (fileChunkCache.count(filePath)) {
-            fileChunkCache.erase(filePath);
-        }
+        lru_content_cache->erase(filePath);
         
         // 获取父目录路径并标记其缓存为无效
         std::string parentDir = fs::path(filePath).parent_path().string();
-        if (dir_cache.count(parentDir)) {
-            dir_cache[parentDir].valid = false;
-        }
+        lru_dir_cache->erase(parentDir);
     }
     
     return true;
@@ -561,24 +561,17 @@ bool writeFileContent(const std::string & filePath, const std::string & content)
  * 2. 删除超过有效期的缓存项
  * 3. 线程安全操作
  */
-void clearFileChunkCache(const std::chrono::seconds& expiry) {
+void clearFileChunkCache(const std::chrono::seconds& /*expiry*/) {
     // 加锁保护缓存操作
     std::lock_guard<std::mutex> lock(cache_mutex);
     
     // 获取当前时间点
     auto now = std::chrono::system_clock::now();
     
-    // 遍历缓存字典
-    for (auto it = fileChunkCache.begin(); it != fileChunkCache.end(); ) {
-        // 检查缓存项是否过期
-        if (now - it->second.last_update > expiry) {
-            // 删除过期缓存项
-            it = fileChunkCache.erase(it);
-        } else {
-            // 保留未过期缓存项
-            ++it;
-        }
-    }
+    // 清理过期的LRU缓存项
+    lru_dir_cache->cleanup_expired();
+    lru_size_cache->cleanup_expired();
+    lru_content_cache->cleanup_expired();
 }
 
 
@@ -625,14 +618,10 @@ bool renameFileOrDirectory(const std::string& oldPath, const std::string& newNam
             std::lock_guard<std::mutex> lock(cache_mutex);
             
             // 标记父目录缓存为无效(下次访问会重新加载)
-            if (dir_cache.count(parentPath)) {
-                dir_cache[parentPath].valid = false;
-            }
+            lru_dir_cache->erase(parentPath);
             
             // 清除旧路径的缓存(如果存在)
-            if (dir_cache.count(oldPath)) {
-                dir_cache.erase(oldPath);
-            }
+            lru_dir_cache->erase(oldPath);
         }
         
         return true;
@@ -723,8 +712,6 @@ void clearAllCaches() {
     lru_dir_cache->clear();
     lru_size_cache->clear();
     lru_content_cache->clear();
-    dir_cache.clear();
-    fileChunkCache.clear();
     
     cache_hits.store(0);
     cache_misses.store(0);
@@ -746,14 +733,10 @@ size_t cleanupExpiredCaches() {
     auto now = std::chrono::system_clock::now();
     const std::chrono::seconds expiry(300); // 5分钟过期
     
-    for (auto it = fileChunkCache.begin(); it != fileChunkCache.end();) {
-        if (now - it->second.last_update > expiry) {
-            it = fileChunkCache.erase(it);
-            total_cleaned++;
-        } else {
-            ++it;
-        }
-    }
+    // 清理过期的LRU缓存项
+    lru_dir_cache->cleanup_expired();
+    lru_size_cache->cleanup_expired();
+    lru_content_cache->cleanup_expired();
     
     return total_cleaned;
 }
@@ -816,19 +799,79 @@ void invalidateCacheForPath(const std::string& path) {
     // 这里简化实现，实际可以维护一个反向索引
     lru_content_cache->clear();
     
-    // 从传统缓存中删除
-    std::lock_guard<std::mutex> lock(cache_mutex);
-    dir_cache.erase(path);
-    fileChunkCache.erase(path);
+    // 清理路径访问统计
+    {
+        std::lock_guard<std::mutex> lock(path_tracking_mutex);
+        path_access_count.erase(path);
+    }
     
     // 如果路径是目录，还需要清理其父目录的缓存
     try {
         std::string parent_path = fs::path(path).parent_path().string();
         lru_dir_cache->erase(parent_path);
-        dir_cache.erase(parent_path);
     } catch (...) {
         // 忽略错误
     }
+}
+
+// 新增：智能预加载函数
+void preloadHotPaths() {
+    std::lock_guard<std::mutex> lock(path_tracking_mutex);
+    
+    // 找出访问次数最多的前10个路径
+    std::vector<std::pair<std::string, uint32_t>> hot_paths;
+    for (const auto& [path, count] : path_access_count) {
+        if (count.load() > 5) { // 访问次数超过5次
+            hot_paths.emplace_back(path, count.load());
+        }
+    }
+    
+    // 按访问次数排序
+    std::sort(hot_paths.begin(), hot_paths.end(), 
+              [](const auto& a, const auto& b) { return a.second > b.second; });
+    
+    // 预加载前10个热点路径
+    for (size_t i = 0; i < std::min(size_t(10), hot_paths.size()); ++i) {
+        const std::string& path = hot_paths[i].first;
+        
+        // 预加载目录内容
+        if (fs::is_directory(path)) {
+            getDirectoryContents(path);
+        }
+        
+        // 预加载文件大小
+        if (fs::is_regular_file(path)) {
+            getFileSize(path);
+        }
+        
+        preload_hits.fetch_add(1);
+    }
+}
+
+// 新增：路径访问跟踪
+void trackPathAccess(const std::string& path) {
+    std::lock_guard<std::mutex> lock(path_tracking_mutex);
+    path_access_count[path].fetch_add(1);
+}
+
+// 新增：获取缓存性能报告
+std::string getCachePerformanceReport() {
+    size_t total_requests = cache_hits.load() + cache_misses.load();
+    double hit_ratio = total_requests > 0 ? 
+        static_cast<double>(cache_hits.load()) / total_requests * 100.0 : 0.0;
+    
+    std::ostringstream report;
+    report << "=== 缓存性能报告 ===\n";
+    report << "命中次数: " << cache_hits.load() << "\n";
+    report << "未命中次数: " << cache_misses.load() << "\n";
+    report << "驱逐次数: " << cache_evictions.load() << "\n";
+    report << "预加载命中: " << preload_hits.load() << "\n";
+    report << "命中率: " << std::fixed << std::setprecision(2) << hit_ratio << "%\n";
+    report << "目录缓存大小: " << lru_dir_cache->size() << "\n";
+    report << "大小缓存大小: " << lru_size_cache->size() << "\n";
+    report << "内容缓存大小: " << lru_content_cache->size() << "\n";
+    
+    return report.str();
 }
 
 } // namespace FileManager

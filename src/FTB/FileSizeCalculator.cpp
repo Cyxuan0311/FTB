@@ -39,28 +39,16 @@ namespace FileSizeCalculator
         {
             // 使用互斥锁保护缓存访问
             std::unique_lock<std::mutex> lock(FileManager::cache_mutex);
-            auto& cache = FileManager::dir_cache[path];
-
-            // 如果缓存无效，则重新获取目录内容列表
-            if (!cache.valid || !cache.is_still_valid(path))
-            {
-                lock.unlock(); // 释放锁
-                std::unique_lock<std::mutex> write_lock(FileManager::cache_mutex);
-                
-                // 双重检查
-                if (!cache.valid || !cache.is_still_valid(path)) {
-                    cache.contents    = FileManager::getDirectoryContents(path);
-                    cache.last_update = std::chrono::system_clock::now();
-                    cache.valid       = true;
-                    cache.sizes.clear();
-                    cache.total_size = 0;
-                    cache.file_mod_times.clear();
-                }
-                write_lock.unlock();
+            
+            // 尝试从LRU缓存获取目录内容
+            auto cached_result = FileManager::lru_dir_cache->get(path);
+            if (cached_result.has_value()) {
+                contents_copy = cached_result->contents;
+            } else {
+                lock.unlock(); // 解锁以进行文件系统操作
+                contents_copy = FileManager::getDirectoryContents(path);
                 lock.lock(); // 重新获取锁
             }
-            // 拷贝目录内容以供后续计算使用
-            contents_copy = cache.contents;
         }
 
         // 如果目录为空，则直接将所有输出设置为 0 或空，并返回
@@ -74,15 +62,8 @@ namespace FileSizeCalculator
 
         // -------------------- 尝试获取文件大小缓存 --------------------
         std::vector<uintmax_t> sizes;
-        {
-            std::lock_guard<std::mutex> lock(FileManager::cache_mutex);
-            auto& cache = FileManager::dir_cache[path];
-            // 如果缓存中已经有大小数据，则直接复制
-            if (!cache.sizes.empty())
-            {
-                sizes = cache.sizes;
-            }
-        }
+        // 注意：由于我们使用LRU缓存，这里不再需要检查sizes缓存
+        // 直接进行计算
 
         // -------------------- 并行计算文件大小（若缓存为空） --------------------
         if (sizes.empty())
@@ -100,22 +81,26 @@ namespace FileSizeCalculator
                            });
 
             // 并行计算得到大小数组后，累加获取目录总大小
-            uintmax_t total = std::accumulate(sizes.begin(), sizes.end(), 0ULL);
+            // 计算总大小（用于后续缓存）
+            [[maybe_unused]] uintmax_t total = std::accumulate(sizes.begin(), sizes.end(), 0ULL);
 
             // 更新缓存：存储各文件大小和总大小
-            {
-                std::lock_guard<std::mutex> lock(FileManager::cache_mutex);
-                auto& cache = FileManager::dir_cache[path];
-                cache.sizes      = sizes;
-                cache.total_size = total;
-            }
+            // 注意：LRU缓存会自动管理大小缓存，这里不需要手动存储
         }
 
         // -------------------- 获取目录总大小 --------------------
         uintmax_t totalSize = 0;
         {
             std::lock_guard<std::mutex> lock(FileManager::cache_mutex);
-            totalSize = FileManager::dir_cache[path].total_size;
+            auto cached_result = FileManager::lru_size_cache->get(path);
+            if (cached_result.has_value()) {
+                totalSize = cached_result.value();
+            } else {
+                // 计算总大小
+                totalSize = std::accumulate(sizes.begin(), sizes.end(), uintmax_t(0));
+                // 缓存结果
+                FileManager::lru_size_cache->put(path, totalSize);
+            }
         }
 
         // 将目录总大小存入原子变量以便 UI 线程安全访问
