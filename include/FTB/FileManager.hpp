@@ -100,19 +100,19 @@ namespace FileManager
 
     // ---------------------------- 全局缓存变量声明 ----------------------------
 
-    /// 保护缓存访问的读写锁，提高并发性能
-    extern std::shared_mutex                     cache_mutex;
+    /// 保护缓存访问的互斥锁，确保线程安全
+    extern std::mutex                           cache_mutex;
     /// 目录路径到 DirectoryCache 的映射，用于缓存各个目录的内容信息
     extern std::map<std::string, DirectoryCache> dir_cache;
     /// 文件路径到 FileChunkCache 的映射，用于缓存文件分块读取的数据
     extern std::map<std::string, FileChunkCache> fileChunkCache;
     
     /// 优化的LRU缓存，用于目录内容缓存
-    extern LRUCache<std::string, DirectoryCache> lru_dir_cache;
+    extern std::unique_ptr<FTB::LRUCache<std::string, DirectoryCache>> lru_dir_cache;
     /// 优化的LRU缓存，用于文件大小缓存
-    extern LRUCache<std::string, uintmax_t>      lru_size_cache;
+    extern std::unique_ptr<FTB::LRUCache<std::string, uintmax_t>>      lru_size_cache;
     /// 优化的LRU缓存，用于文件内容缓存
-    extern LRUCache<std::string, std::string>    lru_content_cache;
+    extern std::unique_ptr<FTB::LRUCache<std::string, std::string>>    lru_content_cache;
     
     /// 缓存统计信息
     extern std::atomic<size_t>                   cache_hits;

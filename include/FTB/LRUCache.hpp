@@ -380,7 +380,7 @@ private:
                 Key key = key_deserializer_(key_str);
                 Value value = value_deserializer_(value_str);
                 
-                time_point created_time(std::chrono::seconds(created_seconds));
+                time_point created_time{std::chrono::seconds(created_seconds)};
                 std::chrono::seconds ttl(ttl_seconds);
                 
                 // 检查是否过期
