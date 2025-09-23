@@ -102,10 +102,6 @@ namespace FileManager
 
     /// 保护缓存访问的互斥锁，确保线程安全
     extern std::mutex                           cache_mutex;
-    /// 目录路径到 DirectoryCache 的映射，用于缓存各个目录的内容信息
-    extern std::map<std::string, DirectoryCache> dir_cache;
-    /// 文件路径到 FileChunkCache 的映射，用于缓存文件分块读取的数据
-    extern std::map<std::string, FileChunkCache> fileChunkCache;
     
     /// 优化的LRU缓存，用于目录内容缓存
     extern std::unique_ptr<FTB::LRUCache<std::string, DirectoryCache>> lru_dir_cache;
@@ -297,6 +293,11 @@ namespace FileManager
      * @param path 发生变化的路径
      */
     void invalidateCacheForPath(const std::string& path);
+    
+    // 智能缓存管理函数
+    void preloadHotPaths();
+    void trackPathAccess(const std::string& path);
+    std::string getCachePerformanceReport();
 
 }  // namespace FileManager
 
