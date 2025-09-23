@@ -83,7 +83,7 @@ bool handleRename(
                 allContents = FileManager::getDirectoryContents(currentPath);
                 filteredContents = allContents;
                 // 标记当前目录缓存失效，下次重新加载
-                FileManager::dir_cache[currentPath].valid = false;
+                FileManager::lru_dir_cache->erase(currentPath);
             }
         }
         return true;
@@ -282,7 +282,7 @@ bool handleNewFile(
                     std::lock_guard<std::mutex> lock(FileManager::cache_mutex);
                     allContents = FileManager::getDirectoryContents(currentPath);
                     filteredContents = allContents;
-                    FileManager::dir_cache[currentPath].valid = false;
+                    FileManager::lru_dir_cache->erase(currentPath);
                 } else {
                     // 创建失败则打印错误
                     std::cerr << "❗ Failed to create file: " << fullPath.string() << std::endl;
@@ -329,7 +329,7 @@ bool handleNewFolder(
                     std::lock_guard<std::mutex> lock(FileManager::cache_mutex);
                     allContents = FileManager::getDirectoryContents(currentPath);
                     filteredContents = allContents;
-                    FileManager::dir_cache[currentPath].valid = false;
+                    FileManager::lru_dir_cache->erase(currentPath);
                 } else {
                     // 创建失败则打印错误
                     std::cerr << "❗ Failed to create directory: " << fullPath.string() << std::endl;
@@ -399,7 +399,7 @@ bool handleBackNavigation(
             // 标记当前目录缓存失效
             {
                 std::lock_guard<std::mutex> lock(FileManager::cache_mutex);
-                FileManager::dir_cache[currentPath].valid = false;
+                FileManager::lru_dir_cache->erase(currentPath);
             }
 
             // 异步加载新目录下的内容并更新 allContents、filteredContents，同时更新缓存
@@ -407,8 +407,7 @@ bool handleBackNavigation(
                 auto newContents = FileManager::getDirectoryContents(currentPath);
                 {
                     std::lock_guard<std::mutex> lock(FileManager::cache_mutex);
-                    FileManager::dir_cache[currentPath].contents = newContents;
-                    FileManager::dir_cache[currentPath].valid = true;
+                    // LRU缓存会自动管理目录内容，这里不需要手动更新
                 }
                 allContents = newContents;
                 filteredContents = newContents;
@@ -488,7 +487,7 @@ bool handleVimMode(
                     // 如果写入失败，可在此处理
                 } else {
                     // 标记缓存失效
-                    FileManager::dir_cache[fullPath.string()].valid = false;
+                    FileManager::lru_dir_cache->erase(fullPath.string());
                 }
                 vim_mode_active = false;
                 if (vimEditor) {
@@ -540,7 +539,7 @@ bool handleDelete(
                 allContents = FileManager::getDirectoryContents(currentPath);
                 // 强制修改 filteredContents（const_cast 避免 const 限制）
                 const_cast<std::vector<std::string>&>(filteredContents) = allContents;
-                FileManager::dir_cache[currentPath].valid = false;
+                FileManager::lru_dir_cache->erase(currentPath);
             } else {
                 std::cerr << "❗ Failed to delete: " << fullPath.string() << std::endl;
             }
@@ -694,7 +693,7 @@ bool handlePaste(
                     std::lock_guard<std::mutex> lock(FileManager::cache_mutex);
                     allContents = FileManager::getDirectoryContents(currentPath);
                     filteredContents = allContents;
-                    FileManager::dir_cache[currentPath].valid = false;
+                    FileManager::lru_dir_cache->erase(currentPath);
                 }
             }
         }

@@ -84,11 +84,7 @@ std::pair<ftxui::Component, ftxui::Component> initializeUI(std::string& searchQu
     [[maybe_unused]] auto unused_future = std::async(std::launch::async, [&]() {
         FileManager::enterDirectory(directoryHistory, currentPath, filteredContents, selected);
         auto newContents = FileManager::getDirectoryContents(currentPath);
-        {
-            std::lock_guard<std::mutex> lock(FileManager::cache_mutex);
-            FileManager::dir_cache[currentPath].contents = newContents;
-            FileManager::dir_cache[currentPath].valid = true;
-        }
+        // 注意：LRU缓存会自动管理目录内容，这里不需要手动更新
         allContents = newContents;
         filteredContents = newContents;
         searchQuery.clear();
