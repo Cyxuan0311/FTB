@@ -9,8 +9,12 @@
 #include <string>        // std::string 类型
 #include <tuple>         // std::tuple，用于打包文件夹名与权限信息
 #include <vector>        // std::vector，用于存储目录内容列表
+#include <shared_mutex>  // 读写锁，提高并发性能
+#include <atomic>        // 原子操作
+#include <thread>        // 线程支持
 
 #include "DirectoryHistory.hpp"  // 目录历史记录，用于记录进入/返回操作
+#include "LRUCache.hpp"          // LRU缓存实现
 
 // 定义读取文件时的分块大小：8KB，用于分块加载大文件内容
 constexpr size_t CHUNK_SIZE = 8192;  // 8KB
@@ -28,6 +32,7 @@ namespace FileManager
      *   sizes        - 与 contents 对应的每个条目的大小（filesize 或子目录大小）
      *   total_size   - 整个目录的总大小（递归计算）
      *   last_update  - 本次缓存更新时间戳，用于判断是否过期
+     *   file_mod_times - 文件修改时间，用于智能缓存失效
      */
     struct DirectoryCache
     {
@@ -36,6 +41,25 @@ namespace FileManager
         std::vector<uintmax_t>                sizes;
         uintmax_t                             total_size = 0;
         std::chrono::system_clock::time_point last_update;
+        std::vector<std::chrono::system_clock::time_point> file_mod_times;
+        
+        DirectoryCache() = default;
+        
+        // 检查缓存是否仍然有效（基于文件修改时间）
+        bool is_still_valid(const std::string& path) const {
+            if (!valid) return false;
+            
+            try {
+                auto current_time = std::filesystem::last_write_time(path);
+                auto cache_time = std::chrono::system_clock::from_time_t(
+                    std::chrono::duration_cast<std::chrono::seconds>(
+                        current_time.time_since_epoch()).count());
+                
+                return cache_time <= last_update;
+            } catch (...) {
+                return false;
+            }
+        }
     };
 
     /**
@@ -45,21 +69,55 @@ namespace FileManager
      * 成员变量：
      *   chunks       - 键为块索引（size_t），值为对应块的字符串内容
      *   last_update  - 本次缓存更新时间戳，用于判断是否过期
+     *   file_size    - 文件总大小，用于验证缓存有效性
      */
     struct FileChunkCache
     {
         std::map<size_t, std::string>         chunks;
         std::chrono::system_clock::time_point last_update;
+        uintmax_t                             file_size = 0;
+        
+        FileChunkCache() = default;
+        
+        // 检查缓存是否仍然有效
+        bool is_still_valid(const std::string& file_path) const {
+            try {
+                if (std::filesystem::file_size(file_path) != file_size) {
+                    return false;
+                }
+                
+                auto current_time = std::filesystem::last_write_time(file_path);
+                auto cache_time = std::chrono::system_clock::from_time_t(
+                    std::chrono::duration_cast<std::chrono::seconds>(
+                        current_time.time_since_epoch()).count());
+                
+                return cache_time <= last_update;
+            } catch (...) {
+                return false;
+            }
+        }
     };
 
     // ---------------------------- 全局缓存变量声明 ----------------------------
 
-    /// 保护缓存访问的互斥锁，保证多线程读写缓存时不会冲突
-    extern std::mutex                            cache_mutex;
+    /// 保护缓存访问的读写锁，提高并发性能
+    extern std::shared_mutex                     cache_mutex;
     /// 目录路径到 DirectoryCache 的映射，用于缓存各个目录的内容信息
     extern std::map<std::string, DirectoryCache> dir_cache;
     /// 文件路径到 FileChunkCache 的映射，用于缓存文件分块读取的数据
     extern std::map<std::string, FileChunkCache> fileChunkCache;
+    
+    /// 优化的LRU缓存，用于目录内容缓存
+    extern LRUCache<std::string, DirectoryCache> lru_dir_cache;
+    /// 优化的LRU缓存，用于文件大小缓存
+    extern LRUCache<std::string, uintmax_t>      lru_size_cache;
+    /// 优化的LRU缓存，用于文件内容缓存
+    extern LRUCache<std::string, std::string>    lru_content_cache;
+    
+    /// 缓存统计信息
+    extern std::atomic<size_t>                   cache_hits;
+    extern std::atomic<size_t>                   cache_misses;
+    extern std::atomic<size_t>                   cache_evictions;
 
     // ---------------------------- 接口声明 ----------------------------
 
@@ -187,6 +245,58 @@ namespace FileManager
      */
     bool renameFileOrDirectory(const std::string& oldPath,
                                const std::string& newName);
+
+    // ---------------------------- 缓存管理接口 ----------------------------
+    
+    /**
+     * @brief 初始化缓存系统
+     * @param max_dir_cache_size 目录缓存最大大小
+     * @param max_size_cache_size 大小缓存最大大小
+     * @param max_content_cache_size 内容缓存最大大小
+     * @param enable_persistence 是否启用持久化
+     */
+    void initializeCacheSystem(size_t max_dir_cache_size = 1000,
+                              size_t max_size_cache_size = 5000,
+                              size_t max_content_cache_size = 2000,
+                              bool enable_persistence = true);
+    
+    /**
+     * @brief 清理所有缓存
+     */
+    void clearAllCaches();
+    
+    /**
+     * @brief 清理过期缓存
+     * @return 清理的缓存项数量
+     */
+    size_t cleanupExpiredCaches();
+    
+    /**
+     * @brief 获取缓存统计信息
+     */
+    struct CacheStatistics {
+        size_t dir_cache_size;
+        size_t size_cache_size;
+        size_t content_cache_size;
+        size_t total_hits;
+        size_t total_misses;
+        size_t total_evictions;
+        double hit_ratio;
+    };
+    
+    CacheStatistics getCacheStatistics();
+    
+    /**
+     * @brief 预热缓存（预加载常用目录）
+     * @param paths 要预热的目录路径列表
+     */
+    void warmupCache(const std::vector<std::string>& paths);
+    
+    /**
+     * @brief 智能缓存失效（基于文件系统事件）
+     * @param path 发生变化的路径
+     */
+    void invalidateCacheForPath(const std::string& path);
 
 }  // namespace FileManager
 
