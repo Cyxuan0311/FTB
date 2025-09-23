@@ -37,15 +37,15 @@ namespace FileSizeCalculator
         // -------------------- 获取目录内容副本 --------------------
         std::vector<std::string> contents_copy;
         {
-            // 使用读写锁提高并发性能
-            std::shared_lock<std::shared_mutex> lock(FileManager::cache_mutex);
+            // 使用互斥锁保护缓存访问
+            std::unique_lock<std::mutex> lock(FileManager::cache_mutex);
             auto& cache = FileManager::dir_cache[path];
 
             // 如果缓存无效，则重新获取目录内容列表
             if (!cache.valid || !cache.is_still_valid(path))
             {
-                lock.unlock(); // 释放读锁
-                std::unique_lock<std::shared_mutex> write_lock(FileManager::cache_mutex);
+                lock.unlock(); // 释放锁
+                std::unique_lock<std::mutex> write_lock(FileManager::cache_mutex);
                 
                 // 双重检查
                 if (!cache.valid || !cache.is_still_valid(path)) {
@@ -57,7 +57,7 @@ namespace FileSizeCalculator
                     cache.file_mod_times.clear();
                 }
                 write_lock.unlock();
-                lock.lock(); // 重新获取读锁
+                lock.lock(); // 重新获取锁
             }
             // 拷贝目录内容以供后续计算使用
             contents_copy = cache.contents;
@@ -75,7 +75,7 @@ namespace FileSizeCalculator
         // -------------------- 尝试获取文件大小缓存 --------------------
         std::vector<uintmax_t> sizes;
         {
-            std::shared_lock<std::shared_mutex> lock(FileManager::cache_mutex);
+            std::lock_guard<std::mutex> lock(FileManager::cache_mutex);
             auto& cache = FileManager::dir_cache[path];
             // 如果缓存中已经有大小数据，则直接复制
             if (!cache.sizes.empty())
@@ -104,7 +104,7 @@ namespace FileSizeCalculator
 
             // 更新缓存：存储各文件大小和总大小
             {
-                std::unique_lock<std::shared_mutex> lock(FileManager::cache_mutex);
+                std::lock_guard<std::mutex> lock(FileManager::cache_mutex);
                 auto& cache = FileManager::dir_cache[path];
                 cache.sizes      = sizes;
                 cache.total_size = total;
@@ -114,7 +114,7 @@ namespace FileSizeCalculator
         // -------------------- 获取目录总大小 --------------------
         uintmax_t totalSize = 0;
         {
-            std::shared_lock<std::shared_mutex> lock(FileManager::cache_mutex);
+            std::lock_guard<std::mutex> lock(FileManager::cache_mutex);
             totalSize = FileManager::dir_cache[path].total_size;
         }
 

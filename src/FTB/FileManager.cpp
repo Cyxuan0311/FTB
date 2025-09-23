@@ -23,16 +23,19 @@ namespace FileManager {
 
 // ---------------------------- 全局缓存变量 ----------------------------
 // 用于保护缓存操作的读写锁
-std::shared_mutex cache_mutex;
+std::mutex cache_mutex;
 // 目录缓存：键为目录路径，值为对应的目录缓存结构
 std::map<std::string, DirectoryCache> dir_cache;
 // 文件内容缓存：键为文件路径，值为对应的文件内容块缓存
 std::map<std::string, FileChunkCache> fileChunkCache;
 
 // 优化的LRU缓存
-LRUCache<std::string, DirectoryCache> lru_dir_cache(1000, std::chrono::seconds(300));
-LRUCache<std::string, uintmax_t> lru_size_cache(5000, std::chrono::seconds(600));
-LRUCache<std::string, std::string> lru_content_cache(2000, std::chrono::seconds(180));
+std::unique_ptr<FTB::LRUCache<std::string, DirectoryCache>> lru_dir_cache = 
+    std::make_unique<FTB::LRUCache<std::string, DirectoryCache>>(1000, std::chrono::seconds(300));
+std::unique_ptr<FTB::LRUCache<std::string, uintmax_t>> lru_size_cache = 
+    std::make_unique<FTB::LRUCache<std::string, uintmax_t>>(5000, std::chrono::seconds(600));
+std::unique_ptr<FTB::LRUCache<std::string, std::string>> lru_content_cache = 
+    std::make_unique<FTB::LRUCache<std::string, std::string>>(2000, std::chrono::seconds(180));
 
 // 缓存统计信息
 std::atomic<size_t> cache_hits{0};
@@ -62,7 +65,7 @@ bool isDirectory(const std::string & path) {
  */
 std::vector<std::string> getDirectoryContents(const std::string & path) {
     // 首先尝试从LRU缓存获取
-    auto cached_result = lru_dir_cache.get(path);
+    auto cached_result = lru_dir_cache->get(path);
     if (cached_result.has_value()) {
         cache_hits.fetch_add(1);
         return cached_result->contents;
@@ -102,7 +105,7 @@ std::vector<std::string> getDirectoryContents(const std::string & path) {
             }
         }
         
-        lru_dir_cache.put(path, cache);
+        lru_dir_cache->put(path, cache);
         
     } catch (const std::exception &e) {
         // 捕获并处理遍历过程中可能发生的异常
@@ -130,6 +133,14 @@ std::string formatTime(const std::tm & time) {
  * @return 返回目录中所有文件的总字节数，如果发生错误则返回0
  */
 uintmax_t calculateDirectorySize(const std::string & path) {
+    // 首先尝试从LRU缓存获取
+    auto cached_size = lru_size_cache->get(path);
+    if (cached_size.has_value()) {
+        cache_hits.fetch_add(1);
+        return cached_size.value();
+    }
+    
+    cache_misses.fetch_add(1);
     uintmax_t total = 0;  // 初始化总大小为0
     
     try {
@@ -140,6 +151,10 @@ uintmax_t calculateDirectorySize(const std::string & path) {
                 total += fs::file_size(entry);  // 累加文件大小到总和中
             }
         }
+        
+        // 将结果缓存到LRU缓存中
+        lru_size_cache->put(path, total);
+        
     } catch (...) {
         // 捕获所有可能的异常（如权限不足、路径不存在等）
         return 0;  // 发生错误时返回0
@@ -156,7 +171,7 @@ uintmax_t calculateDirectorySize(const std::string & path) {
  */
 uintmax_t getFileSize(const std::string & path) {
     // 首先尝试从LRU缓存获取
-    auto cached_size = lru_size_cache.get(path);
+    auto cached_size = lru_size_cache->get(path);
     if (cached_size.has_value()) {
         cache_hits.fetch_add(1);
         return cached_size.value();
@@ -173,7 +188,7 @@ uintmax_t getFileSize(const std::string & path) {
         }
         
         // 将结果缓存到LRU缓存中
-        lru_size_cache.put(path, size);
+        lru_size_cache->put(path, size);
         
     } catch (...) {
         size = 0;
@@ -461,7 +476,7 @@ std::string readFileContent(const std::string & filePath, size_t startLine, size
     std::string cache_key = cache_key_stream.str();
     
     // 首先尝试从LRU缓存获取
-    auto cached_content = lru_content_cache.get(cache_key);
+    auto cached_content = lru_content_cache->get(cache_key);
     if (cached_content.has_value()) {
         cache_hits.fetch_add(1);
         return cached_content.value();
@@ -489,7 +504,7 @@ std::string readFileContent(const std::string & filePath, size_t startLine, size
     file.close();
     
     // 将结果缓存到LRU缓存中
-    lru_content_cache.put(cache_key, result);
+    lru_content_cache->put(cache_key, result);
     
     return result;
 }
@@ -639,20 +654,20 @@ void initializeCacheSystem(size_t max_dir_cache_size,
                           size_t max_content_cache_size,
                           bool enable_persistence) {
     // 重新初始化LRU缓存
-    lru_dir_cache = LRUCache<std::string, DirectoryCache>(
-        max_dir_cache_size, std::chrono::seconds(300), enable_persistence, 
+    lru_dir_cache = std::make_unique<FTB::LRUCache<std::string, DirectoryCache>>(
+        max_dir_cache_size, std::chrono::seconds(300), enable_persistence,
         enable_persistence ? "~/.ftb/dir_cache.dat" : "");
     
-    lru_size_cache = LRUCache<std::string, uintmax_t>(
+    lru_size_cache = std::make_unique<FTB::LRUCache<std::string, uintmax_t>>(
         max_size_cache_size, std::chrono::seconds(600), enable_persistence,
         enable_persistence ? "~/.ftb/size_cache.dat" : "");
     
-    lru_content_cache = LRUCache<std::string, std::string>(
+    lru_content_cache = std::make_unique<FTB::LRUCache<std::string, std::string>>(
         max_content_cache_size, std::chrono::seconds(180), enable_persistence,
         enable_persistence ? "~/.ftb/content_cache.dat" : "");
     
     // 设置序列化函数
-    lru_dir_cache.set_serializers(
+    lru_dir_cache->set_serializers(
         [](const std::string& key) { return key; },
         [](const DirectoryCache& value) {
             std::ostringstream oss;
@@ -703,11 +718,11 @@ void initializeCacheSystem(size_t max_dir_cache_size,
  * @brief 清理所有缓存
  */
 void clearAllCaches() {
-    std::unique_lock<std::shared_mutex> lock(cache_mutex);
+    std::lock_guard<std::mutex> lock(cache_mutex);
     
-    lru_dir_cache.clear();
-    lru_size_cache.clear();
-    lru_content_cache.clear();
+    lru_dir_cache->clear();
+    lru_size_cache->clear();
+    lru_content_cache->clear();
     dir_cache.clear();
     fileChunkCache.clear();
     
@@ -722,12 +737,12 @@ void clearAllCaches() {
 size_t cleanupExpiredCaches() {
     size_t total_cleaned = 0;
     
-    total_cleaned += lru_dir_cache.cleanup_expired();
-    total_cleaned += lru_size_cache.cleanup_expired();
-    total_cleaned += lru_content_cache.cleanup_expired();
+    total_cleaned += lru_dir_cache->cleanup_expired();
+    total_cleaned += lru_size_cache->cleanup_expired();
+    total_cleaned += lru_content_cache->cleanup_expired();
     
     // 清理传统缓存
-    std::unique_lock<std::shared_mutex> lock(cache_mutex);
+    std::lock_guard<std::mutex> lock(cache_mutex);
     auto now = std::chrono::system_clock::now();
     const std::chrono::seconds expiry(300); // 5分钟过期
     
@@ -749,9 +764,9 @@ size_t cleanupExpiredCaches() {
 CacheStatistics getCacheStatistics() {
     CacheStatistics stats{};
     
-    stats.dir_cache_size = lru_dir_cache.size();
-    stats.size_cache_size = lru_size_cache.size();
-    stats.content_cache_size = lru_content_cache.size();
+    stats.dir_cache_size = lru_dir_cache->size();
+    stats.size_cache_size = lru_size_cache->size();
+    stats.content_cache_size = lru_content_cache->size();
     stats.total_hits = cache_hits.load();
     stats.total_misses = cache_misses.load();
     stats.total_evictions = cache_evictions.load();
@@ -794,22 +809,22 @@ void warmupCache(const std::vector<std::string>& paths) {
  */
 void invalidateCacheForPath(const std::string& path) {
     // 从LRU缓存中删除相关项
-    lru_dir_cache.erase(path);
-    lru_size_cache.erase(path);
+    lru_dir_cache->erase(path);
+    lru_size_cache->erase(path);
     
     // 删除文件内容缓存中所有相关的项
     // 这里简化实现，实际可以维护一个反向索引
-    lru_content_cache.clear();
+    lru_content_cache->clear();
     
     // 从传统缓存中删除
-    std::unique_lock<std::shared_mutex> lock(cache_mutex);
+    std::lock_guard<std::mutex> lock(cache_mutex);
     dir_cache.erase(path);
     fileChunkCache.erase(path);
     
     // 如果路径是目录，还需要清理其父目录的缓存
     try {
         std::string parent_path = fs::path(path).parent_path().string();
-        lru_dir_cache.erase(parent_path);
+        lru_dir_cache->erase(parent_path);
         dir_cache.erase(parent_path);
     } catch (...) {
         // 忽略错误
