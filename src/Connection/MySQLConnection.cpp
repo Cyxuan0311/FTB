@@ -148,6 +148,7 @@ MySQLQueryResult MySQLConnection::executeNonQuery(const std::string& query) {
 
 std::vector<std::string> MySQLConnection::getDatabases() {
     std::vector<std::string> databases;
+    databases.reserve(50);  // 预分配空间
     
     if (!connected_ || !mysql_) {
         return databases;
@@ -171,6 +172,7 @@ std::vector<std::string> MySQLConnection::getDatabases() {
 
 std::vector<std::string> MySQLConnection::getTables(const std::string& database) {
     std::vector<std::string> tables;
+    tables.reserve(100);  // 预分配空间
     
     if (!connected_ || !mysql_) {
         return tables;
