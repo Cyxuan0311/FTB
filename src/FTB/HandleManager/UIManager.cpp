@@ -18,7 +18,7 @@ bool handleEvents(ftxui::Event event, DirectoryHistory& directoryHistory,
                   std::vector<std::string>& filteredContents, int& selected,
                   std::string& searchQuery, ftxui::ScreenInteractive& screen,
                   std::atomic<bool>& refresh_ui, bool& vim_mode_active,
-                  VimLikeEditor*& vimEditor) {
+                  std::unique_ptr<VimLikeEditor>& vimEditor) {
     try {
         if (event == ftxui::Event::Escape) {
             refresh_ui = false;

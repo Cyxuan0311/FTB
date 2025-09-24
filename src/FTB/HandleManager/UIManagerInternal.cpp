@@ -15,6 +15,8 @@
 #include "FTB/DirectoryHistory.hpp"
 #include "FTB/FileManager.hpp"
 #include "FTB/Vim_Like.hpp"
+#include "FTB/ObjectPool.hpp"
+#include "FTB/AsyncFileManager.hpp"
 #include "Video_and_Photo/ImageViewer.hpp"
 #include "FTB/BinaryFileHandler.hpp"
 #include "UI/MySQLDialog.hpp"
@@ -402,16 +404,14 @@ bool handleBackNavigation(
                 FileManager::lru_dir_cache->erase(currentPath);
             }
 
-            // 异步加载新目录下的内容并更新 allContents、filteredContents，同时更新缓存
-            [[maybe_unused]] auto unused_future = std::async(std::launch::async, [&]() {
-                auto newContents = FileManager::getDirectoryContents(currentPath);
-                {
-                    std::lock_guard<std::mutex> lock(FileManager::cache_mutex);
-                    // LRU缓存会自动管理目录内容，这里不需要手动更新
+            // 使用异步文件管理器加载新目录下的内容
+            FTB::GlobalAsyncFileManager::getInstance().asyncGetDirectoryContents(
+                currentPath, 
+                [&allContents, &filteredContents](std::vector<std::string> newContents) {
+                    allContents = std::move(newContents);
+                    filteredContents = allContents;
                 }
-                allContents = newContents;
-                filteredContents = newContents;
-            });
+            );
 
             // 重置搜索状态和选中项
             searchQuery.clear();
@@ -441,7 +441,7 @@ bool handleVimMode(
     const std::vector<std::string>& filteredContents,
     int selected,
     bool& vim_mode_active,
-    VimLikeEditor*& vimEditor) 
+    std::unique_ptr<VimLikeEditor>& vimEditor) 
 {
     // 仅在 Ctrl+E 键时触发
     if (event == Event::CtrlE) {
@@ -456,48 +456,56 @@ bool handleVimMode(
             return false;
         // 仅对常规文件进行编辑
         if (!FileManager::isDirectory(fullPath.string())) {
-            // 读取文件前 1000 行内容
-            std::string fileContent = FileManager::readFileContent(fullPath.string(), 1, 1000);
-
-            // 如果已有 vimEditor，先释放旧的编辑器
+            // 如果已有 vimEditor，先返回到对象池
             if (vimEditor != nullptr) {
-                delete vimEditor;
-                vimEditor = nullptr;
+                FTB::VimEditorPool::getInstance().release(std::move(vimEditor));
             }
-            // 创建新的 VimLikeEditor 实例
-            vimEditor = new VimLikeEditor();
+            // 从对象池获取新的 VimLikeEditor 实例
+            vimEditor = FTB::VimEditorPool::getInstance().acquire();
+            
+            // 异步读取文件前 1000 行内容
+            FTB::GlobalAsyncFileManager::getInstance().asyncReadFileContent(
+                fullPath.string(), 1, 1000,
+                [&vimEditor, &vim_mode_active, fullPath](std::string fileContent) {
 
-            // 将读取的文本按行分割后设置到编辑器中
-            std::vector<std::string> lines;
-            std::istringstream iss(fileContent);
-            std::string line;
-            while (std::getline(iss, line))
-                lines.push_back(line);
-            vimEditor->SetContent(lines);
+                    // 将读取的文本按行分割后设置到编辑器中
+                    std::vector<std::string> lines;
+                    lines.reserve(1000);  // 预分配空间
+                    std::istringstream iss(fileContent);
+                    std::string line;
+                    while (std::getline(iss, line))
+                        lines.push_back(line);
+                    vimEditor->SetContent(lines);
 
-            // 进入编辑模式
-            vimEditor->EnterEditMode();
-            // 设置退出编辑时的回调：写回文件并更新缓存
-            vimEditor->SetOnExit([&, fullPath](const std::vector<std::string>& new_content) {
-                std::ostringstream oss;
-                for (const auto& l : new_content)
-                    oss << l << "\n";
-                std::string updatedContent = oss.str();
-                if (!FileManager::writeFileContent(fullPath.string(), updatedContent)) {
-                    // 如果写入失败，可在此处理
-                } else {
-                    // 标记缓存失效
-                    FileManager::lru_dir_cache->erase(fullPath.string());
+                    // 进入编辑模式
+                    vimEditor->EnterEditMode();
+                    // 设置退出编辑时的回调：写回文件并更新缓存
+                    vimEditor->SetOnExit([&vimEditor, &vim_mode_active, fullPath](const std::vector<std::string>& new_content) {
+                        std::ostringstream oss;
+                        for (const auto& l : new_content)
+                            oss << l << "\n";
+                        std::string updatedContent = oss.str();
+                        
+                        // 异步写入文件内容
+                        FTB::GlobalAsyncFileManager::getInstance().asyncWriteFileContent(
+                            fullPath.string(), updatedContent,
+                            [&vimEditor, &vim_mode_active, fullPath](bool success) {
+                                if (success) {
+                                    // 标记缓存失效
+                                    FileManager::lru_dir_cache->erase(fullPath.string());
+                                }
+                                vim_mode_active = false;
+                                if (vimEditor) {
+                                    FTB::VimEditorPool::getInstance().release(std::move(vimEditor));
+                                }
+                            }
+                        );
+                    });
+
+                    // 激活 Vim 模式
+                    vim_mode_active = true;
                 }
-                vim_mode_active = false;
-                if (vimEditor) {
-                    delete vimEditor;
-                    vimEditor = nullptr;
-                }
-            });
-
-            // 激活 Vim 模式
-            vim_mode_active = true;
+            );
             return true;
         }
     }
