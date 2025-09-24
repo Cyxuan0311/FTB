@@ -82,12 +82,15 @@ std::vector<std::string> getDirectoryContents(const std::string & path) {
     
     cache_misses.fetch_add(1);
     std::vector<std::string> contents;  // 存储结果的字符串向量
+    contents.reserve(1000);  // 预分配空间，减少重新分配
     
     try {
         // 使用 C++17 文件系统库遍历目录
         for (const auto& entry : fs::directory_iterator(path)) {
             // 获取当前条目的文件名/目录名
-            std::string name = entry.path().filename().string();
+            std::string name;
+            name.reserve(256);  // 预分配常用字符串长度
+            name = entry.path().filename().string();
             
             // 过滤掉 "." 和 ".." 这两个特殊目录
             if (name != "." && name != "..")
@@ -565,8 +568,8 @@ void clearFileChunkCache(const std::chrono::seconds& /*expiry*/) {
     // 加锁保护缓存操作
     std::lock_guard<std::mutex> lock(cache_mutex);
     
-    // 获取当前时间点
-    auto now = std::chrono::system_clock::now();
+    // 获取当前时间点（用于未来扩展）
+    [[maybe_unused]] auto now = std::chrono::system_clock::now();
     
     // 清理过期的LRU缓存项
     lru_dir_cache->cleanup_expired();
@@ -730,8 +733,8 @@ size_t cleanupExpiredCaches() {
     
     // 清理传统缓存
     std::lock_guard<std::mutex> lock(cache_mutex);
-    auto now = std::chrono::system_clock::now();
-    const std::chrono::seconds expiry(300); // 5分钟过期
+    [[maybe_unused]] auto now = std::chrono::system_clock::now();
+    [[maybe_unused]] const std::chrono::seconds expiry(300); // 5分钟过期
     
     // 清理过期的LRU缓存项
     lru_dir_cache->cleanup_expired();

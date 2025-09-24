@@ -8,7 +8,7 @@
 
 namespace FTB {
 
-ConfigManager* ConfigManager::instance_ = nullptr;
+std::unique_ptr<ConfigManager> ConfigManager::instance_ = nullptr;
 
 ConfigManager::ConfigManager() : config_loaded_(false) {
     InitializePredefinedColors();
@@ -17,9 +17,9 @@ ConfigManager::ConfigManager() : config_loaded_(false) {
 
 ConfigManager* ConfigManager::GetInstance() {
     if (instance_ == nullptr) {
-        instance_ = new ConfigManager();
+        instance_ = std::make_unique<ConfigManager>();
     }
-    return instance_;
+    return instance_.get();
 }
 
 bool ConfigManager::LoadConfig(const std::string& config_path) {

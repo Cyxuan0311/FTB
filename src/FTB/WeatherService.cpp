@@ -17,7 +17,7 @@ namespace {
 std::shared_ptr<WeatherService> WeatherService::GetInstance() {
     std::lock_guard<std::mutex> lock(g_instance_mutex);
     if (!g_instance) {
-        g_instance = std::shared_ptr<WeatherService>(new WeatherService());
+        g_instance = std::make_shared<WeatherService>();
     }
     return g_instance;
 }

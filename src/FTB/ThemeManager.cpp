@@ -4,7 +4,7 @@
 
 namespace FTB {
 
-ThemeManager* ThemeManager::instance_ = nullptr;
+std::unique_ptr<ThemeManager> ThemeManager::instance_ = nullptr;
 
 ThemeManager::ThemeManager() : current_theme_("default") {
     InitializePredefinedThemes();
@@ -13,9 +13,9 @@ ThemeManager::ThemeManager() : current_theme_("default") {
 
 ThemeManager* ThemeManager::GetInstance() {
     if (instance_ == nullptr) {
-        instance_ = new ThemeManager();
+        instance_ = std::make_unique<ThemeManager>();
     }
-    return instance_;
+    return instance_.get();
 }
 
 void ThemeManager::ApplyTheme(const std::string& theme_name) {
@@ -32,6 +32,7 @@ void ThemeManager::ApplyTheme(const std::string& theme_name) {
 
 std::vector<std::string> ThemeManager::GetAvailableThemes() const {
     std::vector<std::string> themes;
+    themes.reserve(predefined_themes_.size());  // 预分配空间
     for (const auto& theme : predefined_themes_) {
         themes.push_back(theme.first);
     }

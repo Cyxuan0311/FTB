@@ -19,8 +19,10 @@
 #include "../include/FTB/FileManager.hpp"
 #include "../include/FTB/FileSizeCalculator.hpp"
 #include "../include/FTB/ThreadGuard.hpp"
-#include "../include/FTB/UIManager.hpp"
+#include "../include/FTB/HandleManager/UIManager.hpp"
 #include "../include/FTB/Vim_Like.hpp"
+#include "../include/FTB/ObjectPool.hpp"
+#include "../include/FTB/AsyncFileManager.hpp"
 #include "../include/FTB/WeatherDisplay.hpp"
 #include "../include/FTB/WeatherService.hpp"
 #include "../include/FTB/detail_element.hpp"
@@ -58,6 +60,10 @@ int main()
     // 初始化主题管理器
     auto theme_manager = FTB::ThemeManager::GetInstance();
     std::cout << "主题管理器初始化完成，当前主题: " << theme_manager->GetCurrentTheme() << std::endl;
+    
+    // 初始化异步文件管理器
+    FTB::GlobalAsyncFileManager::initialize();
+    std::cout << "异步文件管理器初始化完成" << std::endl;
     
     // 应用主题配置到布局设置
     const auto& config = config_manager->GetConfig();
@@ -403,7 +409,7 @@ int main()
 
     // detail_width 已在上面从配置中初始化
     bool vim_mode_active = false;        // 是否进入 Vim 模式编辑
-    VimLikeEditor* vimEditor = nullptr;  // Vim 编辑器指针，初始为空
+    std::unique_ptr<VimLikeEditor> vimEditor = nullptr;  // Vim 编辑器智能指针，初始为空
 
     // 定义右侧面板的渲染函数：根据是否进入 Vim 模式选择渲染内容
     auto detailElement = Renderer([&]() -> Element {
@@ -522,13 +528,18 @@ int main()
     // 启动 FTXUI 主循环，渲染 final_component 并响应事件
     screen.Loop(final_component);
 
-    // 程序结束前清理资源
-    if (vimEditor != nullptr)
-        delete vimEditor;
+    // 程序结束前清理资源（返回到对象池）
+    if (vimEditor) {
+        FTB::VimEditorPool::getInstance().release(std::move(vimEditor));
+    }
     
     // 停止天气服务
     weather_service->Stop();
     std::cout << "天气服务已停止" << std::endl;
+    
+    // 清理异步文件管理器
+    FTB::GlobalAsyncFileManager::cleanup();
+    std::cout << "异步文件管理器已清理" << std::endl;
 
     return 0;
 }
