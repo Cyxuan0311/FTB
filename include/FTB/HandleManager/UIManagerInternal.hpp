@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <optional>
+#include <memory>
 #include <filesystem>
 #include <ftxui/component/event.hpp>
 #include <ftxui/component/screen_interactive.hpp>
@@ -65,7 +66,7 @@ bool handleBackNavigation(ftxui::Event event, DirectoryHistory& directoryHistory
 
 bool handleVimMode(ftxui::Event event, const std::string& currentPath,
                    const std::vector<std::string>& filteredContents, int selected,
-                   bool& vim_mode_active, VimLikeEditor*& vimEditor);
+                   bool& vim_mode_active, std::unique_ptr<VimLikeEditor>& vimEditor);
 
 bool handleDelete(ftxui::Event event, const std::string& currentPath,
                   const std::vector<std::string>& filteredContents, int selected,

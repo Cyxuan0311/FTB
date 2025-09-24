@@ -5,6 +5,7 @@
 #include <vector>
 #include <atomic>
 #include <utility>
+#include <memory>
 #include <ftxui/component/component.hpp>
 #include <ftxui/component/screen_interactive.hpp>
 
@@ -42,7 +43,7 @@ namespace UIManager {
                     ftxui::ScreenInteractive& screen,
                     std::atomic<bool>& refresh_ui,
                     bool& vim_mode_active,
-                    VimLikeEditor*& vimEditor);
+                    std::unique_ptr<VimLikeEditor>& vimEditor);
 
   /**
    * 初始化 UI 组件，返回一个 pair，第一个元素为主容器组件，第二个为搜索输入框组件。
