@@ -65,11 +65,13 @@ public:
     // 获取主题配置
     const FTBConfig& GetThemeConfig() const;
 
-private:
+public:
     ThemeManager();
     ~ThemeManager() = default;
     ThemeManager(const ThemeManager&) = delete;
     ThemeManager& operator=(const ThemeManager&) = delete;
+
+private:
     
     // 初始化预定义主题
     void InitializePredefinedThemes();
@@ -81,7 +83,7 @@ private:
     void CreateThemeColorMap(const std::string& theme_name);
 
 private:
-    static ThemeManager* instance_;
+    static std::unique_ptr<ThemeManager> instance_;
     std::string current_theme_;
     FTBConfig theme_config_;
     

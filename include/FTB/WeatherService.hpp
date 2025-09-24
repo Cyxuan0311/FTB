@@ -132,13 +132,15 @@ public:
      */
     std::chrono::system_clock::time_point GetLastUpdateTime() const;
 
-private:
-    // 私有构造函数，实现单例模式
+public:
+    // 构造函数，实现单例模式
     WeatherService() = default;
     
     // 禁用拷贝构造和赋值
     WeatherService(const WeatherService&) = delete;
     WeatherService& operator=(const WeatherService&) = delete;
+
+private:
     
     // 成员变量
     mutable std::mutex data_mutex_;

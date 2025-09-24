@@ -171,11 +171,13 @@ public:
     // 重置为默认配置
     void ResetToDefault();
 
-private:
+public:
     ConfigManager();
     ~ConfigManager() = default;
     ConfigManager(const ConfigManager&) = delete;
     ConfigManager& operator=(const ConfigManager&) = delete;
+
+private:
     
     // 解析配置文件
     bool ParseConfigFile(const std::string& content);
@@ -196,7 +198,7 @@ private:
     bool ValidateConfig() const;
 
 private:
-    static ConfigManager* instance_;
+    static std::unique_ptr<ConfigManager> instance_;
     FTBConfig config_;
     std::string config_path_;
     bool config_loaded_;
