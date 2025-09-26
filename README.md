@@ -13,11 +13,11 @@
 
 ![Platform](https://img.shields.io/badge/Platform-Linux-lightgrey) ![Tool](https://img.shields.io/badge/CMake-3.20.0-red) ![SSH](https://img.shields.io/badge/SSH-Supported-green) ![MySQL](https://img.shields.io/badge/MySQL-Supported-blue) <a href="#"><img src="https://img.shields.io/github/repo-size/Cyxuan0311/FTB"></img></a>
 
-A powerful terminal-based interactive file browser developed using FTXUI library, providing intuitive directory navigation, file management, **SSH remote connection**, and **MySQL database management** capabilities.
+A powerful terminal-based interactive file browser developed using FTXUI library, providing intuitive directory navigation, file management, **SSH remote connection**, and **MySQL database management** capabilities. Built with **high-performance optimizations** including smart memory management, asynchronous file operations, and object pooling for smooth user experience.
 
 ## Demo
 
-![Demo](https://yt3.ggpht.com/F-87fRzFvxPBZSdqt7Wy229FqZfvEiChvp6kpbuCZL7WxfjucfUyyhftxz8V0bTVM_3ZzMVFlNJE=s1600-rw-nd-v1)
+![Demo](image/demo.png)
 
 ## Features
 
@@ -70,6 +70,14 @@ A powerful terminal-based interactive file browser developed using FTXUI library
 - **Color schemes** for files, directories, status bars, and dialogs
 - **Layout customization** including panel ratios and item counts
 - **Style options** for icons, animations, and mouse support
+
+### ⚡ **Performance Optimizations** ✨
+- **Smart Memory Management**: Intelligent pointer usage and container pre-allocation
+- **Asynchronous File Operations**: Non-blocking file I/O for smooth UI experience
+- **Object Pooling**: Efficient resource reuse for frequently created objects
+- **LRU Caching**: Multi-level caching system for directory contents and file metadata
+- **Memory Pool**: Reduced memory fragmentation and allocation overhead
+- **Background Processing**: File operations run in separate threads
 
 ### 🎨 User Experience
 - Modern terminal UI with FTXUI
@@ -147,202 +155,75 @@ FTB             # Launch application
 
 ## Usage
 
-### 🗂️ Navigation
-- **↑/↓**: Navigate file list
-- **Enter**: Open selected directory
-- **Backspace/←**: Return to parent directory
-- **ESC**: Exit program
-- **Search box**: Filter files by keyword
+FTB provides an intuitive keyboard-driven interface with comprehensive shortcuts for all operations.
 
-### 🛠️ File Operations
-- **Ctrl+f**: Create new file
-- **Ctrl+k**: Create new directory
-- **Delete**: Remove selected item
-- **Alt+n**: Rename selected item
-- **Ctrl+t**: Copy selected item
-- **Ctrl+x**: Cut selected item
-- **Ctrl+n**: Paste items
-- **Alt+c**: Add to clipboard
-- **Alt+g**: Clear clipboard
+### 📚 **Documentation**
+- **[Keyboard Shortcuts Guide](docs/KEYBOARD_SHORTCUTS.md)** - Complete shortcut reference
+- **[Configuration Guide](docs/CONFIGURATION.md)** - Detailed configuration options
+- **[Project Structure](docs/PROJECT_STRUCTURE.md)** - Code organization overview
 
-### 📝 Content Viewing
-- **Space**: View item attributes
-- **Ctrl+p**: Preview file content
-- **Alt+v**: Image/text preview
-- **Alt+p**: Video playback
-- **Ctrl+e**: Vim-like editor
+### 🚀 **Quick Start**
+1. **Navigation**: Use ↑/↓ to navigate, Enter to open directories
+2. **File Operations**: Ctrl+f (new file), Ctrl+k (new folder), Delete (remove)
+3. **Content Viewing**: Space (attributes), Ctrl+p (preview), Ctrl+e (edit)
+4. **Remote Access**: Ctrl+s (SSH), Alt+d (MySQL)
+5. **Themes**: Ctrl+t (switch theme), Ctrl+r (reload config)
 
-### 🔗 **SSH Remote Connection**
-- **Ctrl+s**: Open SSH connection dialog
-  - Enter hostname/IP, port, username
-  - Choose password or key authentication
-  - Specify remote directory
-  - Connect and browse remote files
+### 🎯 **Key Features**
+- **Vim-like Editor**: Built-in text editor with full Vim keybindings
+- **Remote Connections**: SSH and MySQL database management
+- **Media Support**: Image preview and video playback
+- **Customizable Themes**: Multiple themes with real-time switching
+- **Performance Optimized**: Smart caching and asynchronous operations
+
+## Remote Connections
+
+### 🔗 **SSH Remote Access**
+- **Quick Connect**: Press `Ctrl+S` for SSH connection dialog
+- **Authentication**: Password or key-based authentication
+- **Remote Browsing**: Navigate remote file systems seamlessly
+- **Command Execution**: Run commands on remote hosts
 
 ### 🗄️ **MySQL Database Management**
-- **Alt+d**: Open MySQL database management dialog
-  - Configure local or remote MySQL connection
-  - Manage databases and tables
-  - Execute SQL queries with visual results
-  - Perform CRUD operations through buttons
+- **Database Access**: Press `Alt+D` for MySQL management
+- **Local & Remote**: Support for both local and remote connections
+- **Visual Interface**: Tabbed interface for database operations
+- **SQL Execution**: Direct SQL query execution with results
 
-### 🎨 **Theme and Configuration**
-- **Ctrl+t**: Switch between available themes
-- **Ctrl+r**: Reload configuration file
-- **~/.ftb**: Customize colors, layout, and behavior
-- **Multiple themes**: default, dark, light, colorful, minimal
-
-### 🎯 Advanced Features
-- **Ctrl+E**: Enter Vim editing mode for text files
-- **Mouse support**: Click to select and navigate
-
-## SSH Connection Example
-
-### Quick Start
-1. Press `Ctrl+S` to open the SSH connection dialog
-2. Fill in the connection details:
-   - **Hostname**: `192.168.1.100` or `server.example.com`
-   - **Port**: `22` (default SSH port)
-   - **Username**: `your_username`
-   - **Authentication**: Choose password or private key
-   - **Remote Directory**: `/home/username` (default)
-3. Click "Confirm" to establish the connection
-4. Browse remote files and execute commands
-
-### Supported Authentication Methods
-- **Password Authentication**: Enter your SSH password
-- **Key Authentication**: Specify path to your private key file
-
-### Security Features
-- Encrypted SSH protocol (libssh2)
-- Secure password handling
-- Key-based authentication support
-- Connection status monitoring
-
-## MySQL Database Management Example
-
-### Quick Start
-1. Press `Alt+D` to open the MySQL database management dialog
-2. Configure connection settings:
-   - **Local Connection**: Use `localhost` or `127.0.0.1` as hostname
-   - **Remote Connection**: Enter remote server IP or hostname
-   - **Port**: Default `3306` (MySQL standard port)
-   - **Username/Password**: Your MySQL credentials
-   - **Database**: Optional, can be selected after connection
-3. Click "连接" to establish the connection
-4. Use the tabbed interface for different operations:
-   - **连接设置**: Configure and manage connections
-   - **数据库操作**: Create, delete, and select databases
-   - **表操作**: Manage tables and perform CRUD operations
-   - **查询执行**: Execute custom SQL queries
-
-### Supported Operations
-- **Database Management**: Create, delete, and switch databases
-- **Table Operations**: Create, delete, and view table structures
-- **Data Manipulation**: Insert, update, delete, and query data
-- **SQL Execution**: Run custom SQL statements with result display
-- **Connection Monitoring**: Real-time connection status and error handling
-
-### Features
-- **Smart Connection Detection**: Automatically identifies local vs remote connections
-- **Visual CRUD Interface**: Button-based operations for common database tasks
-- **Real-time Results**: Immediate display of query results and affected rows
-- **Error Handling**: Comprehensive error messages and connection status
-- **Tabbed Interface**: Organized workflow for different database operations
+For detailed connection guides and all available shortcuts, see **[Keyboard Shortcuts Guide](docs/KEYBOARD_SHORTCUTS.md)**.
 
 ## Project Structure
 
-```
-FTB/
-├── include/                    # Header files
-│   ├── FTB/                   # Core FTB headers
-│   │   ├── FileManager.hpp
-│   │   ├── ThreadGuard.hpp
-│   │   ├── FileSizeCalculator.hpp
-│   │   ├── Vim_Like.hpp
-│   │   ├── DirectoryHistory.hpp
-│   │   ├── detail_element.hpp
-│   │   ├── ConfigManager.hpp  # Configuration management
-│   │   ├── ThemeManager.hpp   # Theme management
-│   │   └── HandleManager/
-│   │       ├── UIManager.hpp
-│   │       └── UIManagerInternal.hpp
-│   ├── UI/                    # User interface components
-│   │   ├── RenameDialog.hpp
-│   │   ├── NewFileDialog.hpp
-│   │   ├── NewFolderDialog.hpp
-│   │   ├── FilePreviewDialog.hpp
-│   │   ├── FolderDetailsDialog.hpp
-│   │   ├── SSHDialog.hpp      # SSH connection dialog
-│   │   └── MySQLDialog.hpp    # MySQL database management dialog
-│   ├── Connection/            # Connection backends
-│   │   ├── SSHConnection.hpp  # SSH connection backend
-│   │   └── MySQLConnection.hpp # MySQL connection backend
-│   └── Video_and_Photo/       # Media handling
-│       ├── ImageViewer.hpp
-│       └── VideoPlayer.hpp
-├── src/                       # Source code
-│   ├── FTB/                   # Core FTB implementation
-│   │   ├── main.cpp
-│   │   ├── FileManager.cpp
-│   │   ├── DirectoryHistory.cpp
-│   │   ├── detail_element.cpp
-│   │   ├── ThreadGuard.cpp
-│   │   ├── Vim_Like.cpp
-│   │   ├── FileSizeCalculator.cpp
-│   │   ├── ConfigManager.cpp  # Configuration management
-│   │   ├── ThemeManager.cpp   # Theme management
-│   │   └── HandleManager/
-│   │       ├── UIManager.cpp
-│   │       └── UIManagerInternal.cpp
-│   ├── UI/                    # UI components
-│   │   ├── RenameDialog.cpp
-│   │   ├── NewFileDialog.cpp
-│   │   ├── NewFolderDialog.cpp
-│   │   ├── FilePreviewDialog.cpp
-│   │   ├── FolderDetailsDialog.cpp
-│   │   ├── SSHDialog.cpp      # SSH dialog implementation
-│   │   └── MySQLDialog.cpp    # MySQL dialog implementation
-│   ├── Connection/            # Connection backends
-│   │   ├── SSHConnection.cpp  # SSH connection logic
-│   │   └── MySQLConnection.cpp # MySQL connection logic
-│   └── Video_and_Photo/       # Media handling
-│       ├── ImageViewer.cpp
-│       ├── VideoPlayer.cpp
-│       ├── CommonMedia.cpp
-│       └── FFmpegUtils.cpp
-├── tests/                     # Test cases
-│   ├── UIManagerTest.cpp
-│   ├── FileManagerTest.cpp
-│   ├── main.cpp
-│   ├── Vim_like_Test.cpp
-│   ├── CMakeLists.txt
-│   └── FileSizeCaculatorTest.cpp
-├── config/                    # Configuration files
-│   └── .ftb.template         # Configuration template
-├── docs/                      # Documentation
-│   └── CONFIGURATION.md      # Configuration guide
-├── bash_tool/                 # Build scripts
-│   ├── build.sh
-│   ├── package_build.sh
-│   └── uninstall.sh
-├── .github/workflows/         # CI/CD
-│   └── Release.yml
-├── CMakeLists.txt            # Build configuration
-├── README.md                 # Documentation
-├── QUICK_CONFIG.md           # Quick configuration guide
-├── test_config.sh            # Configuration test script
-├── .gitignore
-├── Release_notes.md
-├── cmake_uninstall.cmake.in
-├── .clang-format             # Code style
-└── License
-```
+For a detailed overview of the project structure, see **[Project Structure Guide](docs/PROJECT_STRUCTURE.md)**.
+
+### 📁 **Key Directories**
+- **`src/FTB/`** - Core application logic with performance optimizations
+- **`src/UI/`** - User interface components and dialogs
+- **`src/Connection/`** - SSH and MySQL connection backends
+- **`src/Video_and_Photo/`** - Media handling and preview
+- **`tests/`** - Comprehensive test suite
+- **`docs/`** - Complete documentation
+- **`config/`** - Configuration templates
 
 ## Development Environment
 - Compiler: g++ 11.0+
 - Build tool: CMake 3.20+
 - Dependencies: FTXUI 5.0+, libssh2, libmysqlclient
+- **Performance Features**: Smart pointers, async I/O, object pooling, LRU caching
+
+## 📚 Documentation
+
+### **User Guides**
+- **[Keyboard Shortcuts](docs/KEYBOARD_SHORTCUTS.md)** - Complete shortcut reference and usage guide
+- **[Configuration Guide](docs/CONFIGURATION.md)** - Detailed configuration options and customization
+- **[Project Structure](docs/PROJECT_STRUCTURE.md)** - Code organization and development overview
+
+### **Quick References**
+- **Navigation**: ↑/↓ (navigate), Enter (open), Backspace (back)
+- **File Ops**: Ctrl+f (new file), Ctrl+k (new folder), Delete (remove)
+- **Content**: Space (attributes), Ctrl+p (preview), Ctrl+e (edit)
+- **Remote**: Ctrl+s (SSH), Alt+d (MySQL)
+- **Themes**: Ctrl+t (switch), Ctrl+r (reload)
 
 ## License
 
