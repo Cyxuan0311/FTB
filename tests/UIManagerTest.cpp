@@ -2,7 +2,7 @@
 #include "../include/UIManager.hpp"
 #include "../include/FileManager.hpp"
 #include "../include/DirectoryHistory.hpp"  // 使用新的历史记录模块
-#include "../include/Vim_Like.hpp"           // 新增：Vim 编辑器头文件
+#include "../include/FTB/Vim/Vim_Like.hpp"           // 新增：Vim 编辑器头文件
 #include <vector>
 #include <string>
 #include <atomic>
