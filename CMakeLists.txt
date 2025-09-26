@@ -69,6 +69,7 @@ file(GLOB FTB_CORE_SOURCES
     src/UI/*.cpp
     src/FTB/*.cpp
     src/FTB/HandleManager/*.cpp
+    src/FTB/Vim/*.cpp
     src/Connection/*.cpp
 )
 
