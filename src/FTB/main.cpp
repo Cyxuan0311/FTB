@@ -20,7 +20,7 @@
 #include "../include/FTB/FileSizeCalculator.hpp"
 #include "../include/FTB/ThreadGuard.hpp"
 #include "../include/FTB/HandleManager/UIManager.hpp"
-#include "../include/FTB/Vim_Like.hpp"
+#include "../include/FTB/Vim/Vim_Like.hpp"
 #include "../include/FTB/ObjectPool.hpp"
 #include "../include/FTB/AsyncFileManager.hpp"
 #include "../include/FTB/WeatherDisplay.hpp"
@@ -499,6 +499,7 @@ int main()
                 return true;
             }
         }
+
 
         // 将其他按键事件交给 UIManager 处理（包括回车进入目录、删除返回上级、搜索、Vim 编辑等）
         if (UIManager::handleEvents(event,
