@@ -11,7 +11,7 @@
 
 // 引入 DirectoryHistory、VimLikeEditor 的声明（假设这些头文件位于 FTB 目录下）
 #include "FTB/DirectoryHistory.hpp"
-#include "FTB/Vim_Like.hpp"
+#include "FTB/Vim/Vim_Like.hpp"
 #include "FTB/FileManager.hpp"
 
 namespace UIManager {

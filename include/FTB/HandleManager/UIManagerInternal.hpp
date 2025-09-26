@@ -19,7 +19,7 @@
 #include "FTB/ClipboardManager.hpp"
 #include "FTB/DirectoryHistory.hpp"
 #include "FTB/FileManager.hpp"
-#include "FTB/Vim_Like.hpp"
+#include "FTB/Vim/Vim_Like.hpp"
 #include "Video_and_Photo/ImageViewer.hpp"
 #include "Video_and_Photo/VideoPlayer.hpp"
 #include "FTB/BinaryFileHandler.hpp"
@@ -104,6 +104,9 @@ bool handleConfigReload(ftxui::Event event,
 
 bool handleThemeSwitch(ftxui::Event event,
                        ftxui::ScreenInteractive& screen);
+
+bool handleSystemInfo(ftxui::Event event,
+                      ftxui::ScreenInteractive& screen);
 
 } // namespace UIManagerInternal
 
