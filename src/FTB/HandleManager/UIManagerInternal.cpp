@@ -14,12 +14,13 @@
 #include "FTB/ClipboardManager.hpp"
 #include "FTB/DirectoryHistory.hpp"
 #include "FTB/FileManager.hpp"
-#include "FTB/Vim_Like.hpp"
+#include "FTB/Vim/Vim_Like.hpp"
 #include "FTB/ObjectPool.hpp"
 #include "FTB/AsyncFileManager.hpp"
 #include "Video_and_Photo/ImageViewer.hpp"
 #include "FTB/BinaryFileHandler.hpp"
 #include "UI/MySQLDialog.hpp"
+#include "UI/SystemInfoDialog.hpp"
 #include "FTB/ConfigManager.hpp"
 #include "FTB/ThemeManager.hpp"
 
@@ -476,6 +477,9 @@ bool handleVimMode(
                     while (std::getline(iss, line))
                         lines.push_back(line);
                     vimEditor->SetContent(lines);
+                    
+                    // 设置文件名以启用语法高亮
+                    vimEditor->SetFilename(fullPath.string());
 
                     // 进入编辑模式
                     vimEditor->EnterEditMode();
@@ -933,6 +937,44 @@ bool handleThemeSwitch(
             }
         } catch (const std::exception& e) {
             std::cerr << "❌ 主题切换错误: " << e.what() << std::endl;
+        }
+        return true;
+    }
+    return false;
+}
+
+// --------------------------------------------------
+// 处理系统信息显示操作（Alt+H）
+// 功能：监听 Alt+H 键，弹出系统信息对话框，显示设备、状态、磁盘、网络等信息
+// 参数：
+//   event            - 当前捕获的键盘事件
+//   screen           - FTXUI 交互式屏幕引用
+// 返回值：
+//   true 表示事件已处理；false 表示与本操作无关
+// --------------------------------------------------
+bool handleSystemInfo(
+    ftxui::Event event,
+    ftxui::ScreenInteractive& screen) 
+{
+    // 仅在 Alt+H 键时触发
+    if (event == ftxui::Event::AltH) {
+        std::cout << "🔍 Alt+H 键被按下，正在打开系统信息管理器..." << std::endl;
+        try {
+            // 创建系统信息对话框
+            UI::SystemInfoDialog system_info_dialog;
+            
+            // 设置信息更新回调
+            system_info_dialog.setInfoUpdateCallback([]() {
+                std::cout << "🔄 系统信息已更新" << std::endl;
+            });
+            
+            std::cout << "📱 正在显示系统信息管理器界面..." << std::endl;
+            // 显示对话框
+            system_info_dialog.showDialog(screen);
+            std::cout << "✅ 系统信息管理器已关闭" << std::endl;
+            
+        } catch (const std::exception& e) {
+            std::cerr << "❌ 系统信息显示错误: " << e.what() << std::endl;
         }
         return true;
     }
