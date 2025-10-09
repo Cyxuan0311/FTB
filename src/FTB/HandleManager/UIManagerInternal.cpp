@@ -21,6 +21,7 @@
 #include "FTB/BinaryFileHandler.hpp"
 #include "UI/MySQLDialog.hpp"
 #include "UI/SystemInfoDialog.hpp"
+#include "UI/NetworkServiceDialog.hpp"
 #include "FTB/ConfigManager.hpp"
 #include "FTB/ThemeManager.hpp"
 
@@ -975,6 +976,44 @@ bool handleSystemInfo(
             
         } catch (const std::exception& e) {
             std::cerr << "❌ 系统信息显示错误: " << e.what() << std::endl;
+        }
+        return true;
+    }
+    return false;
+}
+
+// --------------------------------------------------
+// 处理网络服务操作（Alt+N）
+// 功能：监听 Alt+N 键，弹出网络服务管理器对话框
+// 参数：
+//   event            - 当前捕获的键盘事件
+//   screen           - FTXUI 交互式屏幕引用
+// 返回值：
+//   true 表示事件已处理；false 表示与本操作无关
+// --------------------------------------------------
+bool handleNetworkService(
+    ftxui::Event event,
+    ftxui::ScreenInteractive& screen) 
+{
+    // 仅在 Alt+N 键时触发
+    if (event == ftxui::Event::AltT) {
+        //std::cout << "🔍 Alt+N 键被按下，正在打开网络服务管理器..." << std::endl;
+        try {
+            // 创建网络服务对话框
+            UI::NetworkServiceDialog network_dialog;
+            
+            // 设置状态更新回调
+            network_dialog.setStatusUpdateCallback([]() {
+                std::cout << "🔄 网络信息已更新" << std::endl;
+            });
+            
+            //std::cout << "📱 正在显示网络服务管理器界面..." << std::endl;
+            // 显示对话框
+            network_dialog.showDialog(screen);
+            //std::cout << "✅ 网络服务管理器已关闭" << std::endl;
+            
+        } catch (const std::exception& e) {
+            std::cerr << "❌ 网络服务错误: " << e.what() << std::endl;
         }
         return true;
     }
