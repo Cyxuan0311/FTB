@@ -62,6 +62,16 @@ A powerful terminal-based interactive file browser developed using FTXUI library
 - **Connection status monitoring** and error handling
 - **Tabbed interface** for organized database management
 
+### 🌐 **Network Service Management** ✨
+- **Network connection monitoring** with real-time status updates
+- **Connection information display** - IP addresses, MAC addresses, signal strength
+- **Network statistics tracking** - data transfer, packet counts, speed monitoring
+- **Network speed testing** with multiple test hosts and latency measurement
+- **WiFi network scanning** and connection management
+- **Network diagnostics** with comprehensive connection testing
+- **Tabbed interface** for organized network management
+- **Keyboard navigation** with full keyboard support
+
 ### 🎨 **Customizable Theme System** ✨
 - **Multiple built-in themes**: default, dark, light, colorful, minimal
 - **Customizable colors** for all interface elements
@@ -87,15 +97,67 @@ A powerful terminal-based interactive file browser developed using FTXUI library
 
 ## Dependencies
 
+### Core Dependencies
 ```bash
-# Install required libraries
-sudo apt-get install libftxui-dev libssh2-1-dev
+# Essential libraries
+sudo apt-get install libftxui-dev libssh2-1-dev libmysqlclient-dev
 
-# Install MySQL development library
-sudo apt-get install libmysqlclient-dev
+# JSON processing
+sudo apt-get install nlohmann-json3-dev
 
-# For video/image support (optional)
-sudo apt-get install libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libx11-dev
+# YAML configuration support
+sudo apt-get install libyaml-cpp-dev
+
+# Threading and performance
+sudo apt-get install libtbb-dev
+```
+
+### Media Support (Optional)
+```bash
+# Video/image processing libraries
+sudo apt-get install libavcodec-dev libavformat-dev libavutil-dev libswscale-dev
+
+# X11 support for media display
+sudo apt-get install libx11-dev
+```
+
+### Development Tools
+```bash
+# CMake build system
+sudo apt-get install cmake
+
+# C++ compiler
+sudo apt-get install g++-11
+```
+
+### Dependency Overview
+
+| Library | Purpose | Required | Package Name |
+|---------|---------|----------|--------------|
+| **FTXUI** | Terminal UI framework | ✅ | libftxui-dev |
+| **libssh2** | SSH connections | ✅ | libssh2-1-dev |
+| **MySQL** | Database connectivity | ✅ | libmysqlclient-dev |
+| **nlohmann-json** | JSON processing | ✅ | nlohmann-json3-dev |
+| **yaml-cpp** | YAML configuration | ✅ | libyaml-cpp-dev |
+| **TBB** | Threading support | ✅ | libtbb-dev |
+| **FFmpeg** | Media processing | ⚠️ Optional | libavcodec-dev, libavformat-dev, libavutil-dev, libswscale-dev |
+| **X11** | Display support | ⚠️ Optional | libx11-dev |
+
+### Quick Installation Script
+
+For Ubuntu/Debian users, you can install all dependencies with a single command:
+
+```bash
+# Install all core dependencies
+sudo apt-get update && sudo apt-get install -y \
+    libftxui-dev libssh2-1-dev libmysqlclient-dev \
+    nlohmann-json3-dev libyaml-cpp-dev libtbb-dev \
+    cmake g++-11
+
+# Install optional media support
+sudo apt-get install -y \
+    libavcodec-dev libavformat-dev libavutil-dev \
+    libswscale-dev libx11-dev
 ```
 
 ## Configuration
@@ -130,14 +192,34 @@ See [Configuration Guide](docs/CONFIGURATION.md) for detailed options.
 
 **CentOS/RHEL/Fedora:**
 ```bash
-sudo yum install mysql-devel mysql
-# or
-sudo dnf install mysql-devel mysql
+# Core dependencies
+sudo yum install mysql-devel libssh2-devel yaml-cpp-devel tbb-devel
+# or for newer versions
+sudo dnf install mysql-devel libssh2-devel yaml-cpp-devel tbb-devel
+
+# Media support (optional)
+sudo yum install ffmpeg-devel libX11-devel
 ```
 
 **Arch Linux:**
 ```bash
-sudo pacman -S mysql
+# Core dependencies
+sudo pacman -S mysql libssh2 yaml-cpp tbb
+
+# Media support (optional)
+sudo pacman -S ffmpeg libx11
+
+# Development tools
+sudo pacman -S cmake gcc
+```
+
+**Ubuntu/Debian (Alternative packages):**
+```bash
+# If nlohmann-json3-dev is not available
+sudo apt-get install nlohmann-json-dev
+
+# For older Ubuntu versions
+sudo apt-get install libftxui5-dev
 ```
 
 ## Build & Run
@@ -166,12 +248,13 @@ FTB provides an intuitive keyboard-driven interface with comprehensive shortcuts
 1. **Navigation**: Use ↑/↓ to navigate, Enter to open directories
 2. **File Operations**: Ctrl+f (new file), Ctrl+k (new folder), Delete (remove)
 3. **Content Viewing**: Space (attributes), Ctrl+p (preview), Ctrl+e (edit)
-4. **Remote Access**: Ctrl+s (SSH), Alt+d (MySQL)
+4. **Remote Access**: Ctrl+s (SSH), Alt+d (MySQL), Alt+n (Network)
 5. **Themes**: Ctrl+t (switch theme), Ctrl+r (reload config)
 
 ### 🎯 **Key Features**
 - **Vim-like Editor**: Built-in text editor with full Vim keybindings
 - **Remote Connections**: SSH and MySQL database management
+- **Network Management**: Comprehensive network monitoring and diagnostics
 - **Media Support**: Image preview and video playback
 - **Customizable Themes**: Multiple themes with real-time switching
 - **Performance Optimized**: Smart caching and asynchronous operations
@@ -190,6 +273,13 @@ FTB provides an intuitive keyboard-driven interface with comprehensive shortcuts
 - **Visual Interface**: Tabbed interface for database operations
 - **SQL Execution**: Direct SQL query execution with results
 
+### 🌐 **Network Service Management**
+- **Network Monitoring**: Press `Alt+N` for network service management
+- **Connection Info**: View IP addresses, MAC addresses, and signal strength
+- **Statistics Tracking**: Monitor data transfer and network performance
+- **Speed Testing**: Test network speed with multiple hosts
+- **WiFi Management**: Scan and connect to available networks
+
 For detailed connection guides and all available shortcuts, see **[Keyboard Shortcuts Guide](docs/KEYBOARD_SHORTCUTS.md)**.
 
 ## Project Structure
@@ -206,9 +296,18 @@ For a detailed overview of the project structure, see **[Project Structure Guide
 - **`config/`** - Configuration templates
 
 ## Development Environment
-- Compiler: g++ 11.0+
-- Build tool: CMake 3.20+
-- Dependencies: FTXUI 5.0+, libssh2, libmysqlclient
+- **Compiler**: g++ 11.0+ (C++17 standard)
+- **Build System**: CMake 3.10+
+- **Core Dependencies**: 
+  - FTXUI 5.0+ (Terminal UI framework)
+  - libssh2 (SSH connections)
+  - libmysqlclient (MySQL database)
+  - nlohmann-json (JSON processing)
+  - yaml-cpp (YAML configuration)
+  - TBB (Threading Building Blocks)
+- **Optional Dependencies**:
+  - FFmpeg (Media processing)
+  - X11 (Display support)
 - **Performance Features**: Smart pointers, async I/O, object pooling, LRU caching
 
 ## 📚 Documentation
@@ -222,7 +321,7 @@ For a detailed overview of the project structure, see **[Project Structure Guide
 - **Navigation**: ↑/↓ (navigate), Enter (open), Backspace (back)
 - **File Ops**: Ctrl+f (new file), Ctrl+k (new folder), Delete (remove)
 - **Content**: Space (attributes), Ctrl+p (preview), Ctrl+e (edit)
-- **Remote**: Ctrl+s (SSH), Alt+d (MySQL)
+- **Remote**: Ctrl+s (SSH), Alt+d (MySQL), Alt+n (Network)
 - **Themes**: Ctrl+t (switch), Ctrl+r (reload)
 
 ## License
