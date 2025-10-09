@@ -194,7 +194,27 @@ save_connection_history = true
 max_connection_history = 10
 ```
 
-### 12. 日志配置 `[logging]`
+### 12. 网络服务配置 `[network]`
+
+```ini
+[network]
+# 网络信息刷新间隔 (秒)
+refresh_interval = 5
+# 是否启用自动刷新
+auto_refresh = true
+# 速度测试超时时间 (毫秒)
+speed_test_timeout = 5000
+# 速度测试主机列表
+test_hosts = 8.8.8.8,1.1.1.1,208.67.222.222
+# 是否显示详细信息
+show_detailed_info = true
+# 是否显示性能指标
+show_performance_metrics = true
+# 是否显示网络详情
+show_network_details = true
+```
+
+### 13. 日志配置 `[logging]`
 
 ```ini
 [logging]

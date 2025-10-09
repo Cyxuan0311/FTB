@@ -71,6 +71,27 @@ This comprehensive guide covers all keyboard shortcuts available in FTB (Termina
 - **Ctrl+Alt+d**: Quick database connection
 - **Ctrl+Shift+d**: Database connection manager
 
+## 🌐 Network Service Management
+
+### Network Service Operations
+- **Alt+n**: Open network service management dialog
+  - View network connection information
+  - Monitor network statistics and performance
+  - Test network speed and connectivity
+  - Manage WiFi connections and settings
+
+### Network Service Features
+- **Tab/Shift+Tab**: Switch between tabs (Connection, Statistics, Speed Test, Settings)
+- **1-4**: Direct tab navigation (Connection, Statistics, Speed Test, Settings)
+- **F5/Ctrl+r**: Refresh network information
+- **ESC**: Close network service dialog
+
+### Network Service Tabs
+- **Connection Info**: View IP addresses, MAC addresses, signal strength
+- **Statistics**: Monitor data transfer, packet counts, upload/download speeds
+- **Speed Test**: Test network speed with multiple hosts
+- **Settings**: Configure refresh intervals and display options
+
 ## 🎨 Theme and Configuration
 
 ### Theme Management
@@ -184,7 +205,8 @@ When in Vim mode (Ctrl+e), additional shortcuts are available:
 ### Remote Operations
 1. Use **Ctrl+s** for quick SSH connections
 2. Use **Alt+d** for database management
-3. Save connection settings for faster access
+3. Use **Alt+n** for network service management
+4. Save connection settings for faster access
 
 ### Theme Customization
 1. Use **Ctrl+t** to cycle through themes

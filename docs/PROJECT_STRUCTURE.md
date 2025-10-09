@@ -18,6 +18,7 @@ FTB/
 │   │   ├── ThemeManager.hpp   # Theme management
 │   │   ├── ObjectPool.hpp     # Object pooling for performance
 │   │   ├── AsyncFileManager.hpp # Asynchronous file operations
+│   │   ├── NetworkService.hpp # Network service management
 │   │   └── HandleManager/
 │   │       ├── UIManager.hpp
 │   │       └── UIManagerInternal.hpp
@@ -28,7 +29,8 @@ FTB/
 │   │   ├── FilePreviewDialog.hpp
 │   │   ├── FolderDetailsDialog.hpp
 │   │   ├── SSHDialog.hpp      # SSH connection dialog
-│   │   └── MySQLDialog.hpp    # MySQL database management dialog
+│   │   ├── MySQLDialog.hpp    # MySQL database management dialog
+│   │   └── NetworkServiceDialog.hpp # Network service management dialog
 │   ├── Connection/            # Connection backends
 │   │   ├── SSHConnection.hpp  # SSH connection backend
 │   │   └── MySQLConnection.hpp # MySQL connection backend
@@ -48,6 +50,7 @@ FTB/
 │   │   ├── ThemeManager.cpp   # Theme management
 │   │   ├── ObjectPool.cpp     # Object pooling implementation
 │   │   ├── AsyncFileManager.cpp # Asynchronous file operations
+│   │   ├── NetworkService.cpp # Network service implementation
 │   │   └── HandleManager/
 │   │       ├── UIManager.cpp
 │   │       └── UIManagerInternal.cpp
@@ -58,7 +61,8 @@ FTB/
 │   │   ├── FilePreviewDialog.cpp
 │   │   ├── FolderDetailsDialog.cpp
 │   │   ├── SSHDialog.cpp      # SSH dialog implementation
-│   │   └── MySQLDialog.cpp    # MySQL dialog implementation
+│   │   ├── MySQLDialog.cpp    # MySQL dialog implementation
+│   │   └── NetworkServiceDialog.cpp # Network service dialog implementation
 │   ├── Connection/            # Connection backends
 │   │   ├── SSHConnection.cpp  # SSH connection logic
 │   │   └── MySQLConnection.cpp # MySQL connection logic
@@ -109,11 +113,13 @@ FTB/
 - **ThemeManager**: Theme and color management
 - **ObjectPool**: Performance optimization with object pooling
 - **AsyncFileManager**: Asynchronous file operations
+- **NetworkService**: Network monitoring and management
 
 ### 🎨 **User Interface** (`src/UI/`)
 - **Dialog Components**: Various input and display dialogs
 - **SSH Dialog**: Remote connection interface
 - **MySQL Dialog**: Database management interface
+- **Network Service Dialog**: Network monitoring and management interface
 
 ### 🔗 **Connection Backends** (`src/Connection/`)
 - **SSHConnection**: Secure shell remote access
