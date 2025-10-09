@@ -108,6 +108,9 @@ bool handleThemeSwitch(ftxui::Event event,
 bool handleSystemInfo(ftxui::Event event,
                       ftxui::ScreenInteractive& screen);
 
+bool handleNetworkService(ftxui::Event event,
+                          ftxui::ScreenInteractive& screen);
+
 } // namespace UIManagerInternal
 
 #endif // UI_MANAGER_INTERNAL_HPP
