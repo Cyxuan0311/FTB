@@ -7,6 +7,11 @@
 #include <algorithm>
 #include <future>
 #include <chrono>
+#ifdef __linux__
+#include <signal.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#endif
 
 namespace {
     // 全局单例实例
@@ -131,6 +136,28 @@ void WeatherService::Stop() {
         }
     }
     
+#ifdef __linux__
+    // 如果有正在运行的 Python 子进程，尝试终止
+    if (python_pid_ > 0) {
+        // 首先发送 SIGTERM 友好退出
+        kill(python_pid_, SIGTERM);
+        // 最多等待 2 秒
+        for (int i = 0; i < 20; ++i) {
+            if (waitpid(python_pid_, nullptr, WNOHANG) > 0) {
+                python_pid_ = -1;
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        // 若仍未退出，强制 SIGKILL
+        if (python_pid_ > 0) {
+            kill(python_pid_, SIGKILL);
+            waitpid(python_pid_, nullptr, 0);
+            python_pid_ = -1;
+        }
+    }
+#endif
+    
     LogMessage("WeatherService已停止");
 }
 
@@ -242,36 +269,52 @@ void WeatherService::UpdateLoop() {
 bool WeatherService::ExecutePythonScript() {
     try {
         // 构建命令
-        std::string command = "python3 \"" + config_.python_script_path + "\"";
-        
-        // LogMessage("执行Python脚本: " + command); // 减少日志输出
-        
-        // 使用异步执行Python脚本，避免阻塞
-        auto future = std::async(std::launch::async, [command]() {
-            return std::system(command.c_str());
-        });
-        
-        // 等待脚本执行完成，设置超时
-        auto status = future.wait_for(std::chrono::seconds(10));
-        
-        if (status == std::future_status::timeout) {
+        std::string script = config_.python_script_path;
+#ifdef __linux__
+        // 使用 fork+exec 启动，并记录 pid
+        pid_t pid = fork();
+        if (pid == 0) {
+            // 子进程：执行 python3 脚本
+            execlp("python3", "python3", script.c_str(), (char*)nullptr);
+            _exit(127); // exec 失败
+        } else if (pid > 0) {
+            python_pid_ = pid;
+            // 等待最多 12 秒或服务停止信号
+            for (int i = 0; i < 120; ++i) {
+                if (!running_.load()) {
+                    return false; // 即将停止，由 Stop() 处理子进程
+                }
+                int status = 0;
+                pid_t r = waitpid(pid, &status, WNOHANG);
+                if (r == pid) {
+                    python_pid_ = -1;
+                    if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
+                        return true;
+                    }
+                    LogError("Python脚本执行失败，返回码: " + std::to_string(WIFEXITED(status) ? WEXITSTATUS(status) : -1));
+                    return false;
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
             LogError("Python脚本执行超时");
             return false;
-        }
-        
-        int result = future.get();
-        if (result != 0) {
-            LogError("Python脚本执行失败，返回码: " + std::to_string(result));
+        } else {
+            LogError("无法 fork 子进程执行 Python");
             return false;
         }
-        
-        // LogMessage("Python脚本执行成功"); // 减少日志输出
-        return true;
+#else
+        // 非 Linux 环境回退到同步执行（保持原逻辑）
+        std::string command = std::string("python3 \"") + script + "\"";
+        int result = std::system(command.c_str());
+        return result == 0;
+#endif
         
     } catch (const std::exception& e) {
         LogError("执行Python脚本时发生异常: " + std::string(e.what()));
         return false;
     }
+    // 兜底返回，防止某些编译路径下出现无返回警告
+    return false;
 }
 
 bool WeatherService::ReadWeatherData() {

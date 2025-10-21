@@ -27,7 +27,7 @@ void ThemeManager::ApplyTheme(const std::string& theme_name) {
     ApplyThemeConfig(theme_name);
     CreateThemeColorMap(theme_name);
     
-    std::cout << "主题已切换到: " << theme_name << std::endl;
+    
 }
 
 std::vector<std::string> ThemeManager::GetAvailableThemes() const {

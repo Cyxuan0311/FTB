@@ -25,7 +25,7 @@ void WeatherDisplay::initialize() {
         
         // 从配置文件启动天气服务
         if (weather_service_->StartFromConfig()) {
-            std::cout << "WeatherDisplay初始化成功" << std::endl;
+            // 静默成功日志
         } else {
             std::cerr << "WeatherDisplay初始化失败，但将继续运行（天气功能可能不可用）" << std::endl;
         }
