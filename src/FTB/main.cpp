@@ -53,17 +53,13 @@ int main()
     auto config_manager = FTB::ConfigManager::GetInstance();
     if (!config_manager->LoadConfig()) {
         std::cerr << "警告: 配置文件加载失败，使用默认配置" << std::endl;
-    } else {
-        std::cout << "配置文件加载成功" << std::endl;
     }
     
     // 初始化主题管理器
-    auto theme_manager = FTB::ThemeManager::GetInstance();
-    std::cout << "主题管理器初始化完成，当前主题: " << theme_manager->GetCurrentTheme() << std::endl;
+    FTB::ThemeManager::GetInstance();
     
     // 初始化异步文件管理器
     FTB::GlobalAsyncFileManager::initialize();
-    std::cout << "异步文件管理器初始化完成" << std::endl;
     
     // 应用主题配置到布局设置
     const auto& config = config_manager->GetConfig();
@@ -76,8 +72,6 @@ int main()
     auto weather_service = WeatherService::GetInstance();
     if (!weather_service->StartFromConfig()) {
         std::cerr << "警告: 天气服务启动失败，天气功能可能不可用" << std::endl;
-    } else {
-        std::cout << "天气服务启动成功" << std::endl;
     }
 
     int hovered_index = -1;  // 鼠标悬停时的索引，-1 表示未悬停
@@ -536,11 +530,9 @@ int main()
     
     // 停止天气服务
     weather_service->Stop();
-    std::cout << "天气服务已停止" << std::endl;
     
     // 清理异步文件管理器
     FTB::GlobalAsyncFileManager::cleanup();
-    std::cout << "异步文件管理器已清理" << std::endl;
 
     return 0;
 }
