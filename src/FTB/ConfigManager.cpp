@@ -59,7 +59,6 @@ bool ConfigManager::LoadConfig(const std::string& config_path) {
     
     config_loaded_ = true;
     ApplyColorConfig();
-    std::cout << "配置文件加载成功: " << config_path_ << std::endl;
     return true;
 }
 
@@ -133,7 +132,6 @@ bool ConfigManager::SaveConfig(const std::string& config_path) {
     file << "show_timestamp = " << (config_.logging.show_timestamp ? "true" : "false") << "\n";
     
     file.close();
-    std::cout << "配置文件保存成功: " << save_path << std::endl;
     return true;
 }
 
