@@ -59,13 +59,17 @@ def fetch_weather():
         print(f"获取天气失败: {e}")
 
 if __name__ == "__main__":
-    # 创建数据目录
-    os.makedirs('/mnt/f/My__StudyStack/My_Project/FTB/data', exist_ok=True)
-    
-    # 首次运行立即获取
-    fetch_weather()
-    
-    # 每30分钟更新一次
-    while True:
-        time.sleep(1800)
+    try:
+        # 创建数据目录
+        os.makedirs('/mnt/f/My__StudyStack/My_Project/FTB/data', exist_ok=True)
+
+        # 首次运行立即获取
         fetch_weather()
+
+        # 每30分钟更新一次
+        while True:
+            time.sleep(1800)
+            fetch_weather()
+    except KeyboardInterrupt:
+        # 优雅退出，避免打印回溯
+        pass
