@@ -10,6 +10,9 @@
 #include <condition_variable>
 #include <nlohmann/json.hpp>
 #include "ConfigManager.hpp"
+#ifdef __linux__
+#include <sys/types.h>
+#endif
 
 /**
  * @brief 天气信息数据结构
@@ -33,7 +36,7 @@ struct WeatherServiceConfig {
     std::string weather_data_path = "/mnt/f/My__StudyStack/My_Project/FTB/data/weather.json";
     std::chrono::minutes update_interval = std::chrono::minutes(30);
     bool auto_start = true;
-    bool enable_logging = true;
+    bool enable_logging = false;
     int max_retry_attempts = 3;
     std::chrono::seconds retry_delay = std::chrono::seconds(60);
 };
@@ -167,4 +170,9 @@ private:
     bool ValidateWeatherData(const WeatherInfo& info) const;
     void NotifyUpdate(const WeatherInfo& info);
     void NotifyError(const std::string& error);
+
+#ifdef __linux__
+    // 记录后台 Python 进程的 PID，便于停止时杀死
+    pid_t python_pid_ = -1;
+#endif
 };
