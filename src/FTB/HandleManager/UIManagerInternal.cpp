@@ -22,6 +22,7 @@
 #include "UI/MySQLDialog.hpp"
 #include "UI/SystemInfoDialog.hpp"
 #include "UI/NetworkServiceDialog.hpp"
+#include "UI/JumpFileContextDialog.hpp"
 #include "FTB/ConfigManager.hpp"
 #include "FTB/ThemeManager.hpp"
 
@@ -1014,6 +1015,85 @@ bool handleNetworkService(
             
         } catch (const std::exception& e) {
             std::cerr << "❌ 网络服务错误: " << e.what() << std::endl;
+        }
+        return true;
+    }
+    return false;
+}
+
+// --------------------------------------------------
+// 处理目录跳转操作（Alt+J）
+// 功能：监听 Alt+J 键，弹出目录跳转对话框，允许用户输入目标路径并跳转
+// 参数：
+//   event            - 当前捕获的键盘事件
+//   currentPath      - 当前所在目录路径（引用，会被更新）
+//   allContents      - 当前目录下所有内容列表（引用，会被更新）
+//   filteredContents - 过滤后的内容列表（引用，会被更新）
+//   selected         - 选中索引（引用，会被重置）
+//   searchQuery      - 搜索关键字（引用，会被清空）
+//   screen           - FTXUI 交互式屏幕引用
+// 返回值：
+//   true 表示事件已处理；false 表示与本操作无关
+// --------------------------------------------------
+bool handleJumpToDirectory(
+    ftxui::Event event,
+    std::string& currentPath,
+    std::vector<std::string>& allContents,
+    std::vector<std::string>& filteredContents,
+    int& selected,
+    std::string& searchQuery,
+    ftxui::ScreenInteractive& screen) 
+{
+    // 仅在 Alt+J 键时触发
+    if (event == ftxui::Event::AltJ) {
+        try {
+            // 创建目录跳转对话框
+            UI::JumpFileContextDialog jump_dialog;
+            
+            // 显示对话框并获取结果
+            auto params = jump_dialog.showDialog(screen);
+            
+            // 如果用户确认了跳转参数
+            if (!params.target_path.empty()) {
+                // 执行跳转逻辑
+                if (FTB::JumpFileContext::executeJump(params)) {
+                    // 获取规范化路径
+                    std::string canonical_path = FTB::JumpFileContext::getCanonicalPath(params.target_path);
+                    
+                    // 更新当前路径
+                    currentPath = canonical_path;
+                    
+                    // 清空搜索查询
+                    searchQuery.clear();
+                    
+                    // 重置选中索引
+                    selected = 0;
+                    
+                    // 标记当前目录缓存失效
+                    {
+                        std::lock_guard<std::mutex> lock(FileManager::cache_mutex);
+                        FileManager::lru_dir_cache->erase(currentPath);
+                    }
+                    
+                    // 使用高效的并发方式异步加载新目录内容
+                    // 立即启动异步任务，不阻塞UI线程，提高响应速度
+                    [[maybe_unused]] auto future = std::async(std::launch::async, [&allContents, &filteredContents, currentPath]() {
+                        try {
+                            // 在后台线程中获取目录内容，使用并发优化
+                            auto newContents = FileManager::getDirectoryContents(currentPath);
+                            
+                            // 原子性更新内容列表，避免竞态条件
+                            allContents = std::move(newContents);
+                            filteredContents = allContents;
+                        } catch (const std::exception& e) {
+                            std::cerr << "❌ 异步加载目录内容失败: " << e.what() << std::endl;
+                        }
+                    });
+                }
+            }
+            
+        } catch (const std::exception& e) {
+            std::cerr << "❌ 目录跳转错误: " << e.what() << std::endl;
         }
         return true;
     }

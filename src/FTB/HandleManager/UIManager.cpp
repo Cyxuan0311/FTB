@@ -69,6 +69,8 @@ bool handleEvents(ftxui::Event event, DirectoryHistory& directoryHistory,
             return true;
         if (UIManagerInternal::handleNetworkService(event, screen))
             return true;
+        if (UIManagerInternal::handleJumpToDirectory(event, currentPath, allContents, filteredContents, selected, searchQuery, screen))
+            return true;
     } catch (const std::exception& e) {
         std::cerr << "❗ Error: " << e.what() << std::endl;
     }
