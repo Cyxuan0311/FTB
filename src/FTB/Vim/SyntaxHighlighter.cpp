@@ -19,15 +19,27 @@ void SyntaxHighlighter::SetLanguage(Language lang) {
 }
 
 void SyntaxHighlighter::InitializePatterns() {
-    // C/C++ 关键字
+    // C/C++ 关键字（扩充，参考 VSCode C++ 语法高亮）
     std::vector<std::string> cpp_keywords = {
+        // C 基础关键字
         "auto", "break", "case", "char", "const", "continue", "default", "do", "double", "else",
         "enum", "extern", "float", "for", "goto", "if", "int", "long", "register", "return",
         "short", "signed", "sizeof", "static", "struct", "switch", "typedef", "union", "unsigned",
-        "void", "volatile", "while", "asm", "bool", "catch", "class", "const_cast", "delete",
-        "dynamic_cast", "explicit", "export", "false", "friend", "inline", "mutable", "namespace",
-        "new", "operator", "private", "protected", "public", "reinterpret_cast", "static_cast",
-        "template", "this", "throw", "true", "try", "typeid", "typename", "using", "virtual"
+        "void", "volatile", "while", "asm",
+
+        // C++ 核心与 OOP
+        "bool", "catch", "class", "const_cast", "delete", "dynamic_cast", "explicit", "export",
+        "friend", "inline", "mutable", "namespace", "new", "operator", "private", "protected",
+        "public", "reinterpret_cast", "static_cast", "template", "this", "throw", "try", "typeid",
+        "typename", "using", "virtual", "override", "final",
+
+        // C++11/14/17/20/23 扩展
+        "alignas", "alignof", "char16_t", "char32_t", "char8_t", "constexpr", "consteval",
+        "constinit", "decltype", "noexcept", "nullptr", "static_assert", "thread_local",
+        "wchar_t", "co_await", "co_return", "co_yield", "concept", "requires", "module", "import",
+
+        // 备用操作符关键字（替代符号）
+        "and", "and_eq", "bitand", "bitor", "compl", "not", "not_eq", "or", "or_eq", "xor", "xor_eq"
     };
     keyword_patterns_[Language::C] = cpp_keywords;
     keyword_patterns_[Language::CPP] = cpp_keywords;
@@ -49,9 +61,15 @@ void SyntaxHighlighter::InitializePatterns() {
     };
     keyword_patterns_[Language::PYTHON] = python_keywords;
     
-    // C/C++ 类型
+    // C/C++ 类型（扩充）
     std::vector<std::string> cpp_types = {
-        "int", "char", "float", "double", "void", "bool", "string", "vector", "map", "set", "list"
+        // 基本与内建
+        "int", "char", "float", "double", "void", "bool", "wchar_t", "char16_t", "char32_t", "char8_t",
+        // 常见 typedef/别名
+        "size_t", "ptrdiff_t", "nullptr_t",
+        // 常见 STL 类型名（按单词匹配，无法识别作用域）
+        "string", "vector", "map", "set", "list", "deque", "queue", "stack", "unordered_map",
+        "unordered_set", "pair", "tuple", "optional", "variant", "any"
     };
     type_patterns_[Language::C] = cpp_types;
     type_patterns_[Language::CPP] = cpp_types;
