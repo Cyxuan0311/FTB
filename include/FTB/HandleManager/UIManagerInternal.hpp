@@ -111,6 +111,14 @@ bool handleSystemInfo(ftxui::Event event,
 bool handleNetworkService(ftxui::Event event,
                           ftxui::ScreenInteractive& screen);
 
+bool handleJumpToDirectory(ftxui::Event event,
+                          std::string& currentPath,
+                          std::vector<std::string>& allContents,
+                          std::vector<std::string>& filteredContents,
+                          int& selected,
+                          std::string& searchQuery,
+                          ftxui::ScreenInteractive& screen);
+
 } // namespace UIManagerInternal
 
 #endif // UI_MANAGER_INTERNAL_HPP
