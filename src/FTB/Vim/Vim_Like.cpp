@@ -23,7 +23,7 @@ const int MAX_VISIBLE_LINES = 35;
  *   original_lines_- 保存初始状态，用于放弃修改时恢复
  */
 VimLikeEditor::VimLikeEditor()
-    : edit_mode_(false), cursor_line_(0), cursor_col_(0), scroll_offset_(0), undo_index_(0), move_repeat_count_(0) {
+    : edit_mode_(false), cursor_line_(0), cursor_col_(0), scroll_offset_(0), undo_index_(0), move_repeat_count_(0), markdown_preview_mode_(false) {
     lines_.push_back("");           // 至少保留一行，避免空内容导致渲染问题
     original_lines_ = lines_;       // 初始状态（空内容）
     
@@ -94,6 +94,11 @@ void VimLikeEditor::EnterEditMode() {
  * - 下方为提示信息栏
  */
 Element VimLikeEditor::Render() {
+    // 如果处于Markdown预览模式，渲染预览内容
+    if (markdown_preview_mode_) {
+        return RenderMarkdownPreview();
+    }
+
     Elements rendered_lines;                                // 存放渲染后的每一行 Element
     int total_lines = static_cast<int>(lines_.size());      // 当前行数
     // 计算本次需要渲染的末尾行索引
@@ -103,8 +108,8 @@ Element VimLikeEditor::Render() {
     int max_line_number_width = std::to_string(end_line).length();
 
     // 实现闪烁光标：每 500 毫秒切换一次 blink_on 状态
-    auto now = std::chrono::steady_clock::now();
-    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+    // auto now = std::chrono::steady_clock::now();
+    // auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
     // bool blink_on = ((ms / 500) % 2 == 0); // 暂时注释掉，避免未使用变量警告
 
     // 预分配空间，避免动态扩容
@@ -195,8 +200,46 @@ bool VimLikeEditor::OnEvent(Event event) {
         return true;
     }
 
+    // ==================== Markdown预览快捷键：Alt+M 切换预览模式 ====================
+    if (event == Event::AltM) {
+        ToggleMarkdownPreview();
+        return true;
+    }
+
+    // ==================== 鼠标滚轮支持 ====================
+    if (event.is_mouse()) {
+        if (event.mouse().button == Mouse::WheelUp) {
+            if (markdown_preview_mode_) {
+                HandlePreviewScroll(-3); // 向上滚动
+            } else {
+                // 普通模式下的滚动
+                if (scroll_offset_ > 0) {
+                    scroll_offset_ = std::max(0, scroll_offset_ - 3);
+                }
+            }
+            return true;
+        } else if (event.mouse().button == Mouse::WheelDown) {
+            if (markdown_preview_mode_) {
+                HandlePreviewScroll(3); // 向下滚动
+            } else {
+                // 普通模式下的滚动
+                int max_scroll = std::max(0, static_cast<int>(lines_.size()) - MAX_VISIBLE_LINES);
+                if (scroll_offset_ < max_scroll) {
+                    scroll_offset_ = std::min(max_scroll, scroll_offset_ + 3);
+                }
+            }
+            return true;
+        }
+    }
+
     // ==================== 如果当前处于查看模式 ====================
     if (!edit_mode_) {
+        // 如果处于Markdown预览模式，按ESC退出预览
+        if (markdown_preview_mode_ && event == Event::Escape) {
+            markdown_preview_mode_ = false;
+            return true;
+        }
+        
         // 查看模式仅允许按 'i' 键进入编辑模式
         if (event.is_character() && event.character() == "i") {
             edit_mode_ = true;
@@ -779,4 +822,72 @@ void VimLikeEditor::UpdateMoveSpeed() {
     }
     
     last_move_time_ = now;
+}
+
+// ---------------------------- Markdown预览功能 ----------------------------
+
+/**
+ * @brief 切换Markdown预览模式
+ */
+void VimLikeEditor::ToggleMarkdownPreview() {
+    markdown_preview_mode_ = !markdown_preview_mode_;
+    if (markdown_preview_mode_) {
+        // 进入预览模式时重置滚动
+        md_transformer_.ResetScroll();
+    }
+}
+
+/**
+ * @brief 检查是否处于Markdown预览模式
+ * @return 如果处于预览模式返回true，否则返回false
+ */
+bool VimLikeEditor::IsMarkdownPreviewMode() const {
+    return markdown_preview_mode_;
+}
+
+/**
+ * @brief 设置Markdown预览模式
+ * @param enabled 是否启用预览模式
+ */
+void VimLikeEditor::SetMarkdownPreviewMode(bool enabled) {
+    markdown_preview_mode_ = enabled;
+    if (enabled) {
+        md_transformer_.ResetScroll();
+    }
+}
+
+/**
+ * @brief 处理预览模式下的滚动
+ * @param delta 滚动增量（正数向下，负数向上）
+ */
+void VimLikeEditor::HandlePreviewScroll(int delta) {
+    if (markdown_preview_mode_) {
+        md_transformer_.ScrollBy(delta);
+    }
+}
+
+/**
+ * @brief 渲染Markdown预览内容
+ * @return 预览模式的UI Element
+ */
+ftxui::Element VimLikeEditor::RenderMarkdownPreview() {
+    // 将当前内容转换为Markdown预览
+    ftxui::Element preview_content = md_transformer_.TransformToElement(lines_);
+    
+    // 构造预览模式的标题栏
+    std::string mode_text = "📖 Markdown预览模式";
+    
+    // 构造预览模式的提示信息
+    Elements preview_hints = {
+        text("📖 Markdown预览：Alt+M切换预览|鼠标滚轮滚动|ESC退出预览") | center,
+        text("支持：标题、列表、代码块、粗体、斜体、链接等Markdown语法") | center
+    };
+    
+    // 返回预览模式的布局
+    return vbox({
+        text("Vim-Like Editor - " + mode_text) | bold | center | bgcolor(Color::Purple),
+        separator(),
+        preview_content | border,
+        vbox(preview_hints) | borderHeavy | color(Color::Purple)
+    }) | border;
 }
