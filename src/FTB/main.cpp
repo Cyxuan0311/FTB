@@ -28,6 +28,7 @@
 #include "../include/FTB/detail_element.hpp"
 #include "../include/FTB/ConfigManager.hpp"
 #include "../include/FTB/ThemeManager.hpp"
+#include "../include/FTB/showing/MarioAnimation.hpp"
 
 using namespace ftxui;
 namespace fs = std::filesystem;
@@ -36,7 +37,10 @@ namespace fs = std::filesystem;
 const std::string FOLDER_ICON = "📁 ";
 const std::string FILE_ICON   = "📄 ";
 
-// 加载动画帧，用于显示“波浪”或加载进度效果
+// 马里奥动画实例
+FTB::MarioAnimation marioAnimation;
+
+// 加载动画帧，用于显示"波浪"或加载进度效果
 const std::vector<std::string> loadingFrames = {
     " ░▒▓ ░▒▓ ░▒▓ ░▒▓ ░▒▓",
     "░▒▓ ░▒▓ ░▒▓ ░▒▓ ░▒▓ ",
@@ -60,6 +64,9 @@ int main()
     
     // 初始化异步文件管理器
     FTB::GlobalAsyncFileManager::initialize();
+    
+    // 启用马里奥动画的高帧率模式以获得更流畅的动画
+    marioAnimation.setHighFrameRateMode(true);
     
     // 应用主题配置到布局设置
     const auto& config = config_manager->GetConfig();
@@ -106,27 +113,28 @@ int main()
     std::atomic<double> wave_progress(0.0); // 用于控制加载动画的当前进度
     std::atomic<bool> refresh_ui{true};     // 控制 UI 刷新的标志，设为 false 即可停止刷新
 
-    // 启动一个后台线程，不断更新 wave_progress 以驱动加载动画
+    // 启动一个后台线程，不断更新 wave_progress 以驱动马里奥跳跃动画
     std::thread wave_thread([&] {
         while (refresh_ui)
         {
-            // 每次增加一点进度
-            wave_progress.store(wave_progress.load() + 0.1, std::memory_order_relaxed);
+            // 根据12帧动画调整进度，使跳跃动作更自然流畅
+            // 放慢动画速度，让用户更好地欣赏动画细节
+            wave_progress.store(wave_progress.load() + 0.06, std::memory_order_relaxed);
             if (wave_progress.load() > 2 * M_PI)
                 wave_progress.store(0.0, std::memory_order_relaxed);
-            // 100ms 刷新一次
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            // 120ms 刷新一次，更优雅的动画节奏
+            std::this_thread::sleep_for(std::chrono::milliseconds(120));
             // 通知屏幕线程进行一次重绘
             screen.Post(Event::Custom);
         }
     });
     ThreadGuard waveGuard(wave_thread);  // 使用 RAII 管理线程生命周期，防止程序退出时线程未 join
 
-    // 再启动一个定时器线程，每 200ms 向屏幕线程发送自定义事件，用于触发整体 UI 刷新
+    // 再启动一个定时器线程，每 150ms 向屏幕线程发送自定义事件，用于触发整体 UI 刷新
     std::thread timer([&] {
         while (refresh_ui)
         {
-            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+            std::this_thread::sleep_for(std::chrono::milliseconds(150));
             screen.Post(Event::Custom);
         }
     });
@@ -147,26 +155,9 @@ int main()
 
     // 简化的天气显示 - 静态显示，减少复杂性
 
-    // 构建"波浪"进度条的渲染函数
-    auto waveGauge = [&] {
-        Elements wave_elements;
-        // 生成 10 个子进度条，形成波浪效果
-        for (int i = 0; i < 10; ++i)
-        {
-            double progress   = wave_progress.load() + i * 0.4;
-            double wave_value = (std::sin(progress) + 1) / 2;
-            wave_elements.push_back(
-                gauge(wave_value) |
-                color(Color::BlueLight) |
-                size(HEIGHT, LESS_THAN, 1)
-            );
-        }
-        // 垂直排列这 10 条进度条，并添加双线边框、固定大小
-        return vbox(std::move(wave_elements)) |
-               borderDouble |
-               color(Color::RGB(33, 136, 143)) |
-               size(WIDTH, EQUAL, 40) |
-               size(HEIGHT, EQUAL, 10);
+    // 构建马里奥运动动画的渲染函数
+    auto marioAnimationRenderer = [&] {
+        return marioAnimation.render(wave_progress.load());
     };
 
     // ---------- 主渲染函数（Renderer） ----------
@@ -348,18 +339,18 @@ int main()
         return vbox({
             // 第一行：标题栏 + 加载动画 + 文件大小进度 + 天气显示 + 时间 / 加载指示符
             hbox({
+                // 左侧：应用名称和路径信息 + 马里奥动画
                 vbox({
-                    // 左侧：应用名称 “FTB” + 当前路径
                     hbox({
                         text("FTB") | bold | borderDouble | bgcolor(Color::BlueLight) |
                         size(WIDTH, LESS_THAN, 5),
-                        filler() | size(WIDTH, EQUAL, 2),
+                        filler() | size(WIDTH, EQUAL, 1),
                         text("🤖当前路径: " + displayPath) |
                         bold | borderHeavy | color(Color::Pink1) |
                         size(HEIGHT, LESS_THAN, 1) | flex
                     }),
-                    // 下面一行：加载动画波浪条
-                    waveGauge() | size(HEIGHT, EQUAL, 10) | size(WIDTH, LESS_THAN, 75)
+                    // 马里奥运动动画 - 放在FTB徽章下方，增加高度
+                    marioAnimationRenderer() | size(HEIGHT, EQUAL, 15) | size(WIDTH, EQUAL, 40)
                 }) | size(WIDTH, EQUAL, 80),
                 filler(),
                 // 中间：显示当前选中项大小和 % 进度条

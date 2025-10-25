@@ -49,16 +49,16 @@ void WeatherDisplay::cleanup() {
 
 std::string WeatherDisplay::getWeatherEmoji(const std::string& weather) {
     if (weather.find("晴") != std::string::npos)
-        return "☺️";
+        return "☀";
     if (weather.find("多云") != std::string::npos)
-        return "😑";
+        return "☁";
     if (weather.find("阴") != std::string::npos)
-        return "😰";
+        return "☁";
     if (weather.find("雨") != std::string::npos)
-        return "🫤";
+        return "☂";
     if (weather.find("雪") != std::string::npos)
-        return "🥶";
-    return "❓";
+        return "❄";
+    return "?";
 }
 
 ftxui::Color WeatherDisplay::getTemperatureColor(int temp) {
@@ -77,7 +77,7 @@ ftxui::Element WeatherDisplay::render() {
     auto tm = *std::localtime(&time_t);
     
     // 尝试获取真实天气数据，如果失败则使用模拟数据
-    std::string weather_icon = "🌤️";
+    std::string weather_icon = "☁";
     std::string weather_text = "多云";
     std::string city = "武汉";
     int temp = 28;
@@ -110,16 +110,16 @@ ftxui::Element WeatherDisplay::render() {
             
             // 根据天气设置图标和颜色
             if (weather_text.find("晴") != std::string::npos) {
-                weather_icon = "☀️";
+                weather_icon = "☀";
                 weather_color = Color::Yellow;
             } else if (weather_text.find("雨") != std::string::npos) {
-                weather_icon = "🌧️";
+                weather_icon = "☂";
                 weather_color = Color::Blue;
             } else if (weather_text.find("云") != std::string::npos) {
-                weather_icon = "☁️";
+                weather_icon = "☁";
                 weather_color = Color::Cyan;
             } else if (weather_text.find("雪") != std::string::npos) {
-                weather_icon = "❄️";
+                weather_icon = "❄";
                 weather_color = Color::White;
             }
         } catch (...) {
@@ -131,19 +131,19 @@ ftxui::Element WeatherDisplay::render() {
     if (!initialized_ || !weather_service_ || !weather_service_->IsDataValid()) {
         int hour = tm.tm_hour;
         if (hour >= 6 && hour < 12) {
-            weather_icon = "🌅";
+            weather_icon = "☀";
             weather_text = "晴朗";
             weather_color = Color::Yellow;
         } else if (hour >= 12 && hour < 18) {
-            weather_icon = "☀️";
+            weather_icon = "☀";
             weather_text = "晴朗";
             weather_color = Color::Yellow;
         } else if (hour >= 18 && hour < 22) {
-            weather_icon = "🌆";
+            weather_icon = "☀";
             weather_text = "傍晚";
             weather_color = Color::Orange1;
         } else {
-            weather_icon = "🌙";
+            weather_icon = "☽";
             weather_text = "夜晚";
             weather_color = Color::Blue;
         }
