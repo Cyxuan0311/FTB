@@ -8,6 +8,7 @@
 #include <ftxui/component/event.hpp>
 #include <ftxui/dom/elements.hpp>
 #include "FTB/Vim/SyntaxHighlighter.hpp"
+#include "FTB/Vim/MD_transformer.hpp"
 
 class VimLikeEditor {
 public:
@@ -42,6 +43,12 @@ public:
     void MoveToNextWord();
     void PageUp();
     void PageDown();
+    
+    // Markdown预览功能
+    void ToggleMarkdownPreview();
+    bool IsMarkdownPreviewMode() const;
+    void SetMarkdownPreviewMode(bool enabled);
+    void HandlePreviewScroll(int delta);
 
 private:
     bool edit_mode_;
@@ -67,9 +74,14 @@ private:
     std::chrono::steady_clock::time_point last_move_time_;
     int move_repeat_count_;
     
+    // Markdown预览相关
+    bool markdown_preview_mode_;
+    FTB::Vim::MDTransformer md_transformer_;
+    
     // 辅助方法
     void SaveState();
     void UpdateMoveSpeed();
+    ftxui::Element RenderMarkdownPreview();
 };
 
 #endif // VIM_LIKE_HPP
