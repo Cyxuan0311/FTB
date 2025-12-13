@@ -47,41 +47,24 @@ namespace VideoPlayer
     // 实现私有辅助方法
     float VideoPlayerUI::calculateBrightness(const PixelColor& color)
     {
-        // 使用 Rec. 709 亮度系数
-        return (0.2126f * color.r + 0.7152f * color.g + 0.0722f * color.b) / 255.0f;
+        // 参考 dsa 项目的 RGB 到灰度转换算法
+        // 使用标准亮度系数：0.299∙R + 0.587∙G + 0.114∙B（与 dsa 一致）
+        // 这比 Rec. 709 更适合终端显示
+        return (0.299f * color.r + 0.587f * color.g + 0.114f * color.b) / 255.0f;
     }
 
     std::vector<std::pair<int, float>> VideoPlayerUI::getExtendedUnicodeCharSet()
     {
+        // 完全使用 dsa 项目的字符集，只使用 4 个字符
+        // 按 dsa 的 get_unicode_char 函数逻辑：
+        // index = (gray_value * 3) / 255，索引 0-3 对应 ░▒▓█
+        // 但 dsa 中 index=0 是最亮(░)，index=3 是最暗(█)
+        // 我们按亮度值从暗到亮排列，对应亮度比例
         return {
-            {0x2588, 1.0f},    // █ FULL BLOCK
-            {0x2589, 0.875f},  // ▉ LEFT SEVEN EIGHTHS BLOCK
-            {0x258A, 0.75f},   // ▊ LEFT THREE QUARTERS BLOCK
-            {0x258B, 0.625f},  // ▋ LEFT FIVE EIGHTHS BLOCK
-            {0x258C, 0.5f},    // ▌ LEFT HALF BLOCK
-            {0x258D, 0.375f},  // ▍ LEFT THREE EIGHTHS BLOCK
-            {0x258E, 0.25f},   // ▎ LEFT QUARTER BLOCK
-            {0x258F, 0.125f},  // ▏ LEFT ONE EIGHTH BLOCK
-            {0x2594, 0.125f},  // ▔ UPPER ONE EIGHTH BLOCK
-            {0x2595, 0.125f},  // ▕ RIGHT ONE EIGHTH BLOCK
-            {0x2596, 0.25f},   // ▖ QUADRANT LOWER LEFT
-            {0x2597, 0.25f},   // ▗ QUADRANT LOWER RIGHT
-            {0x2598, 0.25f},   // ▘ QUADRANT UPPER LEFT
-            {0x2599, 0.75f},   // ▙ QUADRANT UPPER LEFT AND LOWER LEFT AND LOWER RIGHT
-            {0x259A, 0.5f},    // ▚ QUADRANT UPPER LEFT AND LOWER RIGHT
-            {0x259B, 0.75f},   // ▛ QUADRANT UPPER LEFT AND UPPER RIGHT AND LOWER LEFT
-            {0x259C, 0.75f},   // ▜ QUADRANT UPPER LEFT AND UPPER RIGHT AND LOWER RIGHT
-            {0x259D, 0.25f},   // ▝ QUADRANT UPPER RIGHT
-            {0x259E, 0.5f},    // ▞ QUADRANT UPPER RIGHT AND LOWER LEFT
-            {0x259F, 0.75f},   // ▟ QUADRANT UPPER RIGHT AND LOWER LEFT AND LOWER RIGHT
-            // 添加更多细致的字符
-            {0x2591, 0.25f},  // ░ LIGHT SHADE
-            {0x2592, 0.5f},   // ▒ MEDIUM SHADE
-            {0x2593, 0.75f},  // ▓ DARK SHADE
-            {0x25E2, 0.25f},  // ◢ BLACK LOWER RIGHT TRIANGLE
-            {0x25E3, 0.25f},  // ◣ BLACK LOWER LEFT TRIANGLE
-            {0x25E4, 0.25f},  // ◤ BLACK UPPER LEFT TRIANGLE
-            {0x25E5, 0.25f}   // ◥ BLACK UPPER RIGHT TRIANGLE
+            {0x2588, 1.0f},   // █ FULL BLOCK (最暗，对应 dsa index=3)
+            {0x2593, 0.75f},  // ▓ DARK SHADE (对应 dsa index=2)
+            {0x2592, 0.5f},   // ▒ MEDIUM SHADE (对应 dsa index=1)
+            {0x2591, 0.25f}   // ░ LIGHT SHADE (最亮，对应 dsa index=0)
         };
     }
 
@@ -390,19 +373,20 @@ namespace VideoPlayer
                 float brightness = calculateBrightness(color);
                 brightness       = std::pow(brightness, gamma);
 
-                // 选择最佳匹配字符
-                int   bestChar = charSet[0].first;
-                float minDiff  = std::abs(brightness - charSet[0].second);
-
-                for (size_t i = 1; i < charSet.size(); ++i)
-                {
-                    float diff = std::abs(brightness - charSet[i].second);
-                    if (diff < minDiff)
-                    {
-                        minDiff  = diff;
-                        bestChar = charSet[i].first;
-                    }
-                }
+                // 完全按照 dsa 项目的字符选择算法
+                // dsa 的 get_unicode_char: index = (gray_value * 3) / 255
+                // 由于我们的 brightness 是归一化的 (0.0-1.0)，对应 gray_value/255
+                // 所以：index = brightness * 3
+                // dsa 中：index 0=░(最亮), 1=▒, 2=▓, 3=█(最暗)
+                // 我们的字符集按亮度从暗到亮：0=█(最暗), 1=▓, 2=▒, 3=░(最亮)
+                // 所以需要反转：我们的索引 = 3 - dsa_index
+                int dsaIndex = static_cast<int>(brightness * 3.0f);
+                dsaIndex = std::clamp(dsaIndex, 0, 3);
+                // 反转索引以匹配我们的字符集顺序（从暗到亮）
+                int charIndex = 3 - dsaIndex;
+                charIndex = std::clamp(charIndex, 0, 3);
+                
+                int bestChar = charSet[charIndex].first;
 
                 row_chars.push_back(codepointToUtf8(bestChar));
                 row_colors.push_back(color);

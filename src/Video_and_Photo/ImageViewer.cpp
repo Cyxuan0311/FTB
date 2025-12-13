@@ -95,16 +95,48 @@ ImageDecoder::convertToColorAsciiArt(
     // 获取预定义的 Unicode 字符集及其“灰度值”比例
     const auto& charSet = CommonMedia::getExtendedUnicodeCharSet();
 
-    // 定义一个采样 lambda：根据浮点坐标返回原图中对应的像素颜色
+    // 定义一个区域采样 lambda：参考 dsa 项目的区域采样算法，提高图片质量
+    // 对目标像素周围的区域进行采样，计算平均颜色值
     auto get_pixel = [&](float x, float y) -> CommonMedia::PixelColor {
-        // clamp 坐标到图像范围内
-        int srcX = std::clamp(static_cast<int>(x), 0, originalWidth - 1);
-        int srcY = std::clamp(static_cast<int>(y), 0, originalHeight - 1);
-        int idx = (srcY * originalWidth + srcX) * 3;
+        int centerX = std::clamp(static_cast<int>(x), 0, originalWidth - 1);
+        int centerY = std::clamp(static_cast<int>(y), 0, originalHeight - 1);
+        
+        // 参考 dsa 的区域采样算法，使用 2x2 采样区域
+        int sample_size = 2;
+        int r_sum = 0, g_sum = 0, b_sum = 0, count = 0;
+        
+        // 对采样区域内的像素进行平均
+        for (int dy = -sample_size/2; dy <= sample_size/2; dy++) {
+            for (int dx = -sample_size/2; dx <= sample_size/2; dx++) {
+                int sample_x = centerX + dx;
+                int sample_y = centerY + dy;
+                
+                if (sample_x >= 0 && sample_x < originalWidth && 
+                    sample_y >= 0 && sample_y < originalHeight) {
+                    int idx = (sample_y * originalWidth + sample_x) * 3;
+                    r_sum += pixels[idx];
+                    g_sum += pixels[idx + 1];
+                    b_sum += pixels[idx + 2];
+                    count++;
+                }
+            }
+        }
+        
+        // 返回平均颜色值
+        if (count > 0) {
+            return {
+                static_cast<uint8_t>(r_sum / count),
+                static_cast<uint8_t>(g_sum / count),
+                static_cast<uint8_t>(b_sum / count)
+            };
+        }
+        
+        // 如果采样失败，返回中心像素颜色
+        int idx = (centerY * originalWidth + centerX) * 3;
         return {
-            pixels[idx],       // R
-            pixels[idx + 1],   // G
-            pixels[idx + 2]    // B
+            pixels[idx],
+            pixels[idx + 1],
+            pixels[idx + 2]
         };
     };
 
@@ -134,16 +166,20 @@ ImageDecoder::convertToColorAsciiArt(
             // 计算归一化亮度（0.0 - 1.0）
             float brightness = CommonMedia::calculateBrightness(pixel);
 
-            // 在 charSet 中寻找亮度最接近的字符
-            auto bestChar = charSet[0];
-            float minDiff = std::abs(brightness - charSet[0].second);
-            for (size_t i = 1; i < charSet.size(); ++i) {
-                float diff = std::abs(brightness - charSet[i].second);
-                if (diff < minDiff) {
-                    minDiff = diff;
-                    bestChar = charSet[i];
-                }
-            }
+            // 完全按照 dsa 项目的字符选择算法
+            // dsa 的 get_unicode_char: index = (gray_value * 3) / 255
+            // 由于我们的 brightness 是归一化的 (0.0-1.0)，对应 gray_value/255
+            // 所以：index = brightness * 3
+            // dsa 中：index 0=░(最亮), 1=▒, 2=▓, 3=█(最暗)
+            // 我们的字符集按亮度从暗到亮：0=█(最暗), 1=▓, 2=▒, 3=░(最亮)
+            // 所以需要反转：我们的索引 = 3 - dsa_index
+            int dsaIndex = static_cast<int>(brightness * 3.0f);
+            dsaIndex = std::clamp(dsaIndex, 0, 3);
+            // 反转索引以匹配我们的字符集顺序（从暗到亮）
+            int charIndex = 3 - dsaIndex;
+            charIndex = std::clamp(charIndex, 0, 3);
+            
+            auto bestChar = charSet[charIndex];
 
             // 将选中的 Unicode 码点转换为 UTF-8 字符串
             rowChars.push_back(CommonMedia::codepointToUtf8(bestChar.first));

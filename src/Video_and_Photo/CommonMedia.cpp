@@ -45,11 +45,14 @@ std::string codepointToUtf8(int codepoint) {
 //   color - PixelColor 结构，包含 r、g、b 分量 (0-255)
 // 返回：
 //   标准化到 [0,1] 范围内的亮度值
-// 说明：使用 Rec. 709 亮度计算公式：0.2126∙R + 0.7152∙G + 0.0722∙B，
-//      然后除以 255 归一化
+// 说明：参考 dsa 项目的 RGB 到灰度转换算法
+//       使用标准亮度系数：0.299∙R + 0.587∙G + 0.114∙B（与 dsa 一致）
+//       这比 Rec. 709 更适合终端显示
 // --------------------------------------------------
 float calculateBrightness(const PixelColor& color) {
-    return (0.2126f * color.r + 0.7152f * color.g + 0.0722f * color.b) / 255.0f;
+    // 使用与 dsa 相同的 RGB 到灰度转换系数
+    // 这提供了更好的视觉对比度
+    return (0.299f * color.r + 0.587f * color.g + 0.114f * color.b) / 255.0f;
 }
 
 // --------------------------------------------------
@@ -88,40 +91,24 @@ PixelColor enhanceColor(const PixelColor& color, float contrast, float brightnes
 }
 
 // --------------------------------------------------
-// 获取扩展 Unicode 字符集及对应“占用亮度”比例
+// 获取扩展 Unicode 字符集及对应"占用亮度"比例
 // 返回：
 //   包含多个 (Unicode 码点, 亮度比例) 对的 vector，用于 ASCII 艺术或字符画映射
-// 说明：例如 █ (FULL BLOCK) 对应 1.0，▇ 等其他块状字符根据实心比例不同映射到 0.125 ~ 1.0
+// 说明：完全使用 dsa 项目的字符集：█▓▒░ (4个字符)
+//       按亮度从暗到亮排列：█ (最暗) -> ▓ -> ▒ -> ░ (最亮)
+//       对应 dsa 的 UNICODE_CHARS = "█▓▒░"
 // --------------------------------------------------
 std::vector<std::pair<int, float>> getExtendedUnicodeCharSet() {
+    // 完全使用 dsa 项目的字符集，只使用 4 个字符
+    // 按 dsa 的 get_unicode_char 函数逻辑：
+    // index = (gray_value * 3) / 255，索引 0-3 对应 ░▒▓█
+    // 但 dsa 中 index=0 是最亮(░)，index=3 是最暗(█)
+    // 我们按亮度值从暗到亮排列，对应亮度比例
     return {
-        {0x2588, 1.0f},   // █ FULL BLOCK
-        {0x2589, 0.875f}, // ▉ LEFT SEVEN EIGHTHS BLOCK
-        {0x258A, 0.75f},  // ▊ LEFT THREE QUARTERS BLOCK
-        {0x258B, 0.625f}, // ▋ LEFT FIVE EIGHTHS BLOCK
-        {0x258C, 0.5f},   // ▌ LEFT HALF BLOCK
-        {0x258D, 0.375f}, // ▍ LEFT THREE EIGHTHS BLOCK
-        {0x258E, 0.25f},  // ▎ LEFT QUARTER BLOCK
-        {0x258F, 0.125f}, // ▏ LEFT ONE EIGHTH BLOCK
-        {0x2594, 0.125f}, // ▔ UPPER ONE EIGHTH BLOCK
-        {0x2595, 0.125f}, // ▕ RIGHT ONE EIGHTH BLOCK
-        {0x2596, 0.25f},  // ◖ QUADRANT LOWER LEFT
-        {0x2597, 0.25f},  // ◗ QUADRANT LOWER RIGHT
-        {0x2598, 0.25f},  // ◘ QUADRANT UPPER LEFT
-        {0x2599, 0.75f},  // ▙ QUADRANT UPPER LEFT & LOWER LEFT & LOWER RIGHT
-        {0x259A, 0.5f},   // ▚ QUADRANT UPPER LEFT & LOWER RIGHT
-        {0x259B, 0.75f},  // ▛ QUADRANT UPPER LEFT & UPPER RIGHT & LOWER LEFT
-        {0x259C, 0.75f},  // ▜ QUADRANT UPPER LEFT & UPPER RIGHT & LOWER RIGHT
-        {0x259D, 0.25f},  // ▝ QUADRANT UPPER RIGHT
-        {0x259E, 0.5f},   // ▞ QUADRANT UPPER RIGHT & LOWER LEFT
-        {0x259F, 0.75f},  // ▟ QUADRANT UPPER RIGHT & LOWER LEFT & LOWER RIGHT
-        {0x2591, 0.25f},  // ░ LIGHT SHADE
-        {0x2592, 0.5f},   // ▒ MEDIUM SHADE
-        {0x2593, 0.75f},  // ▓ DARK SHADE
-        {0x25E2, 0.25f},  // ◢ BLACK LOWER RIGHT TRIANGLE
-        {0x25E3, 0.25f},  // ◣ BLACK LOWER LEFT TRIANGLE
-        {0x25E4, 0.25f},  // ◤ BLACK UPPER LEFT TRIANGLE
-        {0x25E5, 0.25f}   // ◥ BLACK UPPER RIGHT TRIANGLE
+        {0x2588, 1.0f},   // █ FULL BLOCK (最暗，对应 dsa index=3)
+        {0x2593, 0.75f},  // ▓ DARK SHADE (对应 dsa index=2)
+        {0x2592, 0.5f},   // ▒ MEDIUM SHADE (对应 dsa index=1)
+        {0x2591, 0.25f}   // ░ LIGHT SHADE (最亮，对应 dsa index=0)
     };
 }
 
