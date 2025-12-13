@@ -52,11 +52,16 @@ def fetch_weather():
             # 保存到文件
             with open('/mnt/f/My__StudyStack/My_Project/FTB/data/weather.json', 'w', encoding='utf-8') as f:
                 json.dump(weather_info, f, ensure_ascii=False, indent=2)
-            print("天气更新成功：", weather_info)
+            # 移除控制台输出，避免干扰用户界面
+            # print("天气更新成功：", weather_info)
         else:
-            print("天气数据状态异常：", data)
+            # 移除控制台输出，避免干扰用户界面
+            # print("天气数据状态异常：", data)
+            pass
     except Exception as e:
-        print(f"获取天气失败: {e}")
+        # 移除控制台输出，避免干扰用户界面
+        # print(f"获取天气失败: {e}")
+        pass
 
 if __name__ == "__main__":
     try:
