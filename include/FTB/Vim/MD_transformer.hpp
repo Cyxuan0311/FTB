@@ -34,6 +34,7 @@ private:
     ftxui::Element ParseListItem(const std::string& line);
     ftxui::Element ParseLinks(const std::string& text);
     ftxui::Element ParseFormatting(const std::string& text);
+    ftxui::Element ParseInlineFormatting(const std::string& text);
 
     // 表格解析
     bool IsTableLine(const std::string& line);
