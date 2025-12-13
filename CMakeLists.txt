@@ -74,6 +74,12 @@ file(GLOB FTB_CORE_SOURCES
     src/Connection/*.cpp
 )
 
+# 确保新增加的源文件被纳入（即使某些生成器未自动刷新 GLOB 结果）
+list(APPEND FTB_CORE_SOURCES
+    src/FTB/IconMapper.cpp
+)
+list(REMOVE_DUPLICATES FTB_CORE_SOURCES)
+
 # 构建核心库
 add_library(FTB_core ${FTB_CORE_SOURCES})
 
