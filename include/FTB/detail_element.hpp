@@ -2,13 +2,15 @@
 #define DETAIL_ELEMENT_HPP
 
 #include <ctime>
+#include <filesystem>
 #include <iomanip>
 #include <sstream>
-#include <vector>
 #include <string>
+#include <vector>
 #include <ftxui/dom/elements.hpp>
-#include "../include/FTB/FileManager.hpp"
 #include "ClipboardManager.hpp"
+#include "FileManager.hpp"
+#include "IconMapper.hpp"
 
 using namespace ftxui;
 using namespace FileManager;
@@ -37,7 +39,8 @@ Element RenderPendingFiles() {
       for (const auto& path : items) {
           fs::path p(path);
           auto filename = p.filename().string();
-          auto fileElement = text(fs::is_directory(p) ? "📁 " + filename : "📄 " + filename);
+          auto icon = FTB::Icons::GetIconForPath(p, fs::is_directory(p));
+          auto fileElement = text(icon + filename);
           
           // 只有在设置了模式后才显示颜色
           if (clipboard.hasModeSelected()) {  // 使用新的判断方法
@@ -138,8 +141,9 @@ inline Element CreateDetailElement(const std::vector<std::string>& filteredConte
     selectedName = "无选中项";
   }
 
-  // 使用不同图标：文件夹用 "📁 "，文件用 "📄 "
-  std::string icon = is_dir ? "📁 " : "📄 ";
+  // 使用统一的 Nerd Font 图标映射
+  fs::path selected_path = fs::path(currentPath) / selectedName;
+  std::string icon = FTB::Icons::GetIconForPath(selected_path, is_dir);
 
   // 生成日历的 Element 列表
   auto calendar_elements = GenerateCalendarElements();
