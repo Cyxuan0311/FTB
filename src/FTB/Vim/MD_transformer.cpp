@@ -189,16 +189,20 @@ ftxui::Element MDTransformer::ParseMarkdownLine(const std::string& line) {
     std::regex numbered_list_regex(R"(^\d+\.\s+(.+))");
     std::smatch match;
     if (std::regex_match(line, match, numbered_list_regex)) {
-        // 数字列表显示 - 使用白色
-        std::string numbered_display = "1. " + match[1].str();
-        return text(numbered_display) | color(Color::White);
+        // 数字列表显示 - 参考 glow 的风格
+        return hbox({
+            text("  " + std::to_string(1) + ". ") | color(Color::CyanLight),
+            ParseFormatting(match[1].str())
+        });
     }
     
     // 检查引用
     if (line.length() >= 2 && line.substr(0, 2) == "> ") {
-        // 引用显示 - 使用白色
-        std::string quote_display = "> " + line.substr(2);
-        return text(quote_display) | color(Color::White) | dim;
+        // 引用显示 - 参考 glow 的风格，使用左侧边框和灰色文字
+        return hbox({
+            text("  │ ") | color(Color::GrayDark),
+            ParseFormatting(line.substr(2)) | color(Color::GrayLight) | dim
+        });
     }
     
     // 普通段落
@@ -206,54 +210,61 @@ ftxui::Element MDTransformer::ParseMarkdownLine(const std::string& line) {
 }
 
 ftxui::Element MDTransformer::ParseHeader(const std::string& line, int level) {
-    // 标题显示 - 使用灰色加粗
-    std::string header_display = "";
+    // 根据级别设置不同的颜色和样式（参考 glow 的设计）
+    ftxui::Color header_color;
+    std::string prefix = "";
     
-    // 根据级别设置不同的显示效果
     switch (level) {
         case 1:
-            // H1: 大标题
-            header_display += "\n";
-            header_display += line + "\n";
-            header_display += "═══════════════════════════════════════\n";
-            header_display += "\n";
-            return text(header_display) | color(Color::GrayLight) | bold;
+            // H1: 大标题 - 使用亮色加粗，添加顶部间距
+            header_color = Color::White;
+            return vbox({
+                text(""),
+                text(line) | color(header_color) | bold,
+                text("")
+            });
             
         case 2:
-            // H2: 中标题
-            header_display += "\n";
-            header_display += line + "\n";
-            header_display += "───────────────────────────────────────\n";
-            header_display += "\n";
-            return text(header_display) | color(Color::GrayLight) | bold;
+            // H2: 中标题 - 使用青色
+            header_color = Color::Cyan;
+            return vbox({
+                text(""),
+                text(line) | color(header_color) | bold,
+                text("")
+            });
             
         case 3:
-            // H3: 小标题
-            header_display += line + "\n";
-            header_display += "───────────────────────────────────────\n";
-            header_display += "\n";
-            return text(header_display) | color(Color::GrayLight) | bold;
+            // H3: 小标题 - 使用亮青色
+            header_color = Color::CyanLight;
+            return vbox({
+                text(""),
+                text(line) | color(header_color) | bold,
+                text("")
+            });
             
         case 4:
-            // H4: 更小的标题
-            header_display += line + "\n";
-            header_display += "───────────────────────────────────────\n";
-            header_display += "\n";
-            return text(header_display) | color(Color::GrayLight) | bold;
+            // H4: 更小的标题 - 使用黄色
+            header_color = Color::Yellow;
+            return vbox({
+                text(line) | color(header_color) | bold,
+                text("")
+            });
             
         case 5:
-            // H5: 最小标题
-            header_display += line + "\n";
-            header_display += "───────────────────────────────────────\n";
-            header_display += "\n";
-            return text(header_display) | color(Color::GrayLight) | bold;
+            // H5: 最小标题 - 使用亮黄色
+            header_color = Color::YellowLight;
+            return vbox({
+                text(line) | color(header_color) | bold,
+                text("")
+            });
             
         default:
-            // H6: 最小标题
-            header_display += line + "\n";
-            header_display += "───────────────────────────────────────\n";
-            header_display += "\n";
-            return text(header_display) | color(Color::GrayLight) | bold;
+            // H6: 最小标题 - 使用灰色
+            header_color = Color::GrayLight;
+            return vbox({
+                text(line) | color(header_color) | bold,
+                text("")
+            });
     }
 }
 
@@ -262,117 +273,187 @@ ftxui::Element MDTransformer::ParseCodeBlock(const std::vector<std::string>& lin
         return text("");
     }
     
-    // 代码块显示 - 优化显示效果
-    std::string code_display = "";
+    // 代码块显示 - 参考 glow 的简洁风格
+    Elements code_elements;
     
     // 限制最大宽度，避免在终端中显示过宽
     const size_t MAX_WIDTH = 80;
-    size_t max_length = 0;
+    
+    // 使用简洁的边框样式，类似 glow
     for (const auto& line : lines) {
-        max_length = std::max(max_length, line.length());
-    }
-    max_length = std::min(max_length, MAX_WIDTH);
-    
-    // 创建标题
-    std::string title = "代码块";
-    if (lines.size() > 0) {
-        // 尝试检测语言类型
-        std::string first_line = lines[0];
-        if (first_line.find("#include") != std::string::npos || first_line.find("int main") != std::string::npos) {
-            title += " (C++)";
-        } else if (first_line.find("def ") != std::string::npos || first_line.find("import ") != std::string::npos) {
-            title += " (Python)";
-        } else if (first_line.find("function") != std::string::npos || first_line.find("const ") != std::string::npos) {
-            title += " (JavaScript)";
-        } else {
-            title += " (Text)";
-        }
-    }
-    
-    // 创建顶部边框
-    std::string top_border = "┌─ " + title + " ";
-    while (top_border.length() < max_length + 4) {
-        top_border += "─";
-    }
-    top_border += "┐\n";
-    
-    code_display += top_border;
-    
-    // 代码行 - 支持文本换行
-    for (const auto& line : lines) {
-        std::string code_line = "│ " + line;
+        std::string code_line = line;
         
-        // 如果行太长，进行换行处理
-        if (line.length() > MAX_WIDTH) {
-            std::string truncated_line = line.substr(0, MAX_WIDTH - 3) + "...";
-            code_line = "│ " + truncated_line;
+        // 如果行太长，进行截断处理
+        if (code_line.length() > MAX_WIDTH) {
+            code_line = code_line.substr(0, MAX_WIDTH - 3) + "...";
         }
         
-        // 填充空格到指定长度
-        while (code_line.length() < top_border.length() - 1) {
-            code_line += " ";
-        }
-        code_line += " │\n";
-        code_display += code_line;
+        // 使用深色背景和亮色文字，类似 glow 的代码块样式
+        // 添加左侧缩进，使代码更易读
+        code_elements.push_back(
+            text("  " + code_line) | 
+            color(Color::White) | 
+            bgcolor(Color::RGB(30, 30, 30))  // 深灰色背景，类似 glow 的代码块
+        );
     }
     
-    // 底部边框
-    std::string bottom_border = "└";
-    while (bottom_border.length() < top_border.length() - 1) {
-        bottom_border += "─";
-    }
-    bottom_border += "┘";
-    
-    code_display += bottom_border;
-    
-    return text(code_display) | color(Color::Cyan) | bgcolor(Color::DarkBlue);
+    // 使用圆角边框和深色背景，参考 glow 的风格
+    return vbox(code_elements) | 
+           borderRounded | 
+           bgcolor(Color::RGB(30, 30, 30)) |
+           color(Color::White);
 }
 
 ftxui::Element MDTransformer::ParseListItem(const std::string& line) {
-    // 列表项显示 - 使用白色
-    std::string list_display = "• " + line;
-    return text(list_display) | color(Color::White);
+    // 列表项显示 - 参考 glow 的风格，使用更美观的符号
+    // 解析列表项内容中的格式化文本
+    return hbox({
+        text("  • ") | color(Color::CyanLight),
+        ParseFormatting(line)
+    });
 }
 
 ftxui::Element MDTransformer::ParseLinks(const std::string& text) {
-    // 链接显示 - 使用蓝色下划线
+    // 链接显示 - 参考 glow 的风格，使用蓝色加下划线
     std::regex link_regex(R"(\[([^\]]+)\]\(([^)]+)\))");
-    std::string result = std::regex_replace(text, link_regex, std::string("[$1]($2)"));
+    std::string result = std::regex_replace(text, link_regex, std::string("$1"));
     
-    return ftxui::text(result) | color(Color::Blue) | underlined;
+    return ftxui::text(result) | color(Color::BlueLight) | underlined;
 }
 
 ftxui::Element MDTransformer::ParseFormatting(const std::string& text) {
-    // 检查是否包含链接
-    if (text.find("[") != std::string::npos && text.find("](") != std::string::npos) {
-        return ParseLinks(text);
-    }
+    // 混合格式化解析 - 参考 glow 的风格，支持多种格式混合
+    Elements elements;
+    std::string current_text = text;
+    size_t pos = 0;
     
-    // 检查是否包含行内代码
-    if (text.find("`") != std::string::npos) {
-        std::string result = text;
+    // 使用更智能的解析，支持嵌套格式
+    while (pos < current_text.length()) {
+        std::string remaining = current_text.substr(pos);
+        
+        // 优先检查链接
+        std::regex link_regex(R"(\[([^\]]+)\]\(([^)]+)\))");
+        std::smatch link_match;
+        if (std::regex_search(remaining, link_match, link_regex)) {
+            size_t match_pos = link_match.position() + pos;
+            // 添加链接前的文本
+            if (match_pos > pos) {
+                std::string before = current_text.substr(pos, match_pos - pos);
+                if (!before.empty()) {
+                    elements.push_back(ParseInlineFormatting(before));
+                }
+            }
+            // 添加链接
+            elements.push_back(
+                ftxui::text(link_match[1].str()) | 
+                color(Color::BlueLight) | 
+                underlined
+            );
+            pos = match_pos + link_match.length();
+            continue;
+        }
+        
+        // 检查行内代码
         std::regex code_regex(R"(`([^`]+)`)");
-        result = std::regex_replace(result, code_regex, std::string("`$1`"));
-        return ftxui::text(result) | color(Color::Cyan) | bgcolor(Color::DarkBlue);
+        std::smatch code_match;
+        if (std::regex_search(remaining, code_match, code_regex)) {
+            size_t match_pos = code_match.position() + pos;
+            // 添加代码前的文本
+            if (match_pos > pos) {
+                std::string before = current_text.substr(pos, match_pos - pos);
+                if (!before.empty()) {
+                    elements.push_back(ParseInlineFormatting(before));
+                }
+            }
+            // 添加行内代码
+            elements.push_back(
+                ftxui::text(code_match[1].str()) | 
+                color(Color::Yellow) | 
+                bgcolor(Color::RGB(40, 40, 40))
+            );
+            pos = match_pos + code_match.length();
+            continue;
+        }
+        
+        // 检查粗体
+        std::regex bold_regex(R"(\*\*([^*]+)\*\*)");
+        std::smatch bold_match;
+        if (std::regex_search(remaining, bold_match, bold_regex)) {
+            size_t match_pos = bold_match.position() + pos;
+            // 添加粗体前的文本
+            if (match_pos > pos) {
+                std::string before = current_text.substr(pos, match_pos - pos);
+                if (!before.empty()) {
+                    elements.push_back(ParseInlineFormatting(before));
+                }
+            }
+            // 添加粗体
+            elements.push_back(
+                ftxui::text(bold_match[1].str()) | 
+                color(Color::White) | 
+                bold
+            );
+            pos = match_pos + bold_match.length();
+            continue;
+        }
+        
+        // 检查斜体（单星号，且不是粗体的一部分）
+        std::regex italic_regex(R"(\*([^*\s][^*]*[^*\s])\*|\*([^*\s])\*)");
+        std::smatch italic_match;
+        if (std::regex_search(remaining, italic_match, italic_regex)) {
+            size_t match_pos = italic_match.position() + pos;
+            // 添加斜体前的文本
+            if (match_pos > pos) {
+                std::string before = current_text.substr(pos, match_pos - pos);
+                if (!before.empty()) {
+                    elements.push_back(ParseInlineFormatting(before));
+                }
+            }
+            // 添加斜体
+            std::string italic_text = italic_match[1].str();
+            if (italic_text.empty() && italic_match.size() > 2) {
+                italic_text = italic_match[2].str();
+            }
+            elements.push_back(
+                ftxui::text(italic_text) | 
+                color(Color::GrayLight) | 
+                dim
+            );
+            pos = match_pos + italic_match.length();
+            continue;
+        }
+        
+        // 没有找到更多格式，添加剩余文本
+        if (pos < current_text.length()) {
+            elements.push_back(ParseInlineFormatting(remaining));
+        }
+        break;
     }
     
-    // 检查是否包含粗体
+    if (elements.empty()) {
+        return ftxui::text(text) | color(Color::White);
+    }
+    
+    return hbox(elements);
+}
+
+// 辅助函数：解析行内格式化（不包含链接和代码块）
+ftxui::Element MDTransformer::ParseInlineFormatting(const std::string& text) {
+    // 简单处理：只处理粗体和斜体
     if (text.find("**") != std::string::npos) {
         std::string result = text;
         std::regex bold_regex(R"(\*\*([^*]+)\*\*)");
-        result = std::regex_replace(result, bold_regex, std::string("**$1**"));
+        result = std::regex_replace(result, bold_regex, std::string("$1"));
         return ftxui::text(result) | color(Color::White) | bold;
     }
     
-    // 检查是否包含斜体
-    if (text.find("*") != std::string::npos && text.find("**") == std::string::npos) {
+    if (text.find("*") != std::string::npos) {
         std::string result = text;
         std::regex italic_regex(R"(\*([^*]+)\*)");
-        result = std::regex_replace(result, italic_regex, std::string("*$1*"));
-        return ftxui::text(result) | color(Color::White) | dim;
+        result = std::regex_replace(result, italic_regex, std::string("$1"));
+        return ftxui::text(result) | color(Color::GrayLight) | dim;
     }
     
-    // 普通文本 - 使用白色显示
     return ftxui::text(text) | color(Color::White);
 }
 
@@ -450,70 +531,12 @@ ftxui::Element MDTransformer::ParseTable(const std::vector<std::string>& table_l
         alignments.resize(header_row.size(), TableAlignment::LEFT);
     }
     
-    // 构建表格
-    Elements table_elements;
-    
-    // 表头
-    if (!header_row.empty()) {
-        Elements header_cells;
-        for (size_t i = 0; i < header_row.size(); ++i) {
-            ftxui::Element cell = ParseFormatting(" " + header_row[i] + " ") 
-                | bold 
-                | color(Color::White) 
-                | bgcolor(Color::Blue)
-                | center;
-            header_cells.push_back(cell);
-        }
-        table_elements.push_back(hbox(header_cells) | borderRounded);
-        
-        // 优化分隔线
-        std::string separator_line = "";
-        for (size_t i = 0; i < header_row.size(); ++i) {
-            if (i > 0) separator_line += "┼";
-            separator_line += "─────";
-        }
-        table_elements.push_back(ftxui::text(separator_line) | color(Color::Cyan) | center);
-    }
-    
-    // 数据行
-    for (size_t row_idx = 0; row_idx < data_rows.size(); ++row_idx) {
-        const auto& row = data_rows[row_idx];
-        Elements row_cells;
-        
-        for (size_t i = 0; i < row.size() && i < header_row.size(); ++i) {
-            // 解析单元格内的格式化文本
-            ftxui::Element cell = ParseFormatting(" " + row[i] + " ");
-            
-            // 根据对齐方式设置样式
-            switch (alignments[i]) {
-                case TableAlignment::CENTER:
-                    cell = cell | center;
-                    break;
-                case TableAlignment::RIGHT:
-                    cell = cell | center; // 暂时使用居中
-                    break;
-                default:
-                    break;
-            }
-            
-            // 优化交替行颜色和边框
-            if (row_idx % 2 == 0) {
-                cell = cell | bgcolor(Color::GrayDark) | border;
-            } else {
-                cell = cell | bgcolor(Color::DarkBlue) | border;
-            }
-            
-            row_cells.push_back(cell);
-        }
-        table_elements.push_back(hbox(row_cells) | borderRounded);
-    }
-    
-    // 表格显示 - 优化显示效果
-    std::string table_display = "";
-    
     if (header_row.empty()) {
         return text("空表格");
     }
+    
+    // 表格显示 - 参考 glow 的简洁风格，使用更好的边框字符
+    std::string table_display = "";
     
     // 限制最大宽度，避免在终端中显示过宽
     const size_t MAX_COLUMN_WIDTH = 20;
@@ -551,20 +574,21 @@ ftxui::Element MDTransformer::ParseTable(const std::vector<std::string>& table_l
         }
     }
     
+    // 使用 Unicode 边框字符，参考 glow 的风格
     // 创建表格顶部边框
-    table_display += "+";
+    table_display += "┌";
     for (size_t i = 0; i < header_row.size(); ++i) {
         for (size_t j = 0; j < column_widths[i] + 2; ++j) {
-            table_display += "-";
+            table_display += "─";
         }
         if (i < header_row.size() - 1) {
-            table_display += "+";
+            table_display += "┬";
         }
     }
-    table_display += "+\n";
+    table_display += "┐\n";
     
     // 表头 - 支持文本截断
-    std::string header_display = "|";
+    std::string header_display = "│";
     for (size_t i = 0; i < header_row.size(); ++i) {
         std::string cell_content = header_row[i];
         
@@ -580,27 +604,28 @@ ftxui::Element MDTransformer::ParseTable(const std::vector<std::string>& table_l
         }
         header_display += cell_content;
         if (i < header_row.size() - 1) {
-            header_display += " |";
+            header_display += " │";
         }
     }
-    header_display += " |\n";
+    header_display += " │\n";
     table_display += header_display;
     
-    // 分隔线
-    table_display += "+";
+    // 分隔线 - 使用更美观的字符
+    table_display += "├";
     for (size_t i = 0; i < header_row.size(); ++i) {
         for (size_t j = 0; j < column_widths[i] + 2; ++j) {
-            table_display += "-";
+            table_display += "─";
         }
         if (i < header_row.size() - 1) {
-            table_display += "+";
+            table_display += "┼";
         }
     }
-    table_display += "+\n";
+    table_display += "┤\n";
     
     // 数据行 - 支持文本截断
-    for (const auto& row : data_rows) {
-        std::string row_display = "|";
+    for (size_t row_idx = 0; row_idx < data_rows.size(); ++row_idx) {
+        const auto& row = data_rows[row_idx];
+        std::string row_display = "│";
         for (size_t i = 0; i < row.size() && i < header_row.size(); ++i) {
             std::string cell_content = row[i];
             
@@ -616,26 +641,27 @@ ftxui::Element MDTransformer::ParseTable(const std::vector<std::string>& table_l
             }
             row_display += cell_content;
             if (i < row.size() - 1 && i < header_row.size() - 1) {
-                row_display += " |";
+                row_display += " │";
             }
         }
-        row_display += " |\n";
+        row_display += " │\n";
         table_display += row_display;
     }
     
     // 底部边框
-    table_display += "+";
+    table_display += "└";
     for (size_t i = 0; i < header_row.size(); ++i) {
         for (size_t j = 0; j < column_widths[i] + 2; ++j) {
-            table_display += "-";
+            table_display += "─";
         }
         if (i < header_row.size() - 1) {
-            table_display += "+";
+            table_display += "┴";
         }
     }
-    table_display += "+";
+    table_display += "┘";
     
-    return text(table_display) | color(Color::White);
+    // 使用更柔和的颜色，参考 glow 的风格
+    return text(table_display) | color(Color::GrayLight);
 }
 
 /**
