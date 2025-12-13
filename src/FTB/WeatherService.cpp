@@ -243,7 +243,8 @@ std::chrono::system_clock::time_point WeatherService::GetLastUpdateTime() const 
 }
 
 void WeatherService::UpdateLoop() {
-    LogMessage("天气更新线程已启动");
+    // 移除控制台输出，避免干扰用户界面
+    // LogMessage("天气更新线程已启动");
     
     while (running_.load()) {
         // 检查是否应该停止
@@ -263,7 +264,8 @@ void WeatherService::UpdateLoop() {
         }
     }
     
-    LogMessage("天气更新线程已退出");
+    // 移除控制台输出，避免干扰用户界面
+    // LogMessage("天气更新线程已退出");
 }
 
 bool WeatherService::ExecutePythonScript() {
@@ -351,7 +353,8 @@ bool WeatherService::ReadWeatherData() {
         if (ValidateWeatherData(new_weather)) {
             new_weather.is_valid = true;
             current_weather_ = new_weather;
-            LogMessage("天气数据读取成功: " + new_weather.city + " " + new_weather.temperature + "°C");
+            // 移除控制台输出，避免干扰用户界面
+            // LogMessage("天气数据读取成功: " + new_weather.city + " " + new_weather.temperature + "°C");
             return true;
         } else {
             LogError("天气数据验证失败");

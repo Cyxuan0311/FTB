@@ -20,6 +20,7 @@
 #include "../include/FTB/FileSizeCalculator.hpp"
 #include "../include/FTB/ThreadGuard.hpp"
 #include "../include/FTB/HandleManager/UIManager.hpp"
+#include "../include/FTB/IconMapper.hpp"
 #include "../include/FTB/Vim/Vim_Like.hpp"
 #include "../include/FTB/ObjectPool.hpp"
 #include "../include/FTB/AsyncFileManager.hpp"
@@ -32,10 +33,6 @@
 
 using namespace ftxui;
 namespace fs = std::filesystem;
-
-// 定义文件夹和文件在界面中显示的图标
-const std::string FOLDER_ICON = "📁 ";
-const std::string FILE_ICON   = "📄 ";
 
 // 马里奥动画实例
 FTB::MarioAnimation marioAnimation;
@@ -226,8 +223,8 @@ int main()
             for (int j = 0; j < items_per_row && (i + j) < end_index; ++j)
             {
                 int         index    = i + j;
-                std::string fullPath = currentPath + "/" + filteredContents[index];
-                bool        is_dir   = FileManager::isDirectory(fullPath);  // 判断是否文件夹
+                fs::path item_path = fs::path(currentPath) / filteredContents[index];
+                bool     is_dir    = FileManager::isDirectory(item_path.string());  // 判断是否文件夹
 
                 // 文件夹和文件分别使用不同颜色
                 auto text_color = is_dir
@@ -242,7 +239,7 @@ int main()
                     bg_style = bgcolor(Color::GrayLight) | color(Color::Black) | bold;
 
                 std::string itemText = filteredContents[index];
-                std::string icon     = is_dir ? FOLDER_ICON : FILE_ICON;
+                std::string icon     = FTB::Icons::GetIconForPath(item_path, is_dir);
                 size_t      pos      = itemText.find(searchQuery);  // 搜索高亮
 
                 // 定义每个项目的固定宽度和高度
@@ -350,7 +347,7 @@ int main()
                         size(HEIGHT, LESS_THAN, 1) | flex
                     }),
                     // 马里奥运动动画 - 放在FTB徽章下方，增加高度
-                    marioAnimationRenderer() | size(HEIGHT, EQUAL, 15) | size(WIDTH, EQUAL, 40)
+                    marioAnimationRenderer() | size(HEIGHT, EQUAL, 14) | size(WIDTH, EQUAL, 40)
                 }) | size(WIDTH, EQUAL, 80),
                 filler(),
                 // 中间：显示当前选中项大小和 % 进度条
