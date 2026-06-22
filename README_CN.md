@@ -10,7 +10,7 @@
 
 <div align="center">
 
-![C++17](https://img.shields.io/badge/C++-17-blue) ![FTXUI](https://img.shields.io/badge/FTXUI-6.0.0-orange) ![Platform](https://img.shields.io/badge/Platform-Linux-lightgrey) ![CMake](https://img.shields.io/badge/CMake-3.10+-red)
+![C++17](https://img.shields.io/badge/C%2B%2B-17-00599C?style=for-the-badge&logo=c%2B%2B) ![FTXUI](https://img.shields.io/badge/FTXUI-6.0.0-E34F26?style=for-the-badge) ![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black) ![macOS](https://img.shields.io/badge/macOS-000000?style=for-the-badge&logo=apple) ![CMake](https://img.shields.io/badge/CMake-3.10+-064F8C?style=for-the-badge&logo=cmake)
 
 [English](README.md) | 中文
 
