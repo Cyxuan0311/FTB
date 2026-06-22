@@ -2,7 +2,7 @@ name: CI/CD
 
 on:
   push:
-    branches: [main, master, develop]
+    branches: [main, master, develop, fix/**]
     tags: ["v*"]
   pull_request:
     branches: [main, master]
