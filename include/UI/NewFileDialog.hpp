@@ -1,12 +1,10 @@
-#ifndef NEW_FILE_DIALOG_HPP
-#define NEW_FILE_DIALOG_HPP
+#pragma once
+#include "FTB/MainUI.hpp"
+#include <ftxui/dom/elements.hpp>
 
-#include <string>
-#include <ftxui/component/screen_interactive.hpp>
+namespace FTB::UI {
 
-namespace NewFileDialog {
-    // 显示新建文件对话框，返回构造后的文件名（例如 "example.txt"），如果取消则返回空字符串
-    std::string show(ftxui::ScreenInteractive& screen);
-}
+ftxui::Element RenderNewFilePanel(MainState& state, int tw, int th);
+bool HandleNewFileEvent(MainState& state, const ftxui::Event& event);
 
-#endif // NEW_FILE_DIALOG_HPP
+}  // namespace FTB::UI

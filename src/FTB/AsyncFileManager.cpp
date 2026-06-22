@@ -1,6 +1,5 @@
 #include "FTB/AsyncFileManager.hpp"
 #include "FTB/FileManager.hpp"
-#include <iostream>
 
 namespace FTB {
 
@@ -45,8 +44,7 @@ void AsyncFileManager::asyncGetDirectoryContents(const std::string& path,
         try {
             auto contents = FileManager::getDirectoryContents(path);
             callback(contents);
-        } catch (const std::exception& e) {
-            std::cerr << "异步获取目录内容失败: " << e.what() << std::endl;
+        } catch (const std::exception&) {
             callback(std::vector<std::string>());
         }
     });
@@ -59,8 +57,7 @@ void AsyncFileManager::asyncReadFileContent(const std::string& file_path,
         try {
             auto content = FileManager::readFileContent(file_path, start_line, end_line);
             callback(content);
-        } catch (const std::exception& e) {
-            std::cerr << "异步读取文件内容失败: " << e.what() << std::endl;
+        } catch (const std::exception&) {
             callback("");
         }
     });
@@ -73,8 +70,7 @@ void AsyncFileManager::asyncWriteFileContent(const std::string& file_path,
         try {
             bool success = FileManager::writeFileContent(file_path, content);
             callback(success);
-        } catch (const std::exception& e) {
-            std::cerr << "异步写入文件内容失败: " << e.what() << std::endl;
+        } catch (const std::exception&) {
             callback(false);
         }
     });
@@ -86,8 +82,7 @@ void AsyncFileManager::asyncDeleteFileOrDirectory(const std::string& path,
         try {
             bool success = FileManager::deleteFileOrDirectory(path);
             callback(success);
-        } catch (const std::exception& e) {
-            std::cerr << "异步删除文件或目录失败: " << e.what() << std::endl;
+        } catch (const std::exception&) {
             callback(false);
         }
     });
@@ -99,8 +94,7 @@ void AsyncFileManager::asyncCreateFile(const std::string& file_path,
         try {
             bool success = FileManager::createFile(file_path);
             callback(success);
-        } catch (const std::exception& e) {
-            std::cerr << "异步创建文件失败: " << e.what() << std::endl;
+        } catch (const std::exception&) {
             callback(false);
         }
     });
@@ -112,8 +106,7 @@ void AsyncFileManager::asyncCreateDirectory(const std::string& dir_path,
         try {
             bool success = FileManager::createDirectory(dir_path);
             callback(success);
-        } catch (const std::exception& e) {
-            std::cerr << "异步创建目录失败: " << e.what() << std::endl;
+        } catch (const std::exception&) {
             callback(false);
         }
     });
@@ -147,8 +140,7 @@ void AsyncFileManager::workerLoop() {
         if (task) {
             try {
                 task();
-            } catch (const std::exception& e) {
-                std::cerr << "异步任务执行失败: " << e.what() << std::endl;
+            } catch (const std::exception&) {
             }
         }
     }

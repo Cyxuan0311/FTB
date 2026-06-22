@@ -11,6 +11,8 @@ const std::set<std::string> BinaryFileRestrictor::binaryExtensions = {
     ".mp3", ".wav", ".ogg", ".flac", ".aac", ".m4a", ".wma", ".aiff", ".alac", ".ape",
     // 图像文件
     ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tiff", ".tif", ".svg", ".ico", ".webp",
+    // 档案/压缩文件
+    ".zip", ".tar", ".tgz", ".tbz2", ".txz", ".tzst", ".7z", ".rar", ".cab",
     // 其他二进制文件
     ".iso", ".img", ".dat", ".bin", ".obj",".a"
 };

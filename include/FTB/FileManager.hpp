@@ -19,6 +19,10 @@
 // 定义读取文件时的分块大小：8KB，用于分块加载大文件内容
 constexpr size_t CHUNK_SIZE = 8192;  // 8KB
 
+#ifdef FTB_ENABLE_SSH
+namespace Connection { class SSHConnection; }
+#endif
+
 namespace FileManager
 {
 
@@ -98,6 +102,26 @@ namespace FileManager
         }
     };
 
+    // ---------------------------- 类型定义 ----------------------------
+
+    /**
+     * @struct DirEntryInfo
+     * @brief 目录条目的完整信息，用于避免重复文件系统调用
+     */
+    struct DirEntryInfo
+    {
+        std::string  name;           // 文件/目录名
+        bool         is_dir = false;
+        bool         is_symlink = false;
+        bool         is_regular = false;
+        bool         is_executable = false;
+        bool         exists = false;
+        uintmax_t    file_size = 0;
+        std::string  mod_time;       // 格式化后的修改时间
+        std::string  permissions;    // 权限字符串 (如 drwxr-xr-x)
+        std::string  icon;           // 图标
+    };
+
     // ---------------------------- 全局缓存变量声明 ----------------------------
 
     /// 保护缓存访问的互斥锁，确保线程安全
@@ -109,6 +133,8 @@ namespace FileManager
     extern std::unique_ptr<FTB::LRUCache<std::string, uintmax_t>>      lru_size_cache;
     /// 优化的LRU缓存，用于文件内容缓存
     extern std::unique_ptr<FTB::LRUCache<std::string, std::string>>    lru_content_cache;
+    /// LRU缓存，用于DirEntryInfo列表缓存
+    extern std::unique_ptr<FTB::LRUCache<std::string, std::vector<DirEntryInfo>>> lru_entry_cache;
     
     /// 缓存统计信息
     extern std::atomic<size_t>                   cache_hits;
@@ -116,6 +142,13 @@ namespace FileManager
     extern std::atomic<size_t>                   cache_evictions;
 
     // ---------------------------- 接口声明 ----------------------------
+
+    /**
+     * @brief 获取指定目录下所有条目的完整信息（使用 directory_iterator 缓存）
+     * @param path 目录路径
+     * @return 返回条目信息列表
+     */
+    std::vector<DirEntryInfo> getDirectoryEntries(const std::string& path);
 
     /**
      * @brief 判断给定路径是否为目录
@@ -233,6 +266,11 @@ namespace FileManager
      */
     void clearFileChunkCache(const std::chrono::seconds& expiry);
 
+#ifdef FTB_ENABLE_SSH
+    void setSSHConnection(Connection::SSHConnection* conn);
+    Connection::SSHConnection* getSSHConnection();
+#endif
+
     /**
      * @brief 重命名文件或目录，并更新缓存状态
      * @param oldPath 原文件/目录路径
@@ -294,6 +332,9 @@ namespace FileManager
      */
     void invalidateCacheForPath(const std::string& path);
     
+    // 排序缓存失效
+    void invalidateEntryCache();
+
     // 智能缓存管理函数
     void preloadHotPaths();
     void trackPathAccess(const std::string& path);

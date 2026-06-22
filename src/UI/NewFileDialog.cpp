@@ -1,47 +1,57 @@
 #include "../../include/UI/NewFileDialog.hpp"
-#include <ftxui/component/component.hpp>
-#include <ftxui/component/event.hpp>
-#include <ftxui/component/screen_interactive.hpp>
-#include <ftxui/dom/elements.hpp>
+#include "../../include/FTB/FileManager.hpp"
+#include <filesystem>
+
+namespace fs = std::filesystem;
+
+namespace FTB::UI {
 
 using namespace ftxui;
 
-namespace NewFileDialog {
-
-std::string show(ScreenInteractive& screen) {
-    std::string fileName;
-    std::string fileType;
-    bool isConfirmed = false; // 新增：用于标记用户是否确认创建
-
-    auto fileNameInput = Input(&fileName, "📝 文件名");
-    auto fileTypeInput = Input(&fileType, "🔤 文件类型");
-    auto cancelButton  = Button("❌ 取消", [&] { screen.Exit(); });
-    auto createButton  = Button("✅ 创建", [&] {
-        isConfirmed = true; // 标记用户确认创建
-        screen.Exit();
-    });
-
-    auto container = Container::Vertical({
-        fileNameInput,
-        fileTypeInput,
-        Container::Horizontal({cancelButton, createButton})
-    });
-    auto renderer = Renderer(container, [&] {
-        return vbox({
-            text("🆕 新建文件") | bgcolor(Color::Green3Bis),
-            fileNameInput->Render(),
-            fileTypeInput->Render(),
-            hbox({filler(), cancelButton->Render() | color(Color::Green3Bis),
-                  createButton->Render() | color(Color::Green3Bis), filler()})
-                | size(WIDTH, GREATER_THAN, 30)
-        }) | borderDouble | color(Color::GrayLight) | size(WIDTH, GREATER_THAN, 50) | vcenter | hcenter;
-    });
-    screen.Loop(renderer);
-
-    // 仅在用户确认创建时返回文件名
-    if (isConfirmed && !fileName.empty() && !fileType.empty())
-        return fileName + "." + fileType;
-    return ""; // 取消时返回空字符串
+Element RenderNewFilePanel(MainState& state, int tw, int /*th*/) {
+    int pw = std::min(55, tw - 4);
+    return vbox({
+        text(" New File") | color(TC("title")) | bold,
+        separator(),
+        hbox({ text(" Filename: ") | color(TC("main_fg")), text(state.panel_input + "\u2588") | color(TC("find_keyword")) }),
+        text(state.panel_message) | color(TC("error")),
+        text(" Enter=Confirm  Esc=Cancel") | color(TC("dim")) | dim,
+    }) | bgcolor(TC("main_bg")) | GetPanelBorder() |
+           size(WIDTH, EQUAL, pw) | center;
 }
 
-} // namespace NewFileDialog
+bool HandleNewFileEvent(MainState& state, const Event& event) {
+    if (event == Event::Return) {
+        if (!state.panel_input.empty()) {
+            fs::path newPath = fs::path(state.currentPath) / state.panel_input;
+            if (FileManager::createFile(newPath.string())) {
+                state.cached_current_path_for_entries.clear();
+                g_preview_cache.key.clear();
+                {
+                    std::lock_guard<std::mutex> lock(FileManager::cache_mutex);
+                    FileManager::lru_dir_cache->erase(state.currentPath);
+                    FileManager::lru_entry_cache->erase(state.currentPath);
+                }
+                state.allContents = FileManager::getDirectoryContents(state.currentPath);
+                state.filteredContents = state.allContents;
+                state.active_panel = ActivePanel::None;
+                state.panel_input.clear();
+                state.panel_message.clear();
+            } else {
+                state.panel_message = " Create file failed!";
+            }
+        }
+        return true;
+    }
+    if (event == Event::Backspace) {
+        if (!state.panel_input.empty()) state.panel_input.pop_back();
+        return true;
+    }
+    if (event.is_character()) {
+        state.panel_input += event.character();
+        return true;
+    }
+    return true;
+}
+
+}  // namespace FTB::UI

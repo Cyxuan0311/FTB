@@ -1,59 +1,56 @@
 #include "../../include/UI/FolderDetailsDialog.hpp"
-#include <ftxui/component/component.hpp>
-#include <ftxui/dom/elements.hpp>
-#include <ftxui/component/event.hpp>
+#include "../../include/FTB/FileManager.hpp"
+#include <filesystem>
+
+namespace fs = std::filesystem;
+
+namespace FTB::UI {
 
 using namespace ftxui;
 
-namespace FolderDetailsDialog {
-
-// 渲染文件夹信息的函数
-std::vector<Element> renderFolderInfo(const FolderDetails& details) {
-    std::vector<Element> elements;
-    // 标题
-    elements.push_back(text("📂 文件夹详情") | bold | borderHeavy | center | color(Color::Green3));
-    // 路径信息
-    elements.push_back(hbox({text("📍 路径: "), text(details.folderPath) | underlined | color(Color::Orange1)}));
-    // 文件夹和文件数量
-    elements.push_back(hbox({text("📁 文件夹数: "), text(std::to_string(details.folderCount)) | color(Color::Orange1)}));
-    elements.push_back(hbox({text("📄 文件数: "), text(std::to_string(details.fileCount)) | color(Color::Orange1)}));
-    elements.push_back(separator());
-    // 文件/文件夹列表
-    elements.push_back(text("📌 文件/文件夹列表:") | bold | color(Color::BlueLight));
-    for (const auto& name : details.fileNames) {
-        bool isDir = details.permissions.find(name) != details.permissions.end();
-        elements.push_back(hbox({text(isDir ? "📂 " : "📄 ") | color(Color::Yellow1),
-            text(name) | color(Color::White)}));
-    }
-    elements.push_back(separator());
-    // 权限信息
-    elements.push_back(text("🛡 文件夹权限信息:") | bold | color(Color::BlueLight));
-    for (const auto& perm : details.permissions) {
-        elements.push_back(hbox({text("📂 ") | bold | color(Color::Yellow1), text(perm.first) | underlined}));
-        elements.push_back(hbox({text("   🛡 权限: ") | bold | color(Color::GrayLight), text(std::to_string(perm.second)) | color(Color::Cyan)}));
-    }
-    return elements;
-}
-
-void show(ScreenInteractive& screen, const FolderDetails& details) {
-    auto exitButton = Button("🚪 退出", [&] { screen.Exit(); });
-    auto renderer = Renderer([&] {
-        std::vector<Element> elements = renderFolderInfo(details);
-        elements.push_back(hbox({filler(), exitButton->Render(), filler()}) | center);
-        elements.push_back(text("🚪 按 ENTER 退出") | bold | color(Color::Red3Bis));
-        return vbox(elements) | borderDouble | center | color(Color::RGB(185,185,168));
-    });
-
-    // 监听Enter键
-    renderer |= CatchEvent([&](Event event) {
-        if (event == Event::Character('\n')) { // Enter键
-            screen.Exit();
-            return true;
+Element RenderFolderDetailsPanel(MainState& state, int tw, int th) {
+    int pw = std::min(65, tw - 4);
+    int ph = std::min(28, th - 4);
+    Elements els;
+    els.push_back(text(" Folder Details") | color(TC("title")) | bold);
+    els.push_back(separator());
+    if (state.selected >= 0 && state.selected < static_cast<int>(state.filteredContents.size())) {
+        fs::path fullPath = fs::path(state.currentPath) / state.filteredContents[state.selected];
+        if (FileManager::isDirectory(fullPath.string())) {
+            int fileCount = 0, folderCount = 0;
+            std::vector<std::tuple<std::string, mode_t>> folderPermissions;
+            std::vector<std::string> fileNames;
+            FileManager::calculation_current_folder_files_number(
+                fullPath.string(), fileCount, folderCount, folderPermissions, fileNames);
+            els.push_back(hbox({ text(" Path: ") | color(TC("dim")), text(fullPath.string()) | color(TC("main_fg")) }));
+            els.push_back(text(" Files: " + std::to_string(fileCount) + "  Folders: " + std::to_string(folderCount)) | color(TC("main_fg")));
+            for (const auto& [name, mode] : folderPermissions) {
+                std::string perm;
+                perm += (mode & S_IRUSR) ? 'r' : '-';
+                perm += (mode & S_IWUSR) ? 'w' : '-';
+                perm += (mode & S_IXUSR) ? 'x' : '-';
+                perm += (mode & S_IRGRP) ? 'r' : '-';
+                perm += (mode & S_IWGRP) ? 'w' : '-';
+                perm += (mode & S_IXGRP) ? 'x' : '-';
+                perm += (mode & S_IROTH) ? 'r' : '-';
+                perm += (mode & S_IWOTH) ? 'w' : '-';
+                perm += (mode & S_IXOTH) ? 'x' : '-';
+                els.push_back(text("  " + perm + " " + name) | color(TC("main_fg")));
+            }
         }
-        return false;
-    });
-
-    screen.Loop(renderer);
+    }
+    els.push_back(text(""));
+    els.push_back(text(" Esc=Close") | color(TC("dim")) | dim);
+    return vbox(els) | bgcolor(TC("main_bg")) | GetPanelBorder() |
+           size(WIDTH, EQUAL, pw) | size(HEIGHT, EQUAL, ph) | center;
 }
 
-} // namespace FolderDetailsDialog
+bool HandleFolderDetailsEvent(MainState& state, const Event& event) {
+    if (event == Event::Character('q')) {
+        state.active_panel = ActivePanel::None;
+        return true;
+    }
+    return true;
+}
+
+}  // namespace FTB::UI

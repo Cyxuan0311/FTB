@@ -4,11 +4,21 @@
 #include <string>
 #include <memory>
 #include <functional>
+#include <vector>
+#include <mutex>
 #include <libssh2.h>
+#include <libssh2_sftp.h>
 
 namespace Connection {
 
-// SSH连接参数结构体
+struct SftpEntry {
+    std::string name;
+    bool is_directory;
+    bool is_symlink;
+    uint64_t file_size;
+    std::string mod_time;
+};
+
 struct SSHConnectionParams {
     std::string hostname;
     int port;
@@ -19,7 +29,6 @@ struct SSHConnectionParams {
     bool use_key_auth;
 };
 
-// SSH连接状态枚举
 enum class SSHConnectionStatus {
     DISCONNECTED,
     CONNECTING,
@@ -27,49 +36,49 @@ enum class SSHConnectionStatus {
     ERROR
 };
 
-// SSH连接类
 class SSHConnection {
 public:
     SSHConnection();
     ~SSHConnection();
 
-    // 连接方法
     bool connect(const SSHConnectionParams& params);
     void disconnect();
-    
-    // 执行远程命令
+
     std::string executeCommand(const std::string& command);
-    
-    // 获取连接状态
+    std::vector<SftpEntry> listDirectory(const std::string& remote_path);
+    std::string readFileContent(const std::string& remote_path, size_t startLine, size_t endLine);
+
     SSHConnectionStatus getStatus() const { return status_; }
-    
-    // 获取错误信息
     std::string getLastError() const { return last_error_; }
-    
-    // 设置状态回调
+    bool isConnected() const { return status_ == SSHConnectionStatus::CONNECTED; }
+
+    void setCurrentRemotePath(const std::string& path) { current_remote_path_ = path; }
+    std::string getCurrentRemotePath() const { return current_remote_path_; }
+
+    std::string getHostname() const { return current_params_.hostname; }
+    std::string getUsername() const { return current_params_.username; }
+    int getPort() const { return current_params_.port; }
+
     void setStatusCallback(std::function<void(SSHConnectionStatus)> callback) {
         status_callback_ = callback;
     }
 
 private:
-    // 初始化libssh2
     bool initializeLibSSH2();
-    
-    // 清理资源
     void cleanup();
-    
-    // 验证连接参数
     bool validateParams(const SSHConnectionParams& params);
+    bool sftpInit();
+    void sftpShutdown();
 
-private:
     LIBSSH2_SESSION* session_;
     LIBSSH2_CHANNEL* channel_;
+    LIBSSH2_SFTP* sftp_;
     int sock_;
+    std::mutex sftp_mutex_;
     SSHConnectionStatus status_;
     std::string last_error_;
+    std::string current_remote_path_;
     std::function<void(SSHConnectionStatus)> status_callback_;
-    
-    // 连接参数
     SSHConnectionParams current_params_;
 };
 

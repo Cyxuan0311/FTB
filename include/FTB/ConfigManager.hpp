@@ -3,24 +3,25 @@
 
 #include <string>
 #include <map>
+#include <vector>
 #include <memory>
 #include <ftxui/dom/elements.hpp>
 
 namespace FTB {
 
-// 颜色配置结构
+// ---- 颜色配置 ----
 struct ColorConfig {
     std::string background;
     std::string foreground;
     std::string border;
     std::string selection_bg;
     std::string selection_fg;
-    
-    ColorConfig() : background("black"), foreground("white"), 
-                   border("blue"), selection_bg("blue"), selection_fg("white") {}
+
+    ColorConfig() : background("#1e1e2e"), foreground("#cdd6f4"),
+                   border("#45475a"), selection_bg("#585b70"), selection_fg("#cdd6f4") {}
 };
 
-// 文件类型颜色配置
+// ---- 文件类型颜色配置 ----
 struct FileTypeColors {
     std::string directory;
     std::string file;
@@ -28,12 +29,40 @@ struct FileTypeColors {
     std::string link;
     std::string hidden;
     std::string system;
-    
-    FileTypeColors() : directory("blue"), file("white"), executable("green"),
-                      link("cyan"), hidden("yellow"), system("red") {}
+
+    FileTypeColors() : directory("#89b4fa"), file("#cdd6f4"), executable("#a6e3a1"),
+                      link("#f5c2e7"), hidden("#6c7086"), system("#f38ba8") {}
 };
 
-// 界面样式配置
+// ---- 语法高亮颜色配置 ----
+struct SyntaxColors {
+    std::string keyword;       // 关键字
+    std::string string;        // 字符串
+    std::string comment;       // 注释
+    std::string number;        // 数字
+    std::string function;      // 函数名
+    std::string type;          // 类型
+    std::string operator_;     // 操作符
+    std::string preprocessor;  // 预处理指令
+    std::string identifier;    // 标识符
+    std::string punctuation;   // 标点符号
+    std::string property;      // 属性/字段
+    std::string tag;           // HTML/XML 标签
+    std::string attribute;     // 属性名
+    std::string regex;         // 正则表达式
+    std::string decorator;     // 装饰器
+    std::string line_number;   // 行号
+
+    SyntaxColors()
+        : keyword("#cba6f7"), string("#a6e3a1"), comment("#6c7086"),
+          number("#fab387"), function("#89b4fa"), type("#f9e2af"),
+          operator_("#89dceb"), preprocessor("#f38ba8"), identifier("#cdd6f4"),
+          punctuation("#6c7086"), property("#89b4fa"), tag("#cba6f7"),
+          attribute("#f9e2af"), regex("#fab387"), decorator("#f38ba8"),
+          line_number("#585b70") {}
+};
+
+// ---- 界面样式配置 ----
 struct StyleConfig {
     bool show_icons;
     bool show_file_size;
@@ -41,135 +70,172 @@ struct StyleConfig {
     bool show_permissions;
     bool enable_mouse;
     bool enable_animations;
-    
-    StyleConfig() : show_icons(true), show_file_size(true), 
-                   show_modified_time(true), show_permissions(true),
-                   enable_mouse(true), enable_animations(true) {}
-};
-
-// 布局配置
-struct LayoutConfig {
-    int items_per_page;
-    int items_per_row;
-    double detail_panel_ratio;
+    bool show_hidden_files;
     bool show_detail_panel;
-    
-    LayoutConfig() : items_per_page(20), items_per_row(5), 
-                    detail_panel_ratio(0.3), show_detail_panel(true) {}
+
+    std::string sort_mode;
+
+    StyleConfig() : show_icons(true), show_file_size(true),
+                   show_modified_time(true), show_permissions(true),
+                   enable_mouse(true), enable_animations(false),
+                   show_hidden_files(false), show_detail_panel(true),
+                   sort_mode("name_asc") {}
 };
 
-// 刷新配置
+// ---- 布局配置 ----
+struct LayoutConfig {
+    double parent_ratio;      // 左栏(父目录)占比 0.0~1.0
+    double current_ratio;     // 中栏(当前目录)占比 0.0~1.0
+    double preview_ratio;     // 右栏(预览)占比 0.0~1.0
+    int items_per_page;       // 0 = auto (根据终端高度)
+
+    LayoutConfig() : parent_ratio(2.0/9.0),    // 22.2% 左栏(父目录)
+                    current_ratio(4.0/9.0),   // 44.4% 中栏(当前目录)
+                    preview_ratio(3.0/9.0),   // 33.3% 右栏(预览)
+                    items_per_page(0) {}
+
+    // 归一化比例，确保总和为1
+    void Normalize() {
+        double total = parent_ratio + current_ratio + preview_ratio;
+        if (total <= 0) { parent_ratio = 2.0/9.0; current_ratio = 4.0/9.0; preview_ratio = 3.0/9.0; total = 1.0; }
+        parent_ratio  /= total;
+        current_ratio /= total;
+        preview_ratio /= total;
+    }
+};
+
+// ---- 刷新配置 ----
 struct RefreshConfig {
-    int ui_refresh_interval;
-    int content_refresh_interval;
+    int ui_refresh_interval_ms;
+    int content_refresh_interval_ms;
     bool auto_refresh;
-    
-    RefreshConfig() : ui_refresh_interval(100), content_refresh_interval(1000), 
+
+    RefreshConfig() : ui_refresh_interval_ms(100), content_refresh_interval_ms(1000),
                      auto_refresh(true) {}
 };
 
-// 主题配置
+// ---- 主题配置 ----
 struct ThemeConfig {
     std::string name;
-    bool use_colors;
     bool use_bold;
     bool use_underline;
-    
-    ThemeConfig() : name("default"), use_colors(true), 
-                   use_bold(false), use_underline(false) {}
+
+    ThemeConfig() : name("default"), use_bold(false), use_underline(false) {}
 };
 
-// MySQL配置
-struct MySQLConfig {
-    std::string default_host;
-    int default_port;
-    std::string default_username;
-    std::string default_database;
-    int connection_timeout;
-    
-    MySQLConfig() : default_host("localhost"), default_port(3306), 
-                   default_username("root"), default_database(""), 
-                   connection_timeout(10) {}
-};
-
-// SSH配置
+// ---- SSH配置 ----
 struct SSHConfig {
     int default_port;
     int connection_timeout;
     bool save_connection_history;
     int max_connection_history;
-    
-    SSHConfig() : default_port(22), connection_timeout(30), 
+
+    SSHConfig() : default_port(22), connection_timeout(30),
                  save_connection_history(true), max_connection_history(10) {}
 };
 
-// 日志配置
+// ---- 日志配置 ----
 struct LoggingConfig {
     std::string level;
     bool output_to_file;
     std::string log_file;
     bool show_timestamp;
-    
-    LoggingConfig() : level("info"), output_to_file(false), 
-                     log_file("~/.ftb.log"), show_timestamp(true) {}
+
+    LoggingConfig() : level("info"), output_to_file(false),
+                     log_file("~/.config/ftb/ftb.log"), show_timestamp(true) {}
 };
 
-// 主配置结构
+// ---- SSH 连接记录 ----
+struct SSHRecord {
+    std::string host;
+    int port = 22;
+    std::string username;
+    std::string remote_directory = "/home";
+};
+
+// ---- 书签配置 ----
+struct BookmarkConfig {
+    std::map<std::string, std::string> bookmarks;  // name -> path
+
+    BookmarkConfig() {
+        bookmarks["home"] = "~";
+        bookmarks["root"] = "/";
+        bookmarks["tmp"]  = "/tmp";
+    }
+};
+
+// ---- UI 装饰风格配置 ----
+struct UIConfig {
+    std::string column_separator = "thin";     // thin | light | heavy | double | dotted | dashed | none
+    std::string panel_border     = "rounded";   // rounded | sharp | double | heavy | none
+    std::string selection_style  = "full";      // full | underline | invert | bar | minimal
+
+    UIConfig() = default;
+};
+
+// ---- 状态栏风格配置 ----
+struct StatusBarConfig {
+    std::string style = "powerline";  // powerline | rounded | thin | arrow | bar | minimal
+    bool show_position = true;        // 显示 选中项/总数
+    bool show_time     = true;        // 显示当前时间
+    bool show_clipboard = true;       // 显示剪贴板待粘贴项数
+    bool use_bold      = false;       // 加粗
+
+    StatusBarConfig() = default;
+};
+
+// ---- 主配置结构 ----
 struct FTBConfig {
     ColorConfig colors_main;
     FileTypeColors colors_files;
+    SyntaxColors colors_syntax;
     ColorConfig colors_status;
     ColorConfig colors_search;
     ColorConfig colors_dialog;
     StyleConfig style;
     LayoutConfig layout;
+    UIConfig ui;
+    StatusBarConfig statusbar;
     RefreshConfig refresh;
     ThemeConfig theme;
-    MySQLConfig mysql;
     SSHConfig ssh;
     LoggingConfig logging;
-    
+    BookmarkConfig bookmarks;
+
     // 自定义颜色映射
     std::map<std::string, ftxui::Color> custom_colors;
 };
 
-// 配置管理器类
+// ---- 配置管理器 ----
 class ConfigManager {
 public:
     static ConfigManager* GetInstance();
-    
-    // 加载配置文件
+
     bool LoadConfig(const std::string& config_path = "");
-    
-    // 保存配置文件
     bool SaveConfig(const std::string& config_path = "");
-    
-    // 获取配置
     const FTBConfig& GetConfig() const { return config_; }
-    
-    // 获取颜色
+    FTBConfig& GetConfigMutable() { return config_; }
+
     ftxui::Color GetColor(const std::string& color_name) const;
-    
-    // 获取文件类型颜色
     ftxui::Color GetFileTypeColor(const std::string& file_type) const;
-    
-    // 应用主题
+    ftxui::Color ParseColor(const std::string& color_str) const;
     void ApplyTheme(const std::string& theme_name);
-    
-    // 重新加载配置
     bool ReloadConfig();
-    
-    // 获取配置文件路径
     std::string GetConfigPath() const { return config_path_; }
-    
-    // 检查配置是否有效
     bool IsConfigValid() const { return config_loaded_; }
-    
-    // 获取默认配置
     FTBConfig GetDefaultConfig() const;
-    
-    // 重置为默认配置
     void ResetToDefault();
+
+    // 书签操作
+    bool AddBookmark(const std::string& name, const std::string& path);
+    bool RemoveBookmark(const std::string& name);
+    std::vector<std::pair<std::string, std::string>> GetBookmarks() const;
+
+    // SSH 记录操作
+    std::vector<SSHRecord> GetSSHRecords() const;
+    void AddSSHRecord(const SSHRecord& record);
+    void RemoveSSHRecord(int index);
+    void SetSSHRecords(const std::vector<SSHRecord>& records);
 
 public:
     ConfigManager();
@@ -178,37 +244,24 @@ public:
     ConfigManager& operator=(const ConfigManager&) = delete;
 
 private:
-    
-    // 解析配置文件
     bool ParseConfigFile(const std::string& content);
-    
-    // 解析颜色值
-    ftxui::Color ParseColor(const std::string& color_str) const;
-    
-    // 应用颜色配置
     void ApplyColorConfig();
-    
-    // 创建默认配置文件
     bool CreateDefaultConfig();
-    
-    // 获取用户主目录
     std::string GetUserHomeDir() const;
-    
-    // 验证配置值
     bool ValidateConfig() const;
+    void InitializePredefinedColors();
 
-private:
     static std::unique_ptr<ConfigManager> instance_;
     FTBConfig config_;
     std::string config_path_;
     bool config_loaded_;
-    
-    // 预定义颜色映射
     std::map<std::string, ftxui::Color> predefined_colors_;
-    
-    // 初始化预定义颜色
-    void InitializePredefinedColors();
+    std::vector<SSHRecord> ssh_records_;
 };
+
+// ---- 获取面板边框装饰器（读取 config.ui.panel_border） ----
+// 注意：此函数返回无颜色边框，仅供不使用主题颜色的场景使用
+// 所有弹窗请使用 detail_element.hpp 中带主题颜色的 GetPanelBorder()
 
 } // namespace FTB
 

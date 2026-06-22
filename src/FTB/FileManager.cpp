@@ -1,6 +1,9 @@
 // FileManager.cpp
 #include "../include/FTB/FileManager.hpp"    // 引入 FileManager 头文件，包含相关声明和类型定义
 #include "../include/FTB/DirectoryHistory.hpp"// 引入 DirectoryHistory，用于记录目录历史
+#include "../include/FTB/IconMapper.hpp"      // 图标映射
+#include "../include/FTB/SortMode.hpp"
+#include "../include/FTB/ConfigManager.hpp"
 #include <filesystem>                         // C++17 文件系统库，用于路径操作和遍历
 #include <fstream>                            // 文件读写
 #include <iostream>                           // 标准输出
@@ -12,6 +15,8 @@
 #include <cstring>                            // C 字符串操作
 #include <numeric>                            // 数值算法
 #include <algorithm>                          // 常用算法
+#include <iomanip>                            // 时间格式化
+#include <sstream>                            // 字符串流
 #include <system_error>                       // 系统错误处理
 #include <thread>                             // 线程支持
 #include <atomic>                             // 原子操作
@@ -19,9 +24,19 @@
 #include <unordered_map>                      // 哈希表
 #include <set>                                // 集合容器
 
+#ifdef FTB_ENABLE_SSH
+#include "../include/Connection/SSHConnection.hpp"
+#endif
+
 namespace fs = std::filesystem;               // 为 std::filesystem 设置简短别名
 
 namespace FileManager {
+
+#ifdef FTB_ENABLE_SSH
+static Connection::SSHConnection* g_ssh_conn = nullptr;
+void setSSHConnection(Connection::SSHConnection* conn) { g_ssh_conn = conn; }
+Connection::SSHConnection* getSSHConnection() { return g_ssh_conn; }
+#endif
 
 // ---------------------------- 全局缓存变量 ----------------------------
 // 用于保护缓存操作的互斥锁
@@ -37,6 +52,9 @@ std::unique_ptr<FTB::LRUCache<std::string, uintmax_t>> lru_size_cache =
 // 内容缓存：较小容量，较短TTL（文件内容可能频繁变化）
 std::unique_ptr<FTB::LRUCache<std::string, std::string>> lru_content_cache = 
     std::make_unique<FTB::LRUCache<std::string, std::string>>(1000, std::chrono::seconds(120));
+// DirEntryInfo列表缓存：中等容量，中等TTL
+std::unique_ptr<FTB::LRUCache<std::string, std::vector<DirEntryInfo>>> lru_entry_cache = 
+    std::make_unique<FTB::LRUCache<std::string, std::vector<DirEntryInfo>>>(500, std::chrono::seconds(300));
 
 // 缓存统计信息
 std::atomic<size_t> cache_hits{0};
@@ -70,6 +88,19 @@ bool isDirectory(const std::string & path) {
  * @return 返回包含目录中所有条目名称的字符串向量
  */
 std::vector<std::string> getDirectoryContents(const std::string & path) {
+#ifdef FTB_ENABLE_SSH
+    if (g_ssh_conn && g_ssh_conn->isConnected()) {
+        auto entries = getDirectoryEntries(path);
+        std::vector<std::string> names;
+        names.reserve(entries.size());
+        // Ensure directories come first with trailing slash
+        for (const auto& e : entries) {
+            names.push_back(e.name);
+        }
+        return names;
+    }
+#endif
+
     // 跟踪路径访问
     trackPathAccess(path);
     
@@ -119,12 +150,131 @@ std::vector<std::string> getDirectoryContents(const std::string & path) {
         
         lru_dir_cache->put(path, cache);
         
-    } catch (const std::exception &e) {
-        // 捕获并处理遍历过程中可能发生的异常
-        std::cerr << "Error reading directory " << path << ": " << e.what() << std::endl;
+    } catch (const std::exception &) {
     }
-    
+
     return contents;  // 返回包含所有条目名称的向量
+}
+
+std::vector<DirEntryInfo> getDirectoryEntries(const std::string& path) {
+#ifdef FTB_ENABLE_SSH
+    if (g_ssh_conn && g_ssh_conn->isConnected()) {
+        auto sftp_entries = g_ssh_conn->listDirectory(path);
+        std::vector<DirEntryInfo> entries;
+        entries.reserve(sftp_entries.size());
+        for (const auto& se : sftp_entries) {
+            DirEntryInfo info;
+            info.name = se.name;
+            info.is_dir = se.is_directory;
+            info.is_symlink = se.is_symlink;
+            info.is_regular = !se.is_directory && !se.is_symlink;
+            info.is_executable = false;
+            info.exists = true;
+            info.file_size = se.file_size;
+            info.mod_time = se.mod_time;
+            info.icon = FTB::Icons::GetIconForPath(std::filesystem::path(se.name), se.is_directory);
+            entries.push_back(std::move(info));
+        }
+        {
+            auto& cfg = FTB::ConfigManager::GetInstance()->GetConfig();
+            auto mode = FTB::SortModeFromString(cfg.style.sort_mode);
+            FTB::SortEntries(entries, mode);
+        }
+        lru_entry_cache->put(path, entries);
+        return entries;
+    }
+#endif
+
+    // 首先尝试从LRU缓存获取
+    auto cached = lru_entry_cache->get(path);
+    if (cached.has_value()) {
+        return cached.value();
+    }
+
+    std::vector<DirEntryInfo> entries;
+    entries.reserve(256);
+
+    try {
+        for (const auto& entry : fs::directory_iterator(path)) {
+            DirEntryInfo info;
+            info.name = entry.path().filename().string();
+
+            // 过滤 "." 和 ".."
+            if (info.name == "." || info.name == "..") continue;
+
+            // directory_entry 自带缓存，这些调用不会额外访问文件系统
+            info.exists = entry.exists();
+            info.is_dir = entry.is_directory();
+            info.is_regular = entry.is_regular_file();
+            info.is_symlink = entry.is_symlink();
+
+            // 文件大小 (仅常规文件)
+            if (info.is_regular) {
+                try { info.file_size = entry.file_size(); } catch (...) {}
+            }
+
+            // 权限
+            try {
+                auto perms = entry.status().permissions();
+                info.is_executable = (perms & fs::perms::owner_exec) != fs::perms::none;
+
+                std::string perm_str;
+                if (entry.is_symlink())
+                    perm_str += 'l';
+                else if (entry.is_directory())
+                    perm_str += 'd';
+                else if (entry.is_fifo())
+                    perm_str += 'p';
+                else if (entry.is_socket())
+                    perm_str += 's';
+                else
+                    perm_str += '-';
+
+                perm_str += (perms & fs::perms::owner_read)  != fs::perms::none ? 'r' : '-';
+                perm_str += (perms & fs::perms::owner_write) != fs::perms::none ? 'w' : '-';
+                perm_str += (perms & fs::perms::owner_exec)  != fs::perms::none ? 'x' : '-';
+                perm_str += (perms & fs::perms::group_read)  != fs::perms::none ? 'r' : '-';
+                perm_str += (perms & fs::perms::group_write) != fs::perms::none ? 'w' : '-';
+                perm_str += (perms & fs::perms::group_exec)  != fs::perms::none ? 'x' : '-';
+                perm_str += (perms & fs::perms::others_read)  != fs::perms::none ? 'r' : '-';
+                perm_str += (perms & fs::perms::others_write) != fs::perms::none ? 'w' : '-';
+                perm_str += (perms & fs::perms::others_exec)  != fs::perms::none ? 'x' : '-';
+
+                info.permissions = perm_str;
+            } catch (...) {
+                info.permissions = "----------";
+            }
+
+            // 修改时间
+            try {
+                auto ftime = entry.last_write_time();
+                auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+                    ftime - fs::file_time_type::clock::now() + std::chrono::system_clock::now());
+                std::time_t cftime = std::chrono::system_clock::to_time_t(sctp);
+                std::ostringstream time_str;
+                time_str << std::put_time(std::localtime(&cftime), "%Y-%m-%d %H:%M");
+                info.mod_time = time_str.str();
+            } catch (...) {}
+
+            // 图标
+            info.icon = FTB::Icons::GetIconForPath(entry.path(), info.is_dir);
+
+            entries.push_back(std::move(info));
+        }
+    } catch (const std::exception&) {
+    }
+
+    // 根据配置的排序模式进行排序
+    {
+        auto& cfg = FTB::ConfigManager::GetInstance()->GetConfig();
+        auto mode = FTB::SortModeFromString(cfg.style.sort_mode);
+        FTB::SortEntries(entries, mode);
+    }
+
+    // 存入LRU缓存
+    lru_entry_cache->put(path, entries);
+
+    return entries;
 }
 
 
@@ -370,7 +520,6 @@ void enterDirectory(DirectoryHistory & history,
     
     // 检查当前路径是否存在且为目录
     if (!fs::exists(currentPath) || !fs::is_directory(currentPath)) {
-        std::cerr << "Invalid working directory: " << currentPath << std::endl;
         selected = -1;
         return;
     }
@@ -394,7 +543,6 @@ void enterDirectory(DirectoryHistory & history,
     // 构建目标目录完整路径
     fs::path fullPath = fs::path(currentPath) / contents[selected];
     if (!fs::exists(fullPath) || !isDirectory(fullPath.string())) {
-        std::cerr << "Target is not a valid directory: " << fullPath << std::endl;
         selected = -1;
         return;
     }
@@ -452,8 +600,6 @@ void calculation_current_folder_files_number(
                 if (stat(entry.path().c_str(), &fileStat) == 0) {
                     // 保存(名称, 权限位)对
                     folder_permissions.emplace_back(name, fileStat.st_mode);
-                } else {
-                    std::cerr << "Error getting permissions for " << entry.path() << std::endl;
                 }
             } 
             // 统计普通文件数量
@@ -461,9 +607,7 @@ void calculation_current_folder_files_number(
                 file_count++; 
             }
         }
-    } catch (const std::exception &e) {
-        // 捕获并记录遍历异常
-        std::cerr << "Error counting entries in " << path << ": " << e.what() << std::endl;
+    } catch (const std::exception &) {
     }
 }
 
@@ -477,6 +621,12 @@ void calculation_current_folder_files_number(
  * @return 返回由指定行拼接而成的字符串，若出错则返回错误信息字符串
  */
 std::string readFileContent(const std::string & filePath, size_t startLine, size_t endLine) {
+#ifdef FTB_ENABLE_SSH
+    if (g_ssh_conn && g_ssh_conn->isConnected()) {
+        return g_ssh_conn->readFileContent(filePath, startLine, endLine);
+    }
+#endif
+
     // 创建缓存键，包含行范围信息
     std::stringstream cache_key_stream;
     cache_key_stream << filePath << ":" << startLine << "-" << endLine;
@@ -596,7 +746,7 @@ void clearFileChunkCache(const std::chrono::seconds& /*expiry*/) {
 bool renameFileOrDirectory(const std::string& oldPath, const std::string& newName) {
     // 验证新名称是否合法(不含非法字符)
     if (!isValidName(newName)) {
-        std::cerr << "❌ 无效的名称: " << newName << std::endl;
+        std::cerr << "Error: invalid name: " << newName << std::endl;
         return false;
     }
     
@@ -607,7 +757,7 @@ bool renameFileOrDirectory(const std::string& oldPath, const std::string& newNam
     try {
         // 检查目标路径是否已存在
         if (fs::exists(newFilePath)) {
-            std::cerr << "❌ 目标文件/文件夹已存在: " << newFilePath << std::endl;
+            std::cerr << "Error: target already exists: " << newFilePath << std::endl;
             return false;
         }
         
@@ -630,7 +780,7 @@ bool renameFileOrDirectory(const std::string& oldPath, const std::string& newNam
         return true;
     } catch (const std::exception& e) {
         // 捕获并记录重命名过程中的异常
-        std::cerr << "❌ 重命名失败: " << e.what() << std::endl;
+        std::cerr << "Error: rename failed: " << e.what() << std::endl;
         return false;
     }
 }
@@ -645,18 +795,24 @@ void initializeCacheSystem(size_t max_dir_cache_size,
                           size_t max_size_cache_size,
                           size_t max_content_cache_size,
                           bool enable_persistence) {
+    std::string cache_dir;
+    if (enable_persistence) {
+        const char* home = std::getenv("HOME");
+        cache_dir = (home ? std::string(home) : "/tmp") + "/.config/ftb/cache";
+        fs::create_directories(cache_dir);
+    }
     // 重新初始化LRU缓存
     lru_dir_cache = std::make_unique<FTB::LRUCache<std::string, DirectoryCache>>(
         max_dir_cache_size, std::chrono::seconds(300), enable_persistence,
-        enable_persistence ? "~/.ftb/dir_cache.dat" : "");
+        enable_persistence ? cache_dir + "/dir_cache.dat" : "");
     
     lru_size_cache = std::make_unique<FTB::LRUCache<std::string, uintmax_t>>(
         max_size_cache_size, std::chrono::seconds(600), enable_persistence,
-        enable_persistence ? "~/.ftb/size_cache.dat" : "");
+        enable_persistence ? cache_dir + "/size_cache.dat" : "");
     
     lru_content_cache = std::make_unique<FTB::LRUCache<std::string, std::string>>(
         max_content_cache_size, std::chrono::seconds(180), enable_persistence,
-        enable_persistence ? "~/.ftb/content_cache.dat" : "");
+        enable_persistence ? cache_dir + "/content_cache.dat" : "");
     
     // 设置序列化函数
     lru_dir_cache->set_serializers(
@@ -875,6 +1031,11 @@ std::string getCachePerformanceReport() {
     report << "内容缓存大小: " << lru_content_cache->size() << "\n";
     
     return report.str();
+}
+
+void invalidateEntryCache() {
+    std::lock_guard<std::mutex> lock(cache_mutex);
+    lru_entry_cache->clear();
 }
 
 } // namespace FileManager

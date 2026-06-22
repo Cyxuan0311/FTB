@@ -1,12 +1,10 @@
-#ifndef NEW_FOLDER_DIALOG_HPP
-#define NEW_FOLDER_DIALOG_HPP
+#pragma once
+#include "FTB/MainUI.hpp"
+#include <ftxui/dom/elements.hpp>
 
-#include <string>
-#include <ftxui/component/screen_interactive.hpp>
+namespace FTB::UI {
 
-namespace NewFolderDialog {
-    // 显示新建文件夹对话框，返回输入的文件夹名称，如果取消则返回空字符串
-    std::string show(ftxui::ScreenInteractive& screen);
-}
+ftxui::Element RenderNewFolderPanel(MainState& state, int tw, int th);
+bool HandleNewFolderEvent(MainState& state, const ftxui::Event& event);
 
-#endif // NEW_FOLDER_DIALOG_HPP
+}  // namespace FTB::UI
