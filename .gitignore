@@ -4,6 +4,7 @@
 **/auto_tool_python/**
 /.vscode
 /image
+/images
 /icon
 
 # executable
