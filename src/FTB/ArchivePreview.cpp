@@ -20,7 +20,8 @@ static std::string ToLower(const std::string& s) {
 // ---- 安全的 shell 命令执行 (输出限制 64KB) ----
 static std::string RunCommand(const std::string& cmd) {
     std::string result;
-    std::unique_ptr<FILE, int(*)(FILE*)> pipe(popen(cmd.c_str(), "r"), pclose);
+    auto closePipe = [](FILE* f) { pclose(f); };
+    std::unique_ptr<FILE, decltype(closePipe)> pipe(popen(cmd.c_str(), "r"), closePipe);
     if (!pipe) return result;
     char buf[4096];
     size_t total = 0;

@@ -33,7 +33,8 @@ static std::string ShellEscape(const std::string& s) {
 // 读取命令全部输出 (无大小限制)
 static std::string RunCommand(const std::string& cmd) {
     std::string result;
-    std::unique_ptr<FILE, int(*)(FILE*)> pipe(popen(cmd.c_str(), "r"), pclose);
+    auto closePipe = [](FILE* f) { pclose(f); };
+    std::unique_ptr<FILE, decltype(closePipe)> pipe(popen(cmd.c_str(), "r"), closePipe);
     if (!pipe) return result;
     char buf[16384];
     size_t n;
