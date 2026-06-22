@@ -56,7 +56,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           brew update
-          brew install cmake ftxui nlohmann-json
+          brew install cmake ftxui nlohmann-json googletest
 
       - name: Configure CMake (GCC)
         if: matrix.compiler == 'gcc'
