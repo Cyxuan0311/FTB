@@ -19,7 +19,7 @@ template<typename T>
 class ObjectPool {
 private:
     std::queue<std::unique_ptr<T>> available_objects_;
-    std::mutex mutex_;
+    mutable std::mutex mutex_;
     std::function<std::unique_ptr<T>()> factory_;
     size_t max_size_;
     size_t current_size_;
