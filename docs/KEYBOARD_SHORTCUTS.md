@@ -1,236 +1,127 @@
-# FTB Keyboard Shortcuts Guide
+# FTB Keyboard Shortcuts
 
-This comprehensive guide covers all keyboard shortcuts available in FTB (Terminal File Browser).
+## Navigation
 
-## 🗂️ Navigation Shortcuts
+| Key | Action |
+|-----|--------|
+| `j` / `Down` | Move selection down |
+| `k` / `Up` | Move selection up |
+| `h` / `Left` | Go to parent directory |
+| `l` / `Right` / `Enter` | Enter directory / open file |
+| `Home` | Jump to first item |
+| `End` | Jump to last item |
+| `PageUp` | Previous page |
+| `PageDown` | Next page |
 
-### Basic Navigation
-- **↑/↓**: Navigate through file list
-- **Enter**: Open selected directory or file
-- **Backspace/←**: Return to parent directory
-- **ESC**: Exit program
-- **Tab**: Focus search box
+## Search
 
-### Advanced Navigation
-- **Page Up/Page Down**: Scroll through large directories
-- **Home**: Jump to first item
-- **End**: Jump to last item
+| Key | Action |
+|-----|--------|
+| `/` | Enter search mode |
+| `Escape` | Clear search / exit search mode |
+| `Backspace` | Delete last character / exit if empty |
+| Character keys | Type search query (in search mode) |
 
-## 🛠️ File Operations
+## File Operations
 
-### File and Directory Management
-- **Ctrl+f**: Create new file
-- **Ctrl+k**: Create new directory
-- **Delete**: Remove selected item
-- **Alt+n**: Rename selected item
-- **Space**: View item attributes and details
+| Key | Action |
+|-----|--------|
+| `Ctrl+Y` | Copy selected item |
+| `Ctrl+X` | Cut selected item |
+| `Ctrl+V` | Paste from clipboard |
+| `Delete` / `Ctrl+D` | Delete selected item |
 
-### Clipboard Operations
-- **Ctrl+t**: Copy selected item
-- **Ctrl+x**: Cut selected item
-- **Ctrl+n**: Paste items from clipboard
-- **Alt+c**: Add selected item to clipboard
-- **Alt+g**: Clear clipboard
+## Command Mode
 
-## 📝 Content Viewing and Editing
+Press `Ctrl+B` to enter prefix mode, then type a command:
 
-### File Content Operations
-- **Ctrl+p**: Preview file content with range input
-- **Alt+v**: Image/text preview
-- **Alt+p**: Video playback (for supported formats)
-- **Ctrl+e**: Enter Vim-like editor mode
+| Command | Alias | Action |
+|---------|-------|--------|
+| `theme` | `th` | Open theme selector |
+| `rename` | `rn` | Rename selected item |
+| `newfile` | `nf` | Create new file |
+| `newfolder` | `nd` | Create new folder |
+| `preview` | `p` | Full file preview |
+| `details` | `d` | Folder details |
+| `jump` | `j` | Jump to directory |
+| `vim` | `v` | Open in Vim editor |
+| `search` | `s` | Enter search mode |
+| `calendar` | `cal` | Calendar panel |
+| `layout` | `lo` | Layout settings |
+| `help` | `h` | Help panel |
+| `ssh` | - | SSH connection (if enabled) |
 
-### Advanced Content Features
-- **Ctrl+Shift+p**: Full file preview
-- **Ctrl+Shift+e**: Advanced editor features
+Press `Enter` to execute, `Escape` to cancel.
 
-## 🔗 Remote Connections
+## Application Control
 
-### SSH Remote Connection
-- **Ctrl+s**: Open SSH connection dialog
-  - Enter hostname/IP address
-  - Specify port (default: 22)
-  - Choose authentication method (password/key)
-  - Set remote directory path
-  - Connect and browse remote files
+| Key | Action |
+|-----|--------|
+| `Ctrl+C` | Quit FTB |
+| `Ctrl+R` | Reload configuration file |
+| `Escape` | Close active panel / clear search |
 
-### SSH Connection Features
-- **Ctrl+Shift+s**: Quick SSH connection with saved settings
-- **Ctrl+Alt+s**: SSH connection manager
+## Vim Editor
 
-## 🗄️ Database Management
+When the Vim editor is open (via `:vim` command), the following keys are available:
 
-### MySQL Database Operations
-- **Alt+d**: Open MySQL database management dialog
-  - Configure local or remote MySQL connection
-  - Manage databases and tables
-  - Execute SQL queries with visual results
-  - Perform CRUD operations through buttons
+### Normal Mode
 
-### Database Shortcuts
-- **Ctrl+Alt+d**: Quick database connection
-- **Ctrl+Shift+d**: Database connection manager
+| Key | Action |
+|-----|--------|
+| `h` / `j` / `k` / `l` | Move cursor |
+| `w` | Next word |
+| `b` | Previous word |
+| `0` | Beginning of line |
+| `$` | End of line |
+| `gg` | Beginning of file |
+| `G` | End of file |
+| `PageUp` / `PageDown` | Scroll page |
+| `i` | Insert mode |
+| `a` | Append mode |
+| `o` | New line below |
+| `O` | New line above |
+| `x` | Delete character |
+| `dd` | Delete line |
+| `yy` | Yank line |
+| `p` / `P` | Paste |
+| `u` | Undo |
+| `Ctrl+R` | Redo |
 
-## 🌐 Network Service Management
+### Command Mode (in Vim editor)
 
-### Network Service Operations
-- **Alt+n**: Open network service management dialog
-  - View network connection information
-  - Monitor network statistics and performance
-  - Test network speed and connectivity
-  - Manage WiFi connections and settings
+| Command | Action |
+|---------|--------|
+| `:w` | Save file |
+| `:q` | Quit editor |
+| `:wq` | Save and quit |
+| `:q!` | Quit without saving |
 
-### Network Service Features
-- **Tab/Shift+Tab**: Switch between tabs (Connection, Statistics, Speed Test, Settings)
-- **1-4**: Direct tab navigation (Connection, Statistics, Speed Test, Settings)
-- **F5/Ctrl+r**: Refresh network information
-- **ESC**: Close network service dialog
+### Search and Replace
 
-### Network Service Tabs
-- **Connection Info**: View IP addresses, MAC addresses, signal strength
-- **Statistics**: Monitor data transfer, packet counts, upload/download speeds
-- **Speed Test**: Test network speed with multiple hosts
-- **Settings**: Configure refresh intervals and display options
+| Key | Action |
+|-----|--------|
+| `/pattern` | Search forward |
+| `:s/old/new` | Replace first occurrence |
+| `:%s/old/new/g` | Replace all occurrences |
 
-## 🎨 Theme and Configuration
+### Markdown Preview
 
-### Theme Management
-- **Ctrl+t**: Switch between available themes
-- **Ctrl+r**: Reload configuration file
-- **Ctrl+Shift+t**: Open theme selector
+| Key | Action |
+|-----|--------|
+| `Ctrl+M` | Toggle Markdown preview mode |
 
-### Configuration
-- **Ctrl+Alt+c**: Open configuration editor
-- **Ctrl+Shift+r**: Reset to default configuration
+## Panel Navigation
 
-## 🎯 Advanced Features
+When a panel (theme, help, calendar, etc.) is open:
 
-### Vim-like Editor Mode
-When in Vim mode (Ctrl+e), additional shortcuts are available:
-
-#### Navigation
-- **h, j, k, l**: Move cursor (left, down, up, right)
-- **w, b**: Move by word (forward, backward)
-- **0, $**: Move to beginning/end of line
-- **gg, G**: Move to beginning/end of file
-
-#### Editing
-- **i**: Insert mode
-- **a**: Append mode
-- **o, O**: New line (below, above)
-- **x**: Delete character
-- **dd**: Delete line
-- **yy**: Copy line
-- **p, P**: Paste (below, above)
-
-#### Saving and Exiting
-- **:w**: Save file
-- **:q**: Quit editor
-- **:wq**: Save and quit
-- **:q!**: Quit without saving
-- **Ctrl+c**: Exit editor mode
-
-### Search and Filter
-- **Ctrl+f**: Focus search box
-- **Ctrl+Shift+f**: Advanced search options
-- **Ctrl+Alt+f**: Filter by file type
-
-## 🖱️ Mouse Support
-
-### Mouse Operations
-- **Left Click**: Select item
-- **Double Click**: Open item
-- **Right Click**: Context menu (if available)
-- **Scroll**: Navigate through list
-
-## 🔧 System Shortcuts
-
-### Application Control
-- **Ctrl+q**: Quit application
-- **Ctrl+Shift+q**: Force quit
-- **F1**: Help/About
-- **F2**: Settings
-- **F5**: Refresh current directory
-
-### Debug and Development
-- **Ctrl+Shift+d**: Debug mode toggle
-- **Ctrl+Alt+i**: Show system information
-- **Ctrl+Shift+i**: Performance metrics
-
-## 📊 Status and Information
-
-### Information Display
-- **Ctrl+i**: Show item information
-- **Ctrl+Shift+i**: Detailed file statistics
-- **Ctrl+Alt+i**: System resource usage
-
-## 🎨 Customization Shortcuts
-
-### Layout and Display
-- **Ctrl+Plus**: Increase font size
-- **Ctrl+Minus**: Decrease font size
-- **Ctrl+0**: Reset font size
-- **Ctrl+Shift+l**: Toggle layout mode
-
-### Color and Theme
-- **Ctrl+Shift+c**: Color picker
-- **Ctrl+Alt+t**: Theme preview
-- **Ctrl+Shift+t**: Custom theme editor
-
-## 🚀 Performance Shortcuts
-
-### Caching and Optimization
-- **Ctrl+Shift+c**: Clear cache
-- **Ctrl+Alt+r**: Refresh cache
-- **Ctrl+Shift+r**: Force refresh
-
-### Background Operations
-- **Ctrl+Alt+b**: Show background tasks
-- **Ctrl+Shift+b**: Background task manager
-
-## 📝 Tips and Best Practices
-
-### Efficient Navigation
-1. Use **Tab** to quickly focus the search box
-2. Use **Ctrl+f** to create files quickly
-3. Use **Ctrl+k** for directory creation
-4. Use **Space** to quickly view file details
-
-### File Management
-1. Use **Ctrl+t** and **Ctrl+x** for copy/cut operations
-2. Use **Ctrl+n** to paste multiple items
-3. Use **Alt+c** to add items to clipboard without cutting
-4. Use **Alt+g** to clear clipboard when done
-
-### Remote Operations
-1. Use **Ctrl+s** for quick SSH connections
-2. Use **Alt+d** for database management
-3. Use **Alt+n** for network service management
-4. Save connection settings for faster access
-
-### Theme Customization
-1. Use **Ctrl+t** to cycle through themes
-2. Use **Ctrl+r** to reload configuration
-3. Use **Ctrl+Shift+t** for advanced theme options
-
-## 🔍 Troubleshooting
-
-### Common Issues
-- **Shortcuts not working**: Check if another application is using the same keys
-- **Vim mode issues**: Press **ESC** to exit insert mode, then use **:q** to quit
-- **Connection problems**: Use **Ctrl+Alt+s** or **Ctrl+Alt+d** for connection management
-
-### Reset Options
-- **Ctrl+Shift+r**: Reset to default configuration
-- **Ctrl+Alt+r**: Reset cache and temporary files
-- **F5**: Refresh and reload current state
-
-## 📚 Additional Resources
-
-- [Configuration Guide](CONFIGURATION.md) - Detailed configuration options
-- [Project Structure](PROJECT_STRUCTURE.md) - Understanding the codebase
-- [Main README](../README.md) - Project overview and features
+| Key | Action |
+|-----|--------|
+| `Escape` | Close panel |
+| `Tab` | Navigate between elements (in some panels) |
+| `Enter` | Confirm / select |
+| Arrow keys | Navigate within panel |
 
 ---
 
-*Note: Some shortcuts may vary depending on your terminal emulator and system configuration. This guide covers the standard FTB shortcuts.*
+See also: [Configuration Guide](CONFIGURATION.md)

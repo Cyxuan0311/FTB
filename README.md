@@ -1,329 +1,230 @@
 <div align="center">
 
-# FTB (Terminal File Browser)
+# FTB - Terminal File Browser
 
 </div>
 
 <div align="center">
-  <img src="icon/FTB.svg" alt="FTB Logo" width="200" height="100">
+  <img src="resource/logo.png" alt="FTB Logo" width="200" height="200">
 </div>
 
-    
-![C++17](https://img.shields.io/badge/C++-17-blue) ![FTXUI](https://img.shields.io/badge/FTXUI-5.0.0-orange)
+<div align="center">
 
-![Platform](https://img.shields.io/badge/Platform-Linux-lightgrey) ![Tool](https://img.shields.io/badge/CMake-3.20.0-red) ![SSH](https://img.shields.io/badge/SSH-Supported-green) ![MySQL](https://img.shields.io/badge/MySQL-Supported-blue) <a href="#"><img src="https://img.shields.io/github/repo-size/Cyxuan0311/FTB"></img></a>
+![C++17](https://img.shields.io/badge/C++-17-blue) ![FTXUI](https://img.shields.io/badge/FTXUI-5.0.0-orange) ![Platform](https://img.shields.io/badge/Platform-Linux-lightgrey) ![CMake](https://img.shields.io/badge/CMake-3.10+-red)
 
-A powerful terminal-based interactive file browser developed using FTXUI library, providing intuitive directory navigation, file management, **SSH remote connection**, and **MySQL database management** capabilities. Built with **high-performance optimizations** including smart memory management, asynchronous file operations, and object pooling for smooth user experience.
+[中文文档](README_CN.md)  |  English
 
-## Demo
+</div>
 
-![Demo](image/demo.png)
+A terminal-based file browser, built with C++17 and [FTXUI](https://github.com/ArthurSonzogni/ftxui). Features a three-column layout (parent / current / preview), vim-like keybindings, syntax-highlighted file preview, and a rich theme system.
+
+<div align="center">
+  <img src="resource/demo.png" alt="plmux demo" />
+  <p>FTB operation in windows terminal(wsl2)</p>
+</div>
 
 ## Features
 
-### 🗂️ Core File Management
-- Real-time directory content display
-- Color-coded items (blue for directories/red for files)
-- Top status bar with current time
-- Path history stack (support backward navigation)
-- Keyboard navigation (↑↓ keys for selection, Enter to enter directories)
-- Auto-refresh (100ms UI update interval)
-- Directory search functionality
-- Memory usage calculation for selected items
+### Three-Column Layout
+- **Left**: Parent directory listing
+- **Center**: Current directory with file icons and type-based coloring
+- **Right**: Context-aware preview panel (file metadata, text with syntax highlighting, image rendering, directory contents)
 
-### 🛠️ File Operations
-- File/folder creation and deletion
-- Copy, cut, and paste operations
-- File/folder renaming
-- Clipboard management
-- Attribute preview and file content inspection
+### File Operations
+- Copy (Ctrl+Y), Cut (Ctrl+X), Paste (Ctrl+V)
+- Delete (Delete / Ctrl+D)
+- Create new file / folder (via command mode)
+- Rename (via command mode)
+- Clipboard management with visual indicator
 
-### 📝 Advanced Features
-- **Vim-Like editing mode** - Built-in text editor
-- **Image preview** - Support for JPG, PNG, BMP, GIF
-- **Video playback** - MP4, AVI, MKV, MOV, FLV, WMV support
-- **Binary file handling** - Smart detection and protection
+### Vim-Like Keybindings
+- `j`/`k` or Arrow keys to navigate
+- `h` to go to parent directory, `l` to enter directory
+- `/` to search, `Ctrl+B` prefix mode for commands
+- Built-in Vim-like text editor with undo/redo, search/replace, and Markdown preview
 
-### 🔗 **SSH Remote Connection** ✨
-- **Secure SSH connections** to remote servers
-- **Password and key-based authentication**
-- **Remote directory browsing**
-- **Command execution** on remote hosts
-- **Connection status monitoring**
-- **Easy-to-use connection dialog**
+### Syntax Highlighting
+- Built-in keyword-based highlighter supporting 40+ languages (C/C++, Python, Rust, Go, Java, JavaScript, TypeScript, etc.)
+- 16 token types: keyword, string, comment, number, function, type, operator, preprocessor, and more
+- Optional tree-sitter backend for advanced parsing (build with `-DFTB_ENABLE_TREE_SITTER=ON`)
+- Theme-aware colors that adapt to the active theme
 
-### 🗄️ **MySQL Database Management** ✨
-- **Local and remote MySQL connections** with easy configuration
-- **Graphical CRUD operations** through intuitive button interface
-- **Database management** - create, delete, and select databases
-- **Table operations** - create, delete, and view table structures
-- **Data manipulation** - insert, update, delete, and query data
-- **SQL query executor** - direct SQL execution with result display
-- **Connection status monitoring** and error handling
-- **Tabbed interface** for organized database management
+### Image Preview
+- Renders JPG, PNG, BMP, GIF images in the terminal using Unicode half-block characters
+- Optional libchafa backend for better quality (build with `-DFTB_ENABLE_LIBCHAFA=ON`)
 
-### 🌐 **Network Service Management** ✨
-- **Network connection monitoring** with real-time status updates
-- **Connection information display** - IP addresses, MAC addresses, signal strength
-- **Network statistics tracking** - data transfer, packet counts, speed monitoring
-- **Network speed testing** with multiple test hosts and latency measurement
-- **WiFi network scanning** and connection management
-- **Network diagnostics** with comprehensive connection testing
-- **Tabbed interface** for organized network management
-- **Keyboard navigation** with full keyboard support
+### Theme System
+18 built-in themes with full syntax color support:
 
-### 🎨 **Customizable Theme System** ✨
-- **Multiple built-in themes**: default, dark, light, colorful, minimal
-- **Customizable colors** for all interface elements
-- **Real-time theme switching** with hotkeys
-- **Configuration file support** (.ftb) for persistent customization
-- **Color schemes** for files, directories, status bars, and dialogs
-- **Layout customization** including panel ratios and item counts
-- **Style options** for icons, animations, and mouse support
+| Theme | Style | Theme | Style |
+|-------|-------|-------|-------|
+| default | Catppuccin Mocha | yazi | Yazi-inspired |
+| dark | High contrast dark | light | Light background |
+| colorful | Vibrant colors | minimal | Monochrome |
+| dracula | Dracula | nord | Nord |
+| tokyo-night | Tokyo Night | gruvbox | Gruvbox |
+| solarized | Solarized Dark | one-dark | One Dark |
+| rose-pine | Rose Pine | kanagawa | Kanagawa |
+| everforest | Everforest | monokai | Monokai |
+| ayu | Ayu Dark | poimandres | Poimandres |
+| material | Material Dark | horizon | Horizon |
+| melange | Melange | solarized-light | Solarized Light |
+| ... | ... | ... | ... |
 
-### ⚡ **Performance Optimizations** ✨
-- **Smart Memory Management**: Intelligent pointer usage and container pre-allocation
-- **Asynchronous File Operations**: Non-blocking file I/O for smooth UI experience
-- **Object Pooling**: Efficient resource reuse for frequently created objects
-- **LRU Caching**: Multi-level caching system for directory contents and file metadata
-- **Memory Pool**: Reduced memory fragmentation and allocation overhead
-- **Background Processing**: File operations run in separate threads
+- Real-time theme switching via command mode (`:theme`)
+- JSON config file (`~/.ftb`) for persistent customization
+- Per-theme syntax highlighting colors
 
-### 🎨 User Experience
-- Modern terminal UI with FTXUI
-- Responsive design and smooth animations
-- Intuitive keyboard shortcuts
-- Error handling and user feedback
+### Command Mode (nvim-style)
+Press `Ctrl+B` to enter prefix mode, then type commands:
 
-## Dependencies
+| Command | Alias | Action |
+|---------|-------|--------|
+| `:theme` | `:th` | Open theme selector |
+| `:rename` | `:rn` | Rename selected item |
+| `:newfile` | `:nf` | Create new file |
+| `:newfolder` | `:nd` | Create new folder |
+| `:preview` | `:p` | Full file preview |
+| `:details` | `:d` | Folder details |
+| `:jump` | `:j` | Jump to directory |
+| `:vim` | `:v` | Open in Vim editor |
+| `:search` | `:s` | Enter search mode |
+| `:calendar` | `:cal` | Calendar panel |
+| `:layout` | `:lo` | Layout settings |
+| `:help` | `:h` | Help panel |
+| `:plugin` | `:pl` | Plugin manager |
+| `:ssh` | - | SSH connection (if enabled) |
+| ... | ... | ... |
 
-### Core Dependencies
-```bash
-# Essential libraries
-sudo apt-get install libftxui-dev libssh2-1-dev libmysqlclient-dev
+### Performance
+- Asynchronous file I/O for non-blocking UI
+- LRU cache for directory contents
+- Object pooling for Vim editor instances
+- Lazy loading for preview content
+- Configurable refresh intervals
 
-# JSON processing
-sudo apt-get install nlohmann-json3-dev
+### Plugin System
+- TypeScript/JavaScript plugins with sandboxed execution
+- Permission-based API (fs, clipboard, env, subprocess)
+- Plugin manager panel (`:plugin`)
+- Auto-discovery from `~/.config/ftb/plugins/`
+- Hot reload support
+- See [Plugin Guide](docs/PLUGINS.md) for details
 
-# YAML configuration support
-sudo apt-get install libyaml-cpp-dev
+## Build
 
-# Threading and performance
-sudo apt-get install libtbb-dev
-```
+### Dependencies
 
-### Media Support (Optional)
-```bash
-# Video/image processing libraries
-sudo apt-get install libavcodec-dev libavformat-dev libavutil-dev libswscale-dev
+| Library | Purpose | Required |
+|---------|---------|----------|
+| FTXUI | Terminal UI framework | Yes |
+| nlohmann-json | JSON config parsing | Yes |
+| libssh2 | SSH connections | No (`-DFTB_ENABLE_SSH=ON`) |
+| tree-sitter | Advanced syntax highlighting | No (`-DFTB_ENABLE_TREE_SITTER=ON`) |
+| libchafa | Image preview | No (`-DFTB_ENABLE_LIBCHAFA=ON`) |
+| QuickJS | Plugin system runtime | No (plugins require `qjs`) |
 
-# X11 support for media display
-sudo apt-get install libx11-dev
-```
-
-### Development Tools
-```bash
-# CMake build system
-sudo apt-get install cmake
-
-# C++ compiler
-sudo apt-get install g++-11
-```
-
-### Dependency Overview
-
-| Library | Purpose | Required | Package Name |
-|---------|---------|----------|--------------|
-| **FTXUI** | Terminal UI framework | ✅ | libftxui-dev |
-| **libssh2** | SSH connections | ✅ | libssh2-1-dev |
-| **MySQL** | Database connectivity | ✅ | libmysqlclient-dev |
-| **nlohmann-json** | JSON processing | ✅ | nlohmann-json3-dev |
-| **yaml-cpp** | YAML configuration | ✅ | libyaml-cpp-dev |
-| **TBB** | Threading support | ✅ | libtbb-dev |
-| **FFmpeg** | Media processing | ⚠️ Optional | libavcodec-dev, libavformat-dev, libavutil-dev, libswscale-dev |
-| **X11** | Display support | ⚠️ Optional | libx11-dev |
-
-### Quick Installation Script
-
-For Ubuntu/Debian users, you can install all dependencies with a single command:
+### Install dependencies (Ubuntu/Debian)
 
 ```bash
-# Install all core dependencies
 sudo apt-get update && sudo apt-get install -y \
-    libftxui-dev libssh2-1-dev libmysqlclient-dev \
-    nlohmann-json3-dev libyaml-cpp-dev libtbb-dev \
-    cmake g++-11
-
-# Install optional media support
-sudo apt-get install -y \
-    libavcodec-dev libavformat-dev libavutil-dev \
-    libswscale-dev libx11-dev
+    libftxui-dev nlohmann-json3-dev cmake g++
 ```
 
-## Configuration
+### Build
 
-FTB uses a `.ftb` configuration file located in your home directory (`~/.ftb`) to customize the interface appearance and behavior.
-
-### Quick Setup
-
-1. **Copy the template**: `cp config/.ftb.template ~/.ftb`
-2. **Edit the file**: Customize colors, themes, and settings
-3. **Restart FTB**: Changes take effect immediately
-
-### Available Themes
-
-- **default**: Classic blue and white theme
-- **dark**: Dark background with high contrast
-- **light**: Light background for bright environments
-- **colorful**: Vibrant colors for visual appeal
-- **minimal**: Clean, monochrome design
-
-### Configuration Sections
-
-- **Colors**: Customize all interface colors
-- **Layout**: Adjust panel sizes and item counts
-- **Style**: Toggle icons, animations, and features
-- **Themes**: Switch between predefined themes
-- **MySQL/SSH**: Set default connection parameters
-
-See [Configuration Guide](docs/CONFIGURATION.md) for detailed options.
-
-### Alternative Installation Methods
-
-**CentOS/RHEL/Fedora:**
 ```bash
-# Core dependencies
-sudo yum install mysql-devel libssh2-devel yaml-cpp-devel tbb-devel
-# or for newer versions
-sudo dnf install mysql-devel libssh2-devel yaml-cpp-devel tbb-devel
-
-# Media support (optional)
-sudo yum install ffmpeg-devel libX11-devel
+mkdir build && cd build
+cmake ..
+make -j$(nproc)
 ```
 
-**Arch Linux:**
+### Build options
+
 ```bash
-# Core dependencies
-sudo pacman -S mysql libssh2 yaml-cpp tbb
+# Disable Nerd Font icons (use ASCII fallback)
+cmake .. -DFTB_ENABLE_ICONS=OFF
 
-# Media support (optional)
-sudo pacman -S ffmpeg libx11
+# Enable SSH support
+cmake .. -DFTB_ENABLE_SSH=ON
 
-# Development tools
-sudo pacman -S cmake gcc
-```
+# Enable tree-sitter syntax highlighting
+cmake .. -DFTB_ENABLE_TREE_SITTER=ON
 
-**Ubuntu/Debian (Alternative packages):**
-```bash
-# If nlohmann-json3-dev is not available
-sudo apt-get install nlohmann-json-dev
+# Enable libchafa image preview
+cmake .. -DFTB_ENABLE_LIBCHAFA=ON
 
-# For older Ubuntu versions
-sudo apt-get install libftxui5-dev
-```
+# Disable plugin system
+cmake .. -DFTB_ENABLE_PLUGINS=OFF
 
-## Build & Run
-```bash
+# Use interactive script for building
 chmod +x ./build.sh
-source ./build.sh      # Run build script
-FTB             # Launch application
-```
-
-## Uninstall(Local)
-```bash
-./uninstall.sh
-
+./build.sh
 ```
 
 ## Usage
 
-FTB provides an intuitive keyboard-driven interface with comprehensive shortcuts for all operations.
+```bash
+# Launch in current directory
+./FTB
 
-### 📚 **Documentation**
-- **[Keyboard Shortcuts Guide](docs/KEYBOARD_SHORTCUTS.md)** - Complete shortcut reference
-- **[Configuration Guide](docs/CONFIGURATION.md)** - Detailed configuration options
-- **[Project Structure](docs/PROJECT_STRUCTURE.md)** - Code organization overview
+# Launch in specific directory
+./FTB /path/to/directory
 
-### 🚀 **Quick Start**
-1. **Navigation**: Use ↑/↓ to navigate, Enter to open directories
-2. **File Operations**: Ctrl+f (new file), Ctrl+k (new folder), Delete (remove)
-3. **Content Viewing**: Space (attributes), Ctrl+p (preview), Ctrl+e (edit)
-4. **Remote Access**: Ctrl+s (SSH), Alt+d (MySQL), Alt+n (Network)
-5. **Themes**: Ctrl+t (switch theme), Ctrl+r (reload config)
+# With performance logging
+./FTB -l
 
-### 🎯 **Key Features**
-- **Vim-like Editor**: Built-in text editor with full Vim keybindings
-- **Remote Connections**: SSH and MySQL database management
-- **Network Management**: Comprehensive network monitoring and diagnostics
-- **Media Support**: Image preview and video playback
-- **Customizable Themes**: Multiple themes with real-time switching
-- **Performance Optimized**: Smart caching and asynchronous operations
+# Specify config file
+./FTB --config /path/to/config.ftb
+```
 
-## Remote Connections
+### Keybindings
 
-### 🔗 **SSH Remote Access**
-- **Quick Connect**: Press `Ctrl+S` for SSH connection dialog
-- **Authentication**: Password or key-based authentication
-- **Remote Browsing**: Navigate remote file systems seamlessly
-- **Command Execution**: Run commands on remote hosts
+| Key | Action |
+|-----|--------|
+| `j` / `Down` | Move down |
+| `k` / `Up` | Move up |
+| `h` / `Left` | Parent directory |
+| `l` / `Right` / `Enter` | Enter directory / open file |
+| `/` | Search |
+| `Ctrl+B` | Command mode |
+| `Ctrl+Y` | Copy |
+| `Ctrl+X` | Cut |
+| `Ctrl+V` | Paste |
+| `Delete` / `Ctrl+D` | Delete |
+| `Ctrl+R` | Reload config |
+| `Ctrl+C` | Quit |
+| `Escape` | Close panel / clear search |
+| `Home` / `End` | Jump to first / last item |
+| `PageUp` / `PageDown` | Scroll pages |
 
-### 🗄️ **MySQL Database Management**
-- **Database Access**: Press `Alt+D` for MySQL management
-- **Local & Remote**: Support for both local and remote connections
-- **Visual Interface**: Tabbed interface for database operations
-- **SQL Execution**: Direct SQL query execution with results
+See [Keyboard Shortcuts](docs/KEYBOARD_SHORTCUTS.md) for the full reference.
 
-### 🌐 **Network Service Management**
-- **Network Monitoring**: Press `Alt+N` for network service management
-- **Connection Info**: View IP addresses, MAC addresses, and signal strength
-- **Statistics Tracking**: Monitor data transfer and network performance
-- **Speed Testing**: Test network speed with multiple hosts
-- **WiFi Management**: Scan and connect to available networks
+## Configuration
 
-For detailed connection guides and all available shortcuts, see **[Keyboard Shortcuts Guide](docs/KEYBOARD_SHORTCUTS.md)**.
+Copy the template and edit:
 
-## Project Structure
+```bash
+cp config/.ftb.template ~/.ftb
+```
 
-For a detailed overview of the project structure, see **[Project Structure Guide](docs/PROJECT_STRUCTURE.md)**.
+The config file uses JSON format. Key sections:
 
-### 📁 **Key Directories**
-- **`src/FTB/`** - Core application logic with performance optimizations
-- **`src/UI/`** - User interface components and dialogs
-- **`src/Connection/`** - SSH and MySQL connection backends
-- **`src/Video_and_Photo/`** - Media handling and preview
-- **`tests/`** - Comprehensive test suite
-- **`docs/`** - Complete documentation
-- **`config/`** - Configuration templates
+- `colors` - UI colors (main, files, status, search, dialog, syntax)
+- `style` - Icons, file size, mouse support, hidden files
+- `layout` - Column ratios and items per page
+- `theme` - Active theme name
+- `ssh` - Default SSH port and timeout
+- `bookmarks` - Named directory bookmarks
 
-## Development Environment
-- **Compiler**: g++ 11.0+ (C++17 standard)
-- **Build System**: CMake 3.10+
-- **Core Dependencies**: 
-  - FTXUI 5.0+ (Terminal UI framework)
-  - libssh2 (SSH connections)
-  - libmysqlclient (MySQL database)
-  - nlohmann-json (JSON processing)
-  - yaml-cpp (YAML configuration)
-  - TBB (Threading Building Blocks)
-- **Optional Dependencies**:
-  - FFmpeg (Media processing)
-  - X11 (Display support)
-- **Performance Features**: Smart pointers, async I/O, object pooling, LRU caching
+See [Configuration Guide](docs/CONFIGURATION.md) for details.
 
-## 📚 Documentation
+## Documentation
 
-### **User Guides**
-- **[Keyboard Shortcuts](docs/KEYBOARD_SHORTCUTS.md)** - Complete shortcut reference and usage guide
-- **[Configuration Guide](docs/CONFIGURATION.md)** - Detailed configuration options and customization
-- **[Project Structure](docs/PROJECT_STRUCTURE.md)** - Code organization and development overview
-
-### **Quick References**
-- **Navigation**: ↑/↓ (navigate), Enter (open), Backspace (back)
-- **File Ops**: Ctrl+f (new file), Ctrl+k (new folder), Delete (remove)
-- **Content**: Space (attributes), Ctrl+p (preview), Ctrl+e (edit)
-- **Remote**: Ctrl+s (SSH), Alt+d (MySQL), Alt+n (Network)
-- **Themes**: Ctrl+t (switch), Ctrl+r (reload)
+- [Keyboard Shortcuts](docs/KEYBOARD_SHORTCUTS.md)
+- [Configuration Guide](docs/CONFIGURATION.md)
+- [Plugin Guide](docs/PLUGINS.md)
 
 ## License
 
-MIT License
+MIT

@@ -1,70 +1,84 @@
-# FTB 配置文件模板
-# 这是FTB (Terminal File Browser) 的配置文件模板
-# 复制此文件到用户主目录下的 .ftb 文件来自定义配置
-
-[colors]
-# 主界面颜色配置
-main_background = black
-main_foreground = white
-main_border = blue
-
-# 状态栏颜色配置
-status_background = blue
-status_foreground = white
-status_time = yellow
-status_path = cyan
-
-# 搜索框颜色配置
-search_background = black
-search_foreground = white
-search_border = green
-search_highlight = yellow
-
-# 对话框颜色配置
-dialog_background = black
-dialog_foreground = white
-dialog_border = magenta
-
-[layout]
-# 布局配置
-items_per_page = 20
-items_per_row = 1
-detail_panel_ratio = 0.3
-
-[refresh]
-# 刷新配置
-ui_refresh_interval = 100
-content_refresh_interval = 1000
-
-[theme]
-# 主题配置
-current_theme = default
-auto_switch = false
-
-[mysql]
-# MySQL连接配置
-default_host = localhost
-default_port = 3306
-default_username = root
-default_password = 
-default_database = 
-
-[ssh]
-# SSH连接配置
-default_host = localhost
-default_port = 22
-default_username = 
-default_password = 
-
-[logging]
-# 日志配置
-log_level = info
-log_to_file = false
-log_file_path = ~/.ftb.log
-
-[weather]
-# 天气服务配置
-enabled = true
-update_interval = 1800
-python_script_path = /mnt/f/My__StudyStack/My_Project/FTB/data/Get_weather_information.py
-data_file_path = /mnt/f/My__StudyStack/My_Project/FTB/data/weather.json
+{
+  "colors": {
+    "main": {
+      "background": "#1e1e2e",
+      "foreground": "#cdd6f4",
+      "border": "#45475a",
+      "selection_bg": "#585b70",
+      "selection_fg": "#cdd6f4"
+    },
+    "files": {
+      "directory": "#89b4fa",
+      "file": "#cdd6f4",
+      "executable": "#a6e3a1",
+      "link": "#f5c2e7",
+      "hidden": "#6c7086",
+      "system": "#f38ba8"
+    },
+    "status": {
+      "background": "#313244",
+      "foreground": "#cdd6f4",
+      "border": "#45475a"
+    },
+    "search": {
+      "background": "#1e1e2e",
+      "foreground": "#cdd6f4",
+      "border": "#89b4fa"
+    },
+    "dialog": {
+      "background": "#1e1e2e",
+      "foreground": "#cdd6f4",
+      "border": "#89b4fa"
+    }
+  },
+  "statusbar": {
+    "style": "powerline",
+    "show_position": true,
+    "show_time": true,
+    "show_clipboard": true,
+    "use_bold": false
+  },
+  "style": {
+    "show_icons": true,
+    "show_file_size": true,
+    "show_modified_time": true,
+    "show_permissions": true,
+    "enable_mouse": true,
+    "enable_animations": false,
+    "show_hidden_files": false,
+    "show_detail_panel": true,
+    "sort_mode": "name_asc"
+  },
+  "layout": {
+    "parent_column_width": 25,
+    "detail_panel_ratio": 0.3,
+    "items_per_page": 0
+  },
+  "refresh": {
+    "ui_refresh_interval_ms": 100,
+    "content_refresh_interval_ms": 1000,
+    "auto_refresh": true
+  },
+  "theme": {
+    "name": "default",
+    "use_bold": false,
+    "use_underline": false
+  },
+  "ssh": {
+    "default_port": 22,
+    "connection_timeout": 30,
+    "save_connection_history": true,
+    "max_connection_history": 10
+  },
+  "logging": {
+    "level": "info",
+    "output_to_file": false,
+    "log_file": "~/.config/ftb/ftb.log",
+    "show_timestamp": true
+  },
+  "bookmarks": {
+    "home": "~",
+    "root": "/",
+    "tmp": "/tmp"
+  }
+}
