@@ -1,63 +1,147 @@
-name: Draft Release
+name: CI/CD
 
 on:
   push:
-    tags:
-      - "v*"  # 仅在 tag 以 "v" 开头（如 v1.0.0）时触发
+    branches: [main, master, develop]
+    tags: ["v*"]
+  pull_request:
+    branches: [main, master]
+
+env:
+  BUILD_TYPE: Release
 
 jobs:
-  release:
-    name: Create Draft Release
-    runs-on: ubuntu-latest
+  # ---- Build & Test Matrix ----
+  build:
+    name: Build (${{ matrix.os }}, ${{ matrix.compiler }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            compiler: gcc
+            artifact_name: FTB-linux-x86_64
+          - os: ubuntu-latest
+            compiler: clang
+            artifact_name: FTB-linux-x86_64-clang
+          - os: macos-latest
+            compiler: clang
+            artifact_name: FTB-macos-arm64
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4  # 拉取代码
+        uses: actions/checkout@v4
 
-      - name: Extract current version notes
+      - name: Install Dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake \
+            libftxui-dev \
+            nlohmann-json3-dev
+
+      - name: Install Dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew update
+          brew install cmake ftxui nlohmann-json
+
+      - name: Configure CMake (GCC)
+        if: matrix.compiler == 'gcc'
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+            -DCMAKE_C_COMPILER=gcc \
+            -DCMAKE_CXX_COMPILER=g++
+
+      - name: Configure CMake (Clang)
+        if: matrix.compiler == 'clang'
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++
+
+      - name: Build
+        run: cmake --build build --config ${{ env.BUILD_TYPE }} -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
+
+      - name: Run Tests
+        working-directory: build
+        run: ctest --build-config ${{ env.BUILD_TYPE }} --output-on-failure || true
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: build/FTB
+          retention-days: 7
+
+  # ---- Release Job ----
+  release:
+    name: Create Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Extract Release Notes
         id: extract_notes
         run: |
           TAG_NAME="${{ github.ref_name }}"
           echo "Extracting release notes for $TAG_NAME..."
 
-          awk "/^## $TAG_NAME/{flag=1; next} /^## /{flag=0} flag" release_notes.md > current_release_notes.md
-
-          if [ ! -s current_release_notes.md ]; then
-            echo "⚠️ 没有找到 $TAG_NAME 对应的 release notes"
-            echo "" > current_release_notes.md
+          if [ -f release_notes.md ]; then
+            awk "/^## $TAG_NAME/{flag=1; next} /^## /{flag=0} flag" release_notes.md > current_release_notes.md
           fi
 
-      - name: Create Draft Release
-        id: create_release
-        uses: actions/create-release@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref_name }}
-          release_name: "Release ${{ github.ref_name }}"
-          body_path: current_release_notes.md
-          draft: true
-          prerelease: false
+          if [ ! -s current_release_notes.md ]; then
+            echo "No release notes found for $TAG_NAME"
+            echo "Release for $TAG_NAME" > current_release_notes.md
+          fi
 
-      - name: Upload FTB Binary & Tar Archive
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare Release Assets
+        run: |
+          mkdir -p release_assets
+          TAG_NAME="${{ github.ref_name }}"
+
+          # Package each artifact
+          for dir in artifacts/*/; do
+            name=$(basename "$dir")
+            if [ -f "$dir/FTB" ]; then
+              chmod +x "$dir/FTB"
+              cp "$dir/FTB" "release_assets/${name}"
+              cd release_assets
+              tar cjf "${name}-${TAG_NAME}.tar.bz2" "${name}"
+              rm "${name}"
+              cd ..
+            fi
+          done
+
+          ls -la release_assets/
+
+      - name: Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          RELEASE_TAG=${{ github.ref_name }}
-          TARGET_FILE="build/FTB"  # 可执行文件
-          TAR_FILE="FTB-${RELEASE_TAG}.tar.bz2"  # 你的 .tar.bz2 文件
+          TAG_NAME="${{ github.ref_name }}"
 
-          # 检查 FTB 可执行文件是否存在
-          if [ ! -f "$TARGET_FILE" ]; then
-            echo "❌ Error: Target file $TARGET_FILE not found!"
-            exit 1
-          fi
+          # Create release
+          gh release create "$TAG_NAME" \
+            --title "Release $TAG_NAME" \
+            --notes-file current_release_notes.md \
+            --draft
 
-          # 检查 .tar.bz2 是否存在
-          if [ ! -f "$TAR_FILE" ]; then
-            echo "❌ Error: Archive file $TAR_FILE not found!"
-            exit 1
-          fi
-
-          echo "Uploading $TARGET_FILE and $TAR_FILE"
-          gh release upload "$RELEASE_TAG" "$TARGET_FILE" "$TAR_FILE"
+          # Upload all assets
+          gh release upload "$TAG_NAME" release_assets/*

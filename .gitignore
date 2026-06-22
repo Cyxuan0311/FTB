@@ -3,6 +3,8 @@
 **/build/**
 **/auto_tool_python/**
 /.vscode
+/image
+/icon
 
 # executable
 *.exe
@@ -22,3 +24,6 @@ some_propmt.md
 *.mp4
 Video_and_Photo.md
 VideoPlayer_one.cpp
+
+# perf/log files
+ftb_perf.log
