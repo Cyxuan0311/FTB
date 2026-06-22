@@ -46,7 +46,7 @@ jobs:
       - name: Build FTXUI from source (Linux)
         if: runner.os == 'Linux'
         run: |
-          git clone https://github.com/ArthurSonzogni/FTXUI.git --branch v5.0.0 --depth 1
+          git clone https://github.com/ArthurSonzogni/FTXUI.git --branch v6.0.0 --depth 1
           cmake -S FTXUI -B FTXUI/build -DCMAKE_BUILD_TYPE=Release
           cmake --build FTXUI/build -j$(nproc)
           sudo cmake --install FTXUI/build
