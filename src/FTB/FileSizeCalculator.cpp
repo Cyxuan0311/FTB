@@ -1,6 +1,7 @@
 // FileSizeCalculator.cpp - 文件大小计算器实现文件
 #include "../include/FTB/FileSizeCalculator.hpp"
 
+#include <algorithm>
 #include <filesystem>
 #include <iomanip>
 #include <mutex>
