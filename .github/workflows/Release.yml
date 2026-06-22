@@ -56,7 +56,16 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           brew update
-          brew install cmake ftxui nlohmann-json googletest
+          brew install cmake nlohmann-json googletest
+
+      - name: Build FTXUI from source (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          git clone https://github.com/ArthurSonzogni/FTXUI.git --branch v6.0.0 --depth 1
+          cmake -S FTXUI -B FTXUI/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build FTXUI/build -j$(sysctl -n hw.ncpu)
+          sudo cmake --install FTXUI/build
+          rm -rf FTXUI
 
       - name: Configure CMake (GCC)
         if: matrix.compiler == 'gcc'
