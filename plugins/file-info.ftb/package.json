@@ -1,0 +1,18 @@
+{
+    "name": "file-info",
+    "version": "1.0.0",
+    "description": "Display detailed file information with size formatting",
+    "author": "FTB",
+    "entry": "main.ts",
+    "type": "functional",
+    "permissions": {
+        "fs_read": true,
+        "fs_write": false,
+        "fs_list": true,
+        "net_fetch": false,
+        "env_read": false,
+        "clipboard": false,
+        "subprocess": false,
+        "max_exec_ms": 5000
+    }
+}

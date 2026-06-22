@@ -1,0 +1,18 @@
+{
+    "name": "git-status",
+    "version": "1.0.0",
+    "description": "Display git branch and status in the status bar",
+    "author": "FTB",
+    "entry": "main.ts",
+    "type": "statusbar",
+    "permissions": {
+        "fs_read": true,
+        "fs_write": false,
+        "fs_list": true,
+        "net_fetch": false,
+        "env_read": false,
+        "clipboard": false,
+        "subprocess": true,
+        "max_exec_ms": 3000
+    }
+}
