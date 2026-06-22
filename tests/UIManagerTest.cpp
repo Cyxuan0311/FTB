@@ -2,7 +2,7 @@
 #include "../include/UIManager.hpp"
 #include "../include/FileManager.hpp"
 #include "../include/DirectoryHistory.hpp"  // 使用新的历史记录模块
-#include "../include/FTB/Vim/Vim_Like.hpp"           // 新增：Vim 编辑器头文件
+#include "../include/FTB/Editor/NanoEditor.hpp"
 #include <vector>
 #include <string>
 #include <atomic>
@@ -57,9 +57,9 @@ protected:
     std::atomic<bool> refresh_ui;
     fs::path testDir;  // 存储测试目录的路径
 
-    // 新增：Vim 模式相关变量
+    // Editor mode related variables
     bool vim_mode_active;
-    VimLikeEditor* vimEditor;
+    FTB::Editor::NanoEditor* vimEditor;
 };
 
 TEST_F(UIManagerTest, HandleEscapeEvent) {
