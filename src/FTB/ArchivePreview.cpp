@@ -4,6 +4,7 @@
 #include <cctype>
 #include <cstdio>
 #include <filesystem>
+#include <cstring>
 #include <memory>
 #include <regex>
 #include <sstream>
