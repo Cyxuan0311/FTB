@@ -208,11 +208,16 @@ if(FTB_ENABLE_TREE_SITTER)
     set(TREE_SITTER_GRAMMARS
         bash         BUILD_TREE_SITTER_BASH
         c            BUILD_TREE_SITTER_C
+        clojure      BUILD_TREE_SITTER_CLOJURE
         cpp          BUILD_TREE_SITTER_CPP
+        dart         BUILD_TREE_SITTER_DART
+        erlang       BUILD_TREE_SITTER_ERLANG
+        fsharp       BUILD_TREE_SITTER_FSHARP
         go           BUILD_TREE_SITTER_GO
         java         BUILD_TREE_SITTER_JAVA
         javascript   BUILD_TREE_SITTER_JAVASCRIPT
         json         BUILD_TREE_SITTER_JSON
+        julia        BUILD_TREE_SITTER_JULIA
         python       BUILD_TREE_SITTER_PYTHON
         rust         BUILD_TREE_SITTER_RUST
         typescript   BUILD_TREE_SITTER_TYPESCRIPT

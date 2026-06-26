@@ -1,8 +1,10 @@
 #include "core/MainUI.hpp"
 
 #include <algorithm>
+#include <cstring>
 #include <filesystem>
 #include <mutex>
+#include <unistd.h>
 #include <ftxui/screen/terminal.hpp>
 
 #include "preview/PreviewCache.hpp"
@@ -27,7 +29,16 @@ void UpdatePathCache(MainState& state) {
         state.cached_canonical_path = new_canonical;
         fs::path parent = canon.parent_path();
         state.cached_parent_path = (!parent.empty() && parent != canon) ? parent.string() : "/";
-        state.cached_parent_display = state.cached_parent_path;
+
+        {
+            const char* user = std::getenv("USER");
+            char host[256] = {};
+            if (!user) user = "unknown";
+            if (::gethostname(host, sizeof(host)) != 0)
+                std::strncpy(host, "unknown", sizeof(host));
+            host[sizeof(host) - 1] = '\0';
+            state.cached_parent_display = std::string(user) + "@" + std::string(host);
+        }
 
         if (!parent.empty() && parent != canon) {
             state.cached_parent_entries = FileManager::getDirectoryEntries(state.cached_parent_path, state.currentSortMode());
@@ -48,7 +59,15 @@ void UpdatePathCache(MainState& state) {
         state.cached_parent_path = "";
         state.cached_parent_entries.clear();
         state.cached_parent_selected = -1;
-        state.cached_parent_display = state.currentPath;
+        {
+            const char* user = std::getenv("USER");
+            char host[256] = {};
+            if (!user) user = "unknown";
+            if (::gethostname(host, sizeof(host)) != 0)
+                std::strncpy(host, "unknown", sizeof(host));
+            host[sizeof(host) - 1] = '\0';
+            state.cached_parent_display = std::string(user) + "@" + std::string(host);
+        }
     }
 }
 

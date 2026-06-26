@@ -197,68 +197,54 @@ std::vector<DirEntryInfo> getDirectoryEntries(const std::string& path) {
     entries.reserve(256);
 
     try {
-        for (const auto& entry : fs::directory_iterator(path)) {
+        for (const auto& entry : fs::directory_iterator(path, fs::directory_options::skip_permission_denied)) {
             DirEntryInfo info;
             info.name = entry.path().filename().string();
 
-            // 过滤 "." 和 ".."
             if (info.name == "." || info.name == "..") continue;
 
-            // directory_entry 自带缓存，这些调用不会额外访问文件系统
-            info.exists = entry.exists();
-            info.is_dir = entry.is_directory();
-            info.is_regular = entry.is_regular_file();
-            info.is_symlink = entry.is_symlink();
+            auto sft = entry.symlink_status();
+            info.exists = true;
+            info.is_symlink = sft.type() == fs::file_type::symlink;
+            info.is_dir = sft.type() == fs::file_type::directory;
+            info.is_regular = sft.type() == fs::file_type::regular;
 
-            // 文件大小 (仅常规文件)
+            if (info.is_symlink) {
+                auto ft = entry.status();
+                info.is_dir = ft.type() == fs::file_type::directory;
+                info.is_regular = ft.type() == fs::file_type::regular;
+            }
+
             if (info.is_regular) {
-                try { info.file_size = entry.file_size(); } catch (...) {}
+                info.file_size = entry.file_size();
             }
 
-            // 权限
-            try {
-                auto perms = entry.status().permissions();
-                info.is_executable = (perms & fs::perms::owner_exec) != fs::perms::none;
+            auto perms = sft.permissions();
+            info.is_executable = (perms & fs::perms::owner_exec) != fs::perms::none;
 
-                std::string perm_str;
-                if (entry.is_symlink())
-                    perm_str += 'l';
-                else if (entry.is_directory())
-                    perm_str += 'd';
-                else if (entry.is_fifo())
-                    perm_str += 'p';
-                else if (entry.is_socket())
-                    perm_str += 's';
-                else
-                    perm_str += '-';
+            static const char kPermChars[] = "rwxrwxrwx";
+            static const fs::perms kPermBits[] = {
+                fs::perms::owner_read,  fs::perms::owner_write, fs::perms::owner_exec,
+                fs::perms::group_read,  fs::perms::group_write, fs::perms::group_exec,
+                fs::perms::others_read, fs::perms::others_write, fs::perms::others_exec
+            };
+            char perm_buf[11];
+            perm_buf[0] = info.is_symlink ? 'l' : info.is_dir ? 'd' : info.is_regular ? '-' : '?';
+            for (int i = 0; i < 9; ++i)
+                perm_buf[1 + i] = (perms & kPermBits[i]) != fs::perms::none ? kPermChars[i] : '-';
+            perm_buf[10] = '\0';
+            info.permissions = std::string(perm_buf, 10);
 
-                perm_str += (perms & fs::perms::owner_read)  != fs::perms::none ? 'r' : '-';
-                perm_str += (perms & fs::perms::owner_write) != fs::perms::none ? 'w' : '-';
-                perm_str += (perms & fs::perms::owner_exec)  != fs::perms::none ? 'x' : '-';
-                perm_str += (perms & fs::perms::group_read)  != fs::perms::none ? 'r' : '-';
-                perm_str += (perms & fs::perms::group_write) != fs::perms::none ? 'w' : '-';
-                perm_str += (perms & fs::perms::group_exec)  != fs::perms::none ? 'x' : '-';
-                perm_str += (perms & fs::perms::others_read)  != fs::perms::none ? 'r' : '-';
-                perm_str += (perms & fs::perms::others_write) != fs::perms::none ? 'w' : '-';
-                perm_str += (perms & fs::perms::others_exec)  != fs::perms::none ? 'x' : '-';
+            auto ftime = entry.last_write_time();
+            auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+                ftime - fs::file_time_type::clock::now() + std::chrono::system_clock::now());
+            std::time_t cftime = std::chrono::system_clock::to_time_t(sctp);
+            char time_buf[20];
+            if (std::strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M", std::localtime(&cftime)))
+                info.mod_time = time_buf;
+            else
+                info.mod_time.clear();
 
-                info.permissions = perm_str;
-            } catch (...) {
-                info.permissions = "----------";
-            }
-
-            // 修改时间
-            try {
-                auto ftime = entry.last_write_time();
-                auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
-                    ftime - fs::file_time_type::clock::now() + std::chrono::system_clock::now());
-                std::time_t cftime = std::chrono::system_clock::to_time_t(sctp);
-                std::ostringstream time_str;
-                time_str << std::put_time(std::localtime(&cftime), "%Y-%m-%d %H:%M");
-                info.mod_time = time_str.str();
-            } catch (...) {}
-
-            // 图标
             info.icon = FTB::Icons::GetIconForPath(entry.path(), info.is_dir);
 
             entries.push_back(std::move(info));

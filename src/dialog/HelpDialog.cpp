@@ -45,8 +45,14 @@ Element RenderHelpPanel(MainState& state, int tw, int th) {
         all_content.push_back(text(" File Operations") | color(TC("title")) | bold);
         all_content.push_back(text("   y                 Copy (yank)") | color(TC("main_fg")));
         all_content.push_back(text("   x                 Cut") | color(TC("main_fg")));
-        all_content.push_back(text("   p                 Paste") | color(TC("main_fg")));
+        all_content.push_back(text("   p                 Paste (auto-rename)") | color(TC("main_fg")));
+        all_content.push_back(text("   P                 Paste (force overwrite)") | color(TC("main_fg")));
         all_content.push_back(text("   d                 Delete to trash") | color(TC("main_fg")));
+        all_content.push_back(text("   Delete / Ctrl+D   Delete confirmation") | color(TC("main_fg")));
+        all_content.push_back(text(""));
+        all_content.push_back(text(" Tabs") | color(TC("title")) | bold);
+        all_content.push_back(text("   [                 Previous tab") | color(TC("main_fg")));
+        all_content.push_back(text("   ]                 Next tab") | color(TC("main_fg")));
         all_content.push_back(text(""));
         all_content.push_back(text(" Preview Panel") | color(TC("title")) | bold);
         all_content.push_back(text("   Alt+J             Scroll down") | color(TC("main_fg")));
@@ -93,7 +99,6 @@ Element RenderHelpPanel(MainState& state, int tw, int th) {
         all_content.push_back(text(" Other") | color(TC("title")) | bold);
         all_content.push_back(text("   Ctrl+R            Reload config") | color(TC("main_fg")));
         all_content.push_back(text("   Ctrl+C (outside)  Quit FTB") | color(TC("main_fg")));
-        all_content.push_back(text("   Ctrl+O            Open file preview") | color(TC("main_fg")));
     } else {
         all_content.push_back(text(""));
         all_content.push_back(text(" Type :command after Ctrl+B, e.g. Ctrl+B th <Enter>") | color(TC("dim")) | dim);
