@@ -217,9 +217,10 @@ cp config/.ftb.template ~/.ftb
 
 ## 文档
 
-- [键盘快捷键](KEYBOARD_SHORTCUTS.md)
-- [配置指南](CONFIGURATION.md)
-- [插件系统](docs/PLUGINS.md)
+- [键盘快捷键](docs/KEYBOARD_SHORTCUTS_CN.md) ([English](docs/KEYBOARD_SHORTCUTS.md))
+- [配置指南](docs/CONFIGURATION_CN.md) ([English](docs/CONFIGURATION.md))
+- [插件系统](docs/PLUGINS_CN.md) ([English](docs/PLUGINS.md))
+- [外部依赖](docs/PREREQUISITES_CN.md) ([English](docs/PREREQUISITES.md))
 
 ## 许可证
 

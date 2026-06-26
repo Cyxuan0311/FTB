@@ -1,3 +1,5 @@
+[中文文档](PLUGINS_CN.md)  |  English
+
 # FTB Plugin System
 
 FTB supports a TypeScript/JavaScript plugin system inspired by [yazi](https://yazi-rs.github.io/docs/plugins/overview), allowing you to extend functionality with custom scripts.
@@ -254,3 +256,7 @@ Requires permissions: `fs_read`, `fs_list`, `subprocess`
 | `d` | Toggle enable/disable |
 | `r` | Reload plugin |
 | `q`/`Esc` | Close panel |
+
+---
+
+See also: [Configuration Guide](CONFIGURATION.md) | [配置指南](CONFIGURATION_CN.md)

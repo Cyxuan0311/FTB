@@ -225,9 +225,10 @@ See [Configuration Guide](docs/CONFIGURATION.md) for details.
 
 ## Documentation
 
-- [Keyboard Shortcuts](docs/KEYBOARD_SHORTCUTS.md)
-- [Configuration Guide](docs/CONFIGURATION.md)
-- [Plugin Guide](docs/PLUGINS.md)
+- [Keyboard Shortcuts](docs/KEYBOARD_SHORTCUTS.md) ([中文](docs/KEYBOARD_SHORTCUTS_CN.md))
+- [Configuration Guide](docs/CONFIGURATION.md) ([配置指南](docs/CONFIGURATION_CN.md))
+- [Plugin Guide](docs/PLUGINS.md) ([插件系统](docs/PLUGINS_CN.md))
+- [External Prerequisites](docs/PREREQUISITES.md) ([外部依赖](docs/PREREQUISITES_CN.md))
 
 ## License
 

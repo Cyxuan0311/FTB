@@ -1,35 +1,42 @@
+[中文文档](KEYBOARD_SHORTCUTS_CN.md)  |  English
+
 # FTB Keyboard Shortcuts
 
-## Navigation
+## File List Navigation
 
 | Key | Action |
 |-----|--------|
 | `j` / `Down` | Move selection down |
 | `k` / `Up` | Move selection up |
-| `h` / `Left` | Go to parent directory |
+| `h` / `Left` | Go to parent directory (first press = first item, second = parent) |
 | `l` / `Right` / `Enter` | Enter directory / open file |
-| `Home` | Jump to first item |
-| `End` | Jump to last item |
+| `Home` / `g` `g` | Jump to first item |
+| `End` / `G` | Jump to last item |
 | `PageUp` | Previous page |
 | `PageDown` | Next page |
-
-## Search
-
-| Key | Action |
-|-----|--------|
-| `/` | Enter search mode |
-| `Escape` | Clear search / exit search mode |
-| `Backspace` | Delete last character / exit if empty |
-| Character keys | Type search query (in search mode) |
+| `.` | Toggle hidden files |
+| `Space` | Toggle batch selection (multi-select) |
 
 ## File Operations
 
 | Key | Action |
 |-----|--------|
-| `y` | Copy selected item |
-| `x` | Cut selected item |
-| `p` | Paste from clipboard |
-| `Delete` / `Ctrl+D` | Delete selected item |
+| `y` | Copy (yank) selected item(s) |
+| `x` | Cut selected item(s) |
+| `p` | Paste from clipboard (auto-rename if exists) |
+| `P` | Paste with force overwrite |
+| `d` | Move to trash |
+| `Delete` / `Ctrl+D` | Open delete confirmation dialog |
+
+## Search
+
+| Key | Action |
+|-----|--------|
+| `/` | Enter search mode (type to filter list) |
+| `Escape` | Clear search / exit search mode |
+| `n` | Jump to next match |
+| `N` | Jump to previous match |
+| `Backspace` | Delete last character / exit if empty |
 
 ## Preview Panel Scrolling
 
@@ -41,106 +48,127 @@
 | `Alt+L` | Scroll preview right |
 | Mouse Wheel | Scroll preview up/down |
 
-## File Opening
+## Tab Management
 
 | Key | Action |
 |-----|--------|
-| `Enter` | Open file with default system program |
+| `[` | Previous tab |
+| `]` | Next tab |
+| `Ctrl+B nt` | Create new tab |
+| `Ctrl+B ct` | Close current tab |
 
 ## Command Mode
 
-Press `Ctrl+B` to enter prefix mode, then type a command:
+Press `Ctrl+B` to enter command prefix mode, then type a command:
 
-| Command | Alias | Action |
-|---------|-------|--------|
+| Command | Aliases | Action |
+|---------|---------|--------|
 | `open` | `op` | Open with picker dialog |
 | `openwith` | `ow` | Manual specify program |
 | `opencfg` | `oc` | Configure openers |
+| `vim` | `v`, `e`, `editor` | Open built-in editor |
 | `theme` | `th` | Open theme selector |
 | `rename` | `rn` | Rename selected item |
+| `batchrename` | `br` | Batch rename with regex |
 | `newfile` | `nf` | Create new file |
 | `newfolder` | `nd` | Create new folder |
 | `preview` | `p` | Full file preview |
 | `details` | `d` | Folder details |
 | `jump` | `j` | Jump to directory |
-| `vim` | `v` | Open in Vim editor |
+| `fdfind` | `fd` | Fuzzy find files |
 | `search` | `s` | Enter search mode |
+| `help` | `h` | Help panel |
 | `calendar` | `cal` | Calendar panel |
 | `layout` | `lo` | Layout settings |
-| `help` | `h` | Help panel |
-| `ssh` | - | SSH connection (if enabled) |
+| `sort` | `so` | Sort mode settings |
+| `uistyle` | `ui` | UI style settings |
+| `statusstyle` | `ss` | Status bar style |
+| `plugin` | `pl` | Plugin manager |
+| `tasks` | `task`, `ts` | Task manager |
+| `clipboard` | `cb` | Show clipboard details |
+| `clr` | `cc` | Clear clipboard |
+| `newtab` | `nt` | Create new tab |
+| `closetab` | `ct` | Close current tab |
+| `nexttab` | `nx` | Next tab |
+| `prevtab` | `pv` | Previous tab |
+| `mdsource` | `mds` | Toggle Markdown preview source |
+| `xlsx` | `xls` | Toggle spreadsheet preview |
+| `media` | `video`, `mp4`, `gif` | Toggle media (timg) preview |
+| `timg` | `play` | Play media fullscreen |
+| `pdf` | `hygg` | Toggle PDF preview |
+| `doc` | `docx`, `pandoc` | Toggle DOC/DOCX preview |
+| `aud` | `audio`, `eyed3` | Toggle audio preview |
+| `hex` | `xxd` | Toggle hex dump preview |
+| `gh` | | Go to home directory |
+| `gd` | | Go to downloads directory |
+| `gc` | | Go to config directory |
+| `ssh` | | SSH connection (if enabled) |
 
-Press `Enter` to execute, `Escape` to cancel.
+- `Tab` — Auto-complete command name
+- `Enter` — Execute command
+- `Escape` — Cancel command mode
 
-## Application Control
+## Built-in Editor (nano-style)
+
+Press `Ctrl+B v` or `Ctrl+B e` to open the current file in the built-in editor.
+
+### Navigation
 
 | Key | Action |
 |-----|--------|
+| Arrow keys | Move cursor |
+| `Ctrl+A` / `Ctrl+E` | Beginning / End of line |
+| `Ctrl+B` / `Ctrl+F` | Character left / right |
+| `Ctrl+P` / `Ctrl+N` | Line up / down |
+| `Ctrl+V` / `PageDown` | Page down |
+| `Ctrl+Y` / `PageUp` | Page up |
+
+### Editing
+
+| Key | Action |
+|-----|--------|
+| `Ctrl+O` | Save file |
+| `Ctrl+X` | Exit editor |
+| `Ctrl+K` | Cut current line |
+| `Ctrl+U` | Paste at cursor |
+| `Ctrl+W` | Search within file |
+| `Ctrl+Z` / `Alt+U` | Undo |
+| `Alt+E` | Redo |
+| `Alt+M` | Toggle Markdown preview mode |
+| `Ctrl+_` | Go to specific line |
+| `Ctrl+C` | Show cursor position |
+
+## Global / Application Control
+
+| Key | Action |
+|-----|--------|
+| `Escape` | Close active panel / clear search / clear batch selection |
 | `Ctrl+C` | Quit FTB |
 | `Ctrl+R` | Reload configuration file |
-| `Escape` | Close active panel / clear search |
+| `Ctrl+L` | Refresh terminal screen |
+| `Ctrl+Z` | (ignored, prevents accidental suspend) |
 
-## Vim Editor
-
-When the Vim editor is open (via `:vim` command), the following keys are available:
-
-### Normal Mode
+## Panels (Help, Theme, Calendar, etc.)
 
 | Key | Action |
 |-----|--------|
-| `h` / `j` / `k` / `l` | Move cursor |
-| `w` | Next word |
-| `b` | Previous word |
-| `0` | Beginning of line |
-| `$` | End of line |
-| `gg` | Beginning of file |
-| `G` | End of file |
-| `PageUp` / `PageDown` | Scroll page |
-| `i` | Insert mode |
-| `a` | Append mode |
-| `o` | New line below |
-| `O` | New line above |
-| `x` | Delete character |
-| `dd` | Delete line |
-| `yy` | Yank line |
-| `p` / `P` | Paste |
-| `u` | Undo |
-| `Ctrl+R` | Redo |
-
-### Command Mode (in Vim editor)
-
-| Command | Action |
-|---------|--------|
-| `:w` | Save file |
-| `:q` | Quit editor |
-| `:wq` | Save and quit |
-| `:q!` | Quit without saving |
-
-### Search and Replace
-
-| Key | Action |
-|-----|--------|
-| `/pattern` | Search forward |
-| `:s/old/new` | Replace first occurrence |
-| `:%s/old/new/g` | Replace all occurrences |
-
-### Markdown Preview
-
-| Key | Action |
-|-----|--------|
-| `Ctrl+M` | Toggle Markdown preview mode |
-
-## Panel Navigation
-
-When a panel (theme, help, calendar, etc.) is open:
-
-| Key | Action |
-|-----|--------|
-| `Escape` | Close panel |
-| `Tab` | Navigate between elements (in some panels) |
-| `Enter` | Confirm / select |
+| `Escape` / `q` | Close panel |
+| `Tab` | Switch tab (help panel) |
 | Arrow keys | Navigate within panel |
+| `Home` / `End` | Jump to top / bottom |
+| `PageUp` / `PageDown` | Scroll page |
+
+## Mouse Support
+
+| Action | Behaviour |
+|--------|-----------|
+| Left click on tab bar | Switch to clicked tab |
+| Left click on columns | Start text selection |
+| Mouse drag | Extend selection |
+| Mouse release | Copy selected text to system clipboard |
+| Wheel up | Scroll preview panel up |
+| Wheel down | Scroll preview panel down |
 
 ---
 
-See also: [Configuration Guide](CONFIGURATION.md)
+See also: [Configuration Guide](CONFIGURATION.md) | [配置指南](CONFIGURATION_CN.md)
