@@ -8,7 +8,6 @@
 
 #include "../../include/utils/PerfLogger.hpp"
 
-// stb_image 实现
 #define STB_IMAGE_IMPLEMENTATION
 #include "../../third_party/stb_image.h"
 
@@ -18,11 +17,11 @@
 
 namespace FTB {
 
-// ---- 静态成员 ----
 std::mutex ImagePreview::s_cache_mutex;
-ImageCache ImagePreview::s_cache;
+std::list<ImageCacheEntry> ImagePreview::s_lru_list;
+using ImageLRUIter = std::list<ImageCacheEntry>::iterator;
+std::unordered_map<std::string, ImageLRUIter> ImagePreview::s_cache_map;
 
-// ---- 检查是否为图片文件 ----
 bool ImagePreview::IsImageFile(const std::string& path) {
     namespace fs = std::filesystem;
     std::string ext = fs::path(path).extension().string();
@@ -39,7 +38,6 @@ bool ImagePreview::IsImageFile(const std::string& path) {
     return false;
 }
 
-// ---- 使用 stb_image 渲染为像素数据 ----
 std::vector<ImageLine> ImagePreview::RenderWithStbImage(
     const std::string& path,
     int max_width,
@@ -53,8 +51,6 @@ std::vector<ImageLine> ImagePreview::RenderWithStbImage(
         return {};
     }
 
-    // Character cells are ~2:1 (taller than wide), so for correct visual
-    // proportions we need: render_w / (render_h * 2) = img_w / img_h
     double target_ratio = 2.0 * img_w / img_h;
     int render_w, render_h;
     if (static_cast<double>(max_width) / max_height > target_ratio) {
@@ -99,8 +95,6 @@ std::vector<ImageLine> ImagePreview::RenderWithChafa(
     unsigned char* data = stbi_load(path.c_str(), &img_w, &img_h, &channels, 3);
     if (!data) return {};
 
-    // Character cells are ~2:1 (taller than wide), so for correct visual
-    // proportions we need: render_w / (render_h * 2) = img_w / img_h
     double target_ratio = 2.0 * img_w / img_h;
     int render_w, render_h;
     if (static_cast<double>(max_width) / max_height > target_ratio) {
@@ -165,7 +159,6 @@ std::vector<ImageLine> ImagePreview::RenderWithChafa(
 }
 #endif
 
-// ---- 渲染入口 ----
 std::vector<ImageLine> ImagePreview::RenderToPixels(
     const std::string& path,
     int max_width,
@@ -179,24 +172,41 @@ std::vector<ImageLine> ImagePreview::RenderToPixels(
 #endif
 }
 
-// ---- 获取缓存 ----
-bool ImagePreview::GetCached(const std::string& path, ImageCache& cache) {
+bool ImagePreview::GetCached(const std::string& path, ImageCacheEntry& cache) {
     std::lock_guard<std::mutex> lock(s_cache_mutex);
-    if (s_cache.key == path && s_cache.loaded) {
-        cache = s_cache;
+    auto it = s_cache_map.find(path);
+    if (it != s_cache_map.end() && it->second->loaded) {
+        cache = *it->second;
+        s_lru_list.splice(s_lru_list.begin(), s_lru_list, it->second);
         return true;
     }
     return false;
 }
 
-// ---- 异步加载 ----
 void ImagePreview::LoadAsync(const std::string& path, int max_width, int max_height) {
     PERF_LOG("preview", "ImagePreview::LoadAsync: " + path);
     {
         std::lock_guard<std::mutex> lock(s_cache_mutex);
-        if (s_cache.key == path && s_cache.loaded) return;
-        s_cache.key = path;
-        s_cache.loaded = false;
+        auto it = s_cache_map.find(path);
+        if (it != s_cache_map.end() && it->second->loaded) {
+            if (it->second->failed) {
+                return;
+            }
+            s_lru_list.splice(s_lru_list.begin(), s_lru_list, it->second);
+            return;
+        }
+        if (it != s_cache_map.end() && it->second->failed) {
+            return;
+        }
+        if (s_cache_map.size() >= static_cast<size_t>(kImageCacheMaxEntries)) {
+            auto oldest = std::prev(s_lru_list.end());
+            s_cache_map.erase(oldest->key);
+            s_lru_list.erase(oldest);
+        }
+        s_lru_list.emplace_front();
+        s_lru_list.front().key = path;
+        s_lru_list.front().loaded = false;
+        s_cache_map[path] = s_lru_list.begin();
     }
 
     std::thread([path, max_width, max_height]() {
@@ -204,13 +214,19 @@ void ImagePreview::LoadAsync(const std::string& path, int max_width, int max_hei
         auto lines = RenderToPixels(path, max_width, max_height);
         PERF_LOG("preview", "ImagePreview thread done: " + path);
         std::lock_guard<std::mutex> lock(s_cache_mutex);
-        s_cache.image_lines = std::move(lines);
-        s_cache.loaded = true;
-        s_cache.is_image = !s_cache.image_lines.empty();
-        if (!s_cache.image_lines.empty()) {
-            s_cache.width = static_cast<int>(s_cache.image_lines[0].pixels.size());
-            s_cache.height = static_cast<int>(s_cache.image_lines.size());
+        auto it = s_cache_map.find(path);
+        if (it == s_cache_map.end()) {
+            return;
         }
+        it->second->image_lines = std::move(lines);
+        it->second->loaded = true;
+        it->second->is_image = !it->second->image_lines.empty();
+        it->second->failed = it->second->image_lines.empty();
+        if (!it->second->image_lines.empty()) {
+            it->second->width = static_cast<int>(it->second->image_lines[0].pixels.size());
+            it->second->height = static_cast<int>(it->second->image_lines.size());
+        }
+        s_lru_list.splice(s_lru_list.begin(), s_lru_list, it->second);
     }).detach();
 }
 

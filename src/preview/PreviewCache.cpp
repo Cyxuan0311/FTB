@@ -34,9 +34,19 @@ void PreviewCache::Update(const std::vector<FileManager::DirEntryInfo>& entries,
         std::lock_guard<std::mutex> lock(mutex_);
         if (data_.key == new_key) {
             PERF_LOG("cache", "PreviewCache::Update: cache hit for " + new_key);
+            auto now = std::chrono::steady_clock::now();
+            auto since_last_update = std::chrono::duration_cast<std::chrono::milliseconds>(
+                now - last_update_time_).count();
+            if (since_last_update > 0 && since_last_update >= 50)
+                preview_pending_ = true;
             return;
         }
     }
+
+    auto now = std::chrono::steady_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_update_time_).count();
+    last_update_time_ = now;
+    bool navigating_rapidly = (elapsed > 0 && elapsed < 50);
 
     PreviewData new_data;
     new_data.key = new_key;
@@ -44,6 +54,7 @@ void PreviewCache::Update(const std::vector<FileManager::DirEntryInfo>& entries,
     if (selected < 0 || selected >= static_cast<int>(entries.size())) {
         std::lock_guard<std::mutex> lock(mutex_);
         data_ = std::move(new_data);
+        preview_pending_ = false;
         return;
     }
 
@@ -58,12 +69,17 @@ void PreviewCache::Update(const std::vector<FileManager::DirEntryInfo>& entries,
     new_data.mod_time = entry.mod_time;
     new_data.icon = entry.icon;
 
+    preview_pending_ = !navigating_rapidly;
+
     std::lock_guard<std::mutex> lock(mutex_);
     data_ = std::move(new_data);
 }
 
 void PreviewCache::EnsureDirLoaded(const std::string& dirPath) {
     PERF_SCOPE("cache");
+    if (!preview_pending_) {
+        return;
+    }
     std::lock_guard<std::mutex> lock(mutex_);
     if (data_.dir_loaded) return;
     data_.dir_loaded = true;
@@ -93,6 +109,9 @@ void PreviewCache::EnsureDirLoaded(const std::string& dirPath) {
 
 void PreviewCache::EnsureTextLoaded(const std::string& filePath, uintmax_t fileSize) {
     PERF_SCOPE("cache");
+    if (!preview_pending_) {
+        return;
+    }
     std::lock_guard<std::mutex> lock(mutex_);
     if (data_.text_loaded) return;
     data_.text_loaded = true;
@@ -128,6 +147,9 @@ void PreviewCache::EnsureTextLoaded(const std::string& filePath, uintmax_t fileS
 }
 
 void PreviewCache::LoadMoreTextLines(const std::string& filePath, int from_line, int count) {
+    if (!preview_pending_) {
+        return;
+    }
     PERF_LOG("cache", "LoadMoreTextLines: " + filePath + " from_line=" + std::to_string(from_line));
     std::lock_guard<std::mutex> lock(mutex_);
     if (data_.text_total_lines >= from_line + count) return;
@@ -159,6 +181,9 @@ void PreviewCache::LoadMoreTextLines(const std::string& filePath, int from_line,
 }
 
 void PreviewCache::EnsureArchiveLoaded(const std::string& filePath) {
+    if (!preview_pending_) {
+        return;
+    }
     std::lock_guard<std::mutex> lock(mutex_);
     if (data_.archive_loaded) return;
     data_.archive_loaded = true;

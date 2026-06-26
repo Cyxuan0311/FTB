@@ -57,6 +57,7 @@ public:
     void EnsureTextLoaded(const std::string& filePath, uintmax_t fileSize);
     void EnsureArchiveLoaded(const std::string& filePath);
     void LoadMoreTextLines(const std::string& filePath, int from_line, int count);
+    bool IsPreviewPending() const { return preview_pending_; }
 
     void SyncDirData(PreviewData& out);
     void SyncTextData(PreviewData& out);
@@ -70,6 +71,8 @@ private:
     PreviewData data_;
     std::mutex mutex_;
     FTB::Editor::SyntaxHighlighter highlighter_;
+    std::chrono::steady_clock::time_point last_update_time_;
+    bool preview_pending_ = false;
 };
 
 void InvalidatePreviewCache();

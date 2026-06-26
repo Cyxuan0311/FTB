@@ -18,6 +18,7 @@
 #include "core/AnsiParser.hpp"
 #include "preview/ArchivePreview.hpp"
 #include "preview/ImagePreview.hpp"
+#include "utils/PerfLogger.hpp"
 #include "preview/MarkdownPreview.hpp"
 #include "preview/SpreadsheetPreview.hpp"
 #include "preview/MediaPreview.hpp"
@@ -262,6 +263,7 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
 #else
     is_image = !data.is_dir && FTB::ImagePreview::IsImageFile(filePath);
 #endif
+    PERF_LOG("preview", "Image preview: " + data.selectedName);
     if (is_image && is_media && MediaPreview::IsEnabled()) {
         is_image = false;
     }
@@ -274,7 +276,8 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
         FTB::ImagePreview::LoadAsync(filePath, img_w, img_h);
 
         FTB::ImageCache img_cache;
-        if (FTB::ImagePreview::GetCached(filePath, img_cache) && img_cache.is_image) {
+        bool cached = FTB::ImagePreview::GetCached(filePath, img_cache);
+        if (cached && img_cache.is_image) {
             info_elements.push_back(separator() | color(TC("main_border")));
             for (const auto& line : img_cache.image_lines) {
                 Elements char_els;
@@ -286,6 +289,9 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
                 }
                 info_elements.push_back(hbox(char_els));
             }
+        } else if (cached && img_cache.failed) {
+            info_elements.push_back(separator() | color(TC("main_border")));
+            info_elements.push_back(text("  Failed to load image preview") | color(Color::Red));
         } else {
             info_elements.push_back(separator() | color(TC("main_border")));
             info_elements.push_back(text("  Loading image...") | color(TC("dim")) | dim);
