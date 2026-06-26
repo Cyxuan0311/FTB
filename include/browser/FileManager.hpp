@@ -14,7 +14,7 @@
 #include <thread>        // 线程支持
 
 #include "DirectoryHistory.hpp"  // 目录历史记录，用于记录进入/返回操作
-#include "LRUCache.hpp"          // LRU缓存实现
+#include "utils/LRUCache.hpp"          // LRU缓存实现
 
 namespace FTB { enum class SortMode; }
 

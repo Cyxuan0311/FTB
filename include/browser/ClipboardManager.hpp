@@ -11,31 +11,27 @@ namespace fs = std::filesystem;
 
 class ClipboardManager {
 public:
-    static ClipboardManager& getInstance() {
-        static ClipboardManager instance;
-        return instance;
-    }
+    static ClipboardManager& getInstance();
 
     void addItem(const std::string& path);
-    void clear() {
-        items.clear();
-        cutMode = false;
-        modeSelected = false;  // 清空时重置标记
-    }
+    void clear();
     bool isCutMode() const { return cutMode; }
-    void setCutMode(bool mode) { 
+    void setCutMode(bool mode) {
         cutMode = mode;
-        modeSelected = true; 
+        modeSelected = true;
     }
     const std::vector<std::string>& getItems() const { return items; }
-    bool hasModeSelected() const { return modeSelected; }  // 新增：检查是否已选择模式
-    bool paste(const std::string& targetPath);
+    bool hasModeSelected() const { return modeSelected; }
+
+    // Async paste — submits to TaskSystem, returns immediately
+    // force_overwrite=true: overwrite existing files, false: auto-rename
+    std::string paste(const std::string& targetPath, bool force_overwrite = false);
 
 private:
     ClipboardManager() = default;
     std::vector<std::string> items;
     bool cutMode = false;
-    bool modeSelected = false; 
+    bool modeSelected = false;
 };
 
-#endif // CLIPBOARD_MANAGER_HPP
+#endif
