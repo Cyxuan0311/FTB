@@ -90,20 +90,28 @@ bool HandleFileOperationEvent(MainState& state, const Event& event) {
         return true;
     }
 
-    // p: 粘贴 (vim paste)
+    // p: 粘贴 (auto-rename on conflict)
     if (event == Event::Character('p')) {
         auto& clipboard = ClipboardManager::getInstance();
-        if (clipboard.paste(state.currentPath)) {
-            state.cached_current_path_for_entries.clear();
-            InvalidatePreviewCache();
-            {
-                std::lock_guard<std::mutex> lock(FileManager::cache_mutex);
-                FileManager::lru_dir_cache->erase(state.currentPath);
-                FileManager::lru_entry_cache->erase(state.currentPath);
-            }
-            state.allContents = FileManager::getDirectoryContents(state.currentPath);
-            state.filteredContents = state.allContents;
+        std::string tid = clipboard.paste(state.currentPath, false);
+        if (!tid.empty()) {
             state.batch_selected.clear();
+            StatusMessage::Show("Paste started (auto-rename)");
+        } else {
+            StatusMessage::Show("Clipboard is empty");
+        }
+        return true;
+    }
+
+    // P: 粘贴 (force overwrite)
+    if (event == Event::Character('P')) {
+        auto& clipboard = ClipboardManager::getInstance();
+        std::string tid = clipboard.paste(state.currentPath, true);
+        if (!tid.empty()) {
+            state.batch_selected.clear();
+            StatusMessage::Show("Paste started (overwrite)");
+        } else {
+            StatusMessage::Show("Clipboard is empty");
         }
         return true;
     }
