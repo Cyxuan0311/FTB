@@ -6,6 +6,8 @@
 #include <filesystem>
 #include <thread>
 
+#include "../../include/utils/PerfLogger.hpp"
+
 // stb_image 实现
 #define STB_IMAGE_IMPLEMENTATION
 #include "../../third_party/stb_image.h"
@@ -43,6 +45,7 @@ std::vector<ImageLine> ImagePreview::RenderWithStbImage(
     int max_width,
     int max_height
 ) {
+    PERF_SCOPE("preview");
     int img_w, img_h, channels;
     unsigned char* data = stbi_load(path.c_str(), &img_w, &img_h, &channels, 3);
 
@@ -168,6 +171,7 @@ std::vector<ImageLine> ImagePreview::RenderToPixels(
     int max_width,
     int max_height
 ) {
+    PERF_SCOPE("preview");
 #ifdef FTB_ENABLE_LIBCHAFA
     return RenderWithChafa(path, max_width, max_height);
 #else
@@ -187,6 +191,7 @@ bool ImagePreview::GetCached(const std::string& path, ImageCache& cache) {
 
 // ---- 异步加载 ----
 void ImagePreview::LoadAsync(const std::string& path, int max_width, int max_height) {
+    PERF_LOG("preview", "ImagePreview::LoadAsync: " + path);
     {
         std::lock_guard<std::mutex> lock(s_cache_mutex);
         if (s_cache.key == path && s_cache.loaded) return;
@@ -195,7 +200,9 @@ void ImagePreview::LoadAsync(const std::string& path, int max_width, int max_hei
     }
 
     std::thread([path, max_width, max_height]() {
+        PERF_LOG("preview", "ImagePreview thread start: " + path);
         auto lines = RenderToPixels(path, max_width, max_height);
+        PERF_LOG("preview", "ImagePreview thread done: " + path);
         std::lock_guard<std::mutex> lock(s_cache_mutex);
         s_cache.image_lines = std::move(lines);
         s_cache.loaded = true;

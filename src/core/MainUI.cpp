@@ -9,6 +9,7 @@
 #include "browser/FileManager.hpp"
 #include "config/ConfigManager.hpp"
 #include "browser/SortMode.hpp"
+#include "utils/PerfLogger.hpp"
 
 namespace fs = std::filesystem;
 
@@ -17,6 +18,7 @@ namespace FTB {
 using namespace ftxui;
 
 void UpdatePathCache(MainState& state) {
+    PERF_SCOPE("cache");
     try {
         fs::path canon = fs::canonical(state.currentPath);
         std::string new_canonical = canon.string();
@@ -51,7 +53,11 @@ void UpdatePathCache(MainState& state) {
 }
 
 void UpdateCurrentEntryCache(MainState& state) {
-    if (state.currentPath == state.cached_current_path_for_entries) return;
+    PERF_SCOPE("cache");
+    if (state.currentPath == state.cached_current_path_for_entries) {
+        PERF_LOG("cache", "UpdateCurrentEntryCache: cache hit for " + state.currentPath);
+        return;
+    }
     state.cached_current_path_for_entries = state.currentPath;
     state.cached_current_entries = FileManager::getDirectoryEntries(state.currentPath, state.currentSortMode());
     state.allContents.clear();
@@ -61,6 +67,8 @@ void UpdateCurrentEntryCache(MainState& state) {
 }
 
 void RefreshDirectoryContents(MainState& state) {
+    PERF_SCOPE("nav");
+    PERF_LOG("nav", "RefreshDirectoryContents: " + state.currentPath);
     state.cached_current_path_for_entries.clear();
     InvalidatePreviewCache();
     {

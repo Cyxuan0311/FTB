@@ -10,6 +10,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include "../../include/utils/PerfLogger.hpp"
+
 namespace FTB {
 
 std::mutex MarkdownPreview::s_cache_mutex;
@@ -76,6 +78,7 @@ void MarkdownPreview::LoadAsync(const std::string& filePath, int panel_width) {
     }
 
     std::thread([filePath, panel_width]() {
+        PERF_LOG("preview", "MarkdownPreview thread start: " + filePath);
         try {
             int glow_width = std::max(20, panel_width - 2);
             std::string cmd = "CLICOLOR_FORCE=1 glow --width=" + std::to_string(glow_width)
@@ -144,6 +147,7 @@ void MarkdownPreview::LoadAsync(const std::string& filePath, int panel_width) {
             bool ok = WIFEXITED(status) && WEXITSTATUS(status) == 0;
 
             {
+                PERF_LOG("preview", "MarkdownPreview thread done: " + filePath);
                 std::lock_guard<std::mutex> lock(s_cache_mutex);
                 if (s_cache.key != filePath) return;
                 if (ok && !result.empty()) {

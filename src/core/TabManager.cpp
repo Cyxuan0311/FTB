@@ -2,6 +2,7 @@
 #include "core/MainUI.hpp"
 #include "config/ConfigManager.hpp"
 #include "preview/PreviewCache.hpp"
+#include "utils/PerfLogger.hpp"
 #include <filesystem>
 #include <mutex>
 
@@ -65,6 +66,7 @@ std::string Tab::displayName() const {
 }
 
 void Tab::init(const std::string& path) {
+    PERF_LOG("tab", "Tab::init: " + path);
     currentPath = path;
     selected = 0;
     current_page = 0;
@@ -77,6 +79,7 @@ void Tab::init(const std::string& path) {
 }
 
 void Tab::refreshContents() {
+    PERF_LOG("tab", "Tab::refreshContents: " + currentPath);
     allContents = FileManager::getDirectoryContents(currentPath);
     filteredContents = allContents;
     total_pages = 1;
@@ -96,6 +99,7 @@ TabManager::TabManager() {
 }
 
 int TabManager::createTab(const std::string& path) {
+    PERF_LOG("tab", "createTab: " + path);
     Tab tab;
     tab.init(path);
     tabs_.push_back(std::move(tab));

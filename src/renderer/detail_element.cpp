@@ -31,6 +31,7 @@
 #include "editor/SyntaxHighlighter.hpp"
 #include "renderer/TextSelection.hpp"
 #include "utils/UnicodeUtil.hpp"
+#include "utils/PerfLogger.hpp"
 
 namespace fs = std::filesystem;
 
@@ -111,6 +112,7 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
                             const std::string& currentPath,
                             int scroll_y,
                             int scroll_x) {
+    PERF_SCOPE("preview");
     auto& cache = PreviewCache::Instance();
 
     cache.Update(entries, selected, currentPath);
@@ -204,6 +206,7 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
     }
 
     if (data.is_dir && data.exists) {
+        PERF_LOG("preview", "Directory preview: " + data.selectedName);
         std::string dirPath = (fs::path(currentPath) / data.selectedName).string();
         cache.EnsureDirLoaded(dirPath);
         cache.SyncDirData(data);
@@ -264,6 +267,7 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
     }
 
     if (is_image) {
+        PERF_LOG("preview", "Image preview: " + data.selectedName);
         int img_w = std::max(20, preview_panel_width - 4);
         int img_h = std::max(10, term_dim.dimy - 12);
 
@@ -295,6 +299,7 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
         && !is_spreadsheet && !is_media && !is_audio && !is_pdf && !is_doc;
 
     if (is_archive) {
+        PERF_LOG("preview", "Archive preview: " + data.selectedName);
         std::string archivePath = (fs::path(currentPath) / data.selectedName).string();
         cache.SyncArchiveData(data);
         if (!data.archive_loaded) {
@@ -407,6 +412,7 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
     }
 
     if (is_spreadsheet) {
+        PERF_LOG("preview", "Spreadsheet preview: " + data.selectedName);
         std::string fp = (fs::path(currentPath) / data.selectedName).string();
         bool xleak_used = false;
 
@@ -433,6 +439,7 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
     }
 
     if (is_media && MediaPreview::IsEnabled()) {
+        PERF_LOG("preview", "Media preview: " + data.selectedName);
         std::string fp = (fs::path(currentPath) / data.selectedName).string();
         MediaPreview::LoadAsync(fp, preview_panel_width);
         MediaCache mc;
@@ -451,6 +458,7 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
     }
 
     if (is_audio && AudioPreview::IsEnabled()) {
+        PERF_LOG("preview", "Audio preview: " + data.selectedName);
         std::string fp = (fs::path(currentPath) / data.selectedName).string();
         AudioPreview::LoadAsync(fp, preview_panel_width);
         AudioCache ac;
@@ -469,6 +477,7 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
     }
 
     if (is_doc) {
+        PERF_LOG("preview", "Doc preview: " + data.selectedName);
         std::string fp = (fs::path(currentPath) / data.selectedName).string();
         bool pandoc_used = false;
 
@@ -495,6 +504,7 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
     }
 
     if (is_pdf) {
+        PERF_LOG("preview", "PDF preview: " + data.selectedName);
         std::string fp = (fs::path(currentPath) / data.selectedName).string();
         bool hygg_used = false;
 
@@ -521,6 +531,7 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
     }
 
     if (is_hex_binary) {
+        PERF_LOG("preview", "Hex preview: " + data.selectedName);
         std::string fp = (fs::path(currentPath) / data.selectedName).string();
         if (HexPreview::IsEnabled()) {
             HexPreview::LoadAsync(fp, data.file_size, preview_panel_width);
@@ -548,6 +559,7 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
         || data.file_size <= static_cast<uintmax_t>(cfg_preview.max_text_file_size_kb) * 1024;
 
     if (!data.is_dir && data.is_regular && text_preview_eligible && !is_image && !is_archive && !is_spreadsheet && !is_media && !is_audio && !is_pdf && !is_doc && !is_hex_binary) {
+        PERF_LOG("preview", "Text preview: " + data.selectedName);
         std::string fp = (fs::path(currentPath) / data.selectedName).string();
 
         bool is_markdown = MarkdownPreview::IsMarkdownFile(data.selectedName);

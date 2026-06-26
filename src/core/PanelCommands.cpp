@@ -8,6 +8,7 @@
 #include <ftxui/dom/elements.hpp>
 
 #include "utils/StatusMessage.hpp"
+#include "utils/PerfLogger.hpp"
 #include "preview/MarkdownPreview.hpp"
 #include "preview/SpreadsheetPreview.hpp"
 #include "preview/MediaPreview.hpp"
@@ -153,6 +154,7 @@ bool HandlePanelEvent(MainState& state, const Event& event) {
 }
 
 void OpenEditorForFile(MainState& state, const std::string& filePath) {
+    PERF_LOG("file", "OpenEditorForFile: " + filePath);
     if (state.vimEditor != nullptr) {
         FTB::NanoEditorPool::GetInstance().release(std::move(state.vimEditor));
     }
@@ -365,6 +367,7 @@ void HandlePanelCommand(MainState& state, FTB::KeyBindings::PanelCommand cmd) {
         break;
     }
     case FTB::KeyBindings::PanelCommand::GoHome: {
+        PERF_LOG("nav", "GoHome");
         const char* home_env = std::getenv("HOME");
         std::string home = home_env ? home_env : "";
         if (!home.empty()) {
@@ -384,6 +387,7 @@ void HandlePanelCommand(MainState& state, FTB::KeyBindings::PanelCommand cmd) {
         break;
     }
     case FTB::KeyBindings::PanelCommand::GoDownloads: {
+        PERF_LOG("nav", "GoDownloads");
         const char* home_env = std::getenv("HOME");
         std::string home = home_env ? home_env : "";
         if (!home.empty()) {
@@ -404,6 +408,7 @@ void HandlePanelCommand(MainState& state, FTB::KeyBindings::PanelCommand cmd) {
         break;
     }
     case FTB::KeyBindings::PanelCommand::GoConfig: {
+        PERF_LOG("nav", "GoConfig");
         const char* home_env = std::getenv("HOME");
         std::string home = home_env ? home_env : "";
         if (!home.empty()) {
@@ -432,6 +437,7 @@ void HandlePanelCommand(MainState& state, FTB::KeyBindings::PanelCommand cmd) {
         state.panel_suggestion.clear();
         state.active_panel = ActivePanel::NewTab; break;
     case FTB::KeyBindings::PanelCommand::CloseTab:
+        PERF_LOG("tab", "CloseTab");
         if (state.tabManager.canClose()) {
             state.saveTabState();
             state.tabManager.closeTab(state.tabManager.activeIndex());
@@ -442,11 +448,13 @@ void HandlePanelCommand(MainState& state, FTB::KeyBindings::PanelCommand cmd) {
         }
         break;
     case FTB::KeyBindings::PanelCommand::NextTab:
+        PERF_LOG("tab", "NextTab");
         state.saveTabState();
         state.tabManager.nextTab();
         state.loadTabState();
         break;
     case FTB::KeyBindings::PanelCommand::PrevTab:
+        PERF_LOG("tab", "PrevTab");
         state.saveTabState();
         state.tabManager.prevTab();
         state.loadTabState();

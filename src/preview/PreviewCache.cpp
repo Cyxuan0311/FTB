@@ -6,6 +6,7 @@
 
 #include "config/ConfigManager.hpp"
 #include "browser/SortMode.hpp"
+#include "utils/PerfLogger.hpp"
 
 namespace FTB {
 
@@ -26,11 +27,15 @@ void PreviewCache::Invalidate() {
 
 void PreviewCache::Update(const std::vector<FileManager::DirEntryInfo>& entries,
                           int selected, const std::string& currentPath) {
+    PERF_SCOPE("cache");
     std::string new_key = currentPath + ":" + std::to_string(selected);
 
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        if (data_.key == new_key) return;
+        if (data_.key == new_key) {
+            PERF_LOG("cache", "PreviewCache::Update: cache hit for " + new_key);
+            return;
+        }
     }
 
     PreviewData new_data;
@@ -58,11 +63,14 @@ void PreviewCache::Update(const std::vector<FileManager::DirEntryInfo>& entries,
 }
 
 void PreviewCache::EnsureDirLoaded(const std::string& dirPath) {
+    PERF_SCOPE("cache");
     std::lock_guard<std::mutex> lock(mutex_);
     if (data_.dir_loaded) return;
     data_.dir_loaded = true;
+    PERF_LOG("cache", "EnsureDirLoaded: " + dirPath);
 
     std::thread([this, dirPath]() {
+        PERF_LOG("cache", "EnsureDirLoaded thread start: " + dirPath);
         try {
             auto entries = FileManager::getDirectoryEntries(dirPath);
             {
@@ -73,6 +81,7 @@ void PreviewCache::EnsureDirLoaded(const std::string& dirPath) {
             std::lock_guard<std::mutex> lock2(mutex_);
             data_.dir_contents = std::move(entries);
             data_.dir_sorted = true;
+            PERF_LOG("cache", "EnsureDirLoaded thread done: " + dirPath);
         } catch (...) {
             std::lock_guard<std::mutex> lock2(mutex_);
             data_.dir_contents.clear();
@@ -81,9 +90,11 @@ void PreviewCache::EnsureDirLoaded(const std::string& dirPath) {
 }
 
 void PreviewCache::EnsureTextLoaded(const std::string& filePath, uintmax_t fileSize) {
+    PERF_SCOPE("cache");
     std::lock_guard<std::mutex> lock(mutex_);
     if (data_.text_loaded) return;
     data_.text_loaded = true;
+    PERF_LOG("cache", "EnsureTextLoaded: " + filePath);
 
     auto& cfg = ConfigManager::GetInstance()->GetConfig();
     int max_file_size_kb = cfg.preview.max_text_file_size_kb;
@@ -91,17 +102,20 @@ void PreviewCache::EnsureTextLoaded(const std::string& filePath, uintmax_t fileS
     int chunk_size = cfg.preview.chunk_size_lines;
 
     if (max_file_size_kb > 0 && fileSize > static_cast<uintmax_t>(max_file_size_kb) * 1024) {
+        PERF_LOG("cache", "EnsureTextLoaded skipped (file too large): " + filePath);
         return;
     }
 
     int end_line = (max_lines > 0) ? max_lines : (chunk_size > 0 ? chunk_size : 100000);
 
     std::thread([this, filePath, end_line]() {
+        PERF_LOG("cache", "EnsureTextLoaded thread start: " + filePath);
         try {
             auto content = FileManager::readFileContent(filePath, 1, end_line);
             std::lock_guard<std::mutex> lock2(mutex_);
             data_.text_preview = std::move(content);
             data_.text_total_lines = end_line;
+            PERF_LOG("cache", "EnsureTextLoaded thread done: " + filePath);
         } catch (...) {
             std::lock_guard<std::mutex> lock2(mutex_);
             data_.text_preview.clear();
@@ -110,6 +124,7 @@ void PreviewCache::EnsureTextLoaded(const std::string& filePath, uintmax_t fileS
 }
 
 void PreviewCache::LoadMoreTextLines(const std::string& filePath, int from_line, int count) {
+    PERF_LOG("cache", "LoadMoreTextLines: " + filePath + " from_line=" + std::to_string(from_line));
     std::lock_guard<std::mutex> lock(mutex_);
     if (data_.text_total_lines >= from_line + count) return;
 
@@ -161,6 +176,7 @@ FTB::Editor::SyntaxHighlighter& PreviewCache::Highlighter() {
 }
 
 void InvalidatePreviewCache() {
+    PERF_LOG("cache", "InvalidatePreviewCache called");
     PreviewCache::Instance().Invalidate();
 }
 

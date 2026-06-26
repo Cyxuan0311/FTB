@@ -1,9 +1,10 @@
 // FileManager.cpp
-#include "../include/browser/FileManager.hpp"    // 引入 FileManager 头文件，包含相关声明和类型定义
-#include "../include/browser/DirectoryHistory.hpp"// 引入 DirectoryHistory，用于记录目录历史
-#include "../include/renderer/IconMapper.hpp"      // 图标映射
+#include "../include/browser/FileManager.hpp"
+#include "../include/browser/DirectoryHistory.hpp"
+#include "../include/renderer/IconMapper.hpp"
 #include "../include/browser/SortMode.hpp"
 #include "../include/config/ConfigManager.hpp"
+#include "../include/utils/PerfLogger.hpp"
 #include <filesystem>                         // C++17 文件系统库，用于路径操作和遍历
 #include <fstream>                            // 文件读写
 #include <iostream>                           // 标准输出
@@ -89,12 +90,12 @@ bool isDirectory(const std::string & path) {
  * @return 返回包含目录中所有条目名称的字符串向量
  */
 std::vector<std::string> getDirectoryContents(const std::string & path) {
+    PERF_SCOPE("file");
 #ifdef FTB_ENABLE_SSH
     if (g_ssh_conn && g_ssh_conn->isConnected()) {
         auto entries = getDirectoryEntries(path);
         std::vector<std::string> names;
         names.reserve(entries.size());
-        // Ensure directories come first with trailing slash
         for (const auto& e : entries) {
             names.push_back(e.name);
         }
@@ -102,10 +103,8 @@ std::vector<std::string> getDirectoryContents(const std::string & path) {
     }
 #endif
 
-    // 跟踪路径访问
     trackPathAccess(path);
     
-    // 首先尝试从LRU缓存获取
     auto cached_result = lru_dir_cache->get(path);
     if (cached_result.has_value()) {
         cache_hits.fetch_add(1);
@@ -113,6 +112,7 @@ std::vector<std::string> getDirectoryContents(const std::string & path) {
     }
     
     cache_misses.fetch_add(1);
+    PERF_LOG("file", "getDirectoryContents cache MISS: " + path);
     std::vector<std::string> contents;  // 存储结果的字符串向量
     contents.reserve(1000);  // 预分配空间，减少重新分配
     
@@ -158,6 +158,7 @@ std::vector<std::string> getDirectoryContents(const std::string & path) {
 }
 
 std::vector<DirEntryInfo> getDirectoryEntries(const std::string& path) {
+    PERF_SCOPE("file");
 #ifdef FTB_ENABLE_SSH
     if (g_ssh_conn && g_ssh_conn->isConnected()) {
         auto sftp_entries = g_ssh_conn->listDirectory(path);
@@ -186,12 +187,12 @@ std::vector<DirEntryInfo> getDirectoryEntries(const std::string& path) {
     }
 #endif
 
-    // 首先尝试从LRU缓存获取
     auto cached = lru_entry_cache->get(path);
     if (cached.has_value()) {
         return cached.value();
     }
 
+    PERF_LOG("file", "getDirectoryEntries cache MISS: " + path);
     std::vector<DirEntryInfo> entries;
     entries.reserve(256);
 
@@ -683,18 +684,17 @@ void calculation_current_folder_files_number(
  * @return 返回由指定行拼接而成的字符串，若出错则返回错误信息字符串
  */
 std::string readFileContent(const std::string & filePath, size_t startLine, size_t endLine) {
+    PERF_SCOPE("file");
 #ifdef FTB_ENABLE_SSH
     if (g_ssh_conn && g_ssh_conn->isConnected()) {
         return g_ssh_conn->readFileContent(filePath, startLine, endLine);
     }
 #endif
 
-    // 创建缓存键，包含行范围信息
     std::stringstream cache_key_stream;
     cache_key_stream << filePath << ":" << startLine << "-" << endLine;
     std::string cache_key = cache_key_stream.str();
     
-    // 首先尝试从LRU缓存获取
     auto cached_content = lru_content_cache->get(cache_key);
     if (cached_content.has_value()) {
         cache_hits.fetch_add(1);
@@ -702,6 +702,7 @@ std::string readFileContent(const std::string & filePath, size_t startLine, size
     }
     
     cache_misses.fetch_add(1);
+    PERF_LOG("file", "readFileContent cache MISS: " + cache_key);
     
     // 打开文件
     std::ifstream file(filePath);
