@@ -80,5 +80,17 @@
     "home": "~",
     "root": "/",
     "tmp": "/tmp"
+  },
+  "opener": {
+    "openers": {
+      "edit": [{"run": "", "block": true, "desc": "Built-in editor"}],
+      "open": [
+        {"run": "xdg-open %s", "orphan": true, "desc": "System default", "platform": "linux"},
+        {"run": "open %s", "orphan": true, "desc": "System default", "platform": "macos"}
+      ]
+    },
+    "rules": [
+      {"name": "*", "use": ["open"]}
+    ]
   }
 }

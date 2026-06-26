@@ -1,0 +1,1195 @@
+#include "renderer/IconMapper.hpp"
+
+#include <algorithm>
+#include <cctype>
+#include <unordered_map>
+#include <vector>
+
+namespace FTB {
+namespace Icons {
+namespace {
+
+using IconMap = std::unordered_map<std::string, std::string>;
+
+constexpr const char* DEFAULT_FOLDER_ICON = u8"\uf115 ";
+constexpr const char* DEFAULT_FILE_ICON   = u8"\uf15b ";
+
+const IconMap kFolderIcons = {
+    // 源码
+    {"src", u8"\ue5fe "},
+    {"source", u8"\ue5fe "},
+    {"sources", u8"\ue5fe "},
+    {"include", u8"\uf0fd "},
+    {"includes", u8"\uf0fd "},
+    {"headers", u8"\uf0fd "},
+    {"build", u8"\uf0ad "},
+    {"builds", u8"\uf0ad "},
+    {"out", u8"\uf0ad "},
+    {"output", u8"\uf0ad "},
+    {"cmake", u8"\ue615 "},
+    {"scripts", u8"\ue795 "},
+    {"script", u8"\ue795 "},
+    {"tools", u8"\uf0ad "},
+    {"tool", u8"\uf0ad "},
+    {"utils", u8"\uf0ad "},
+
+    // 资源
+    {"assets", u8"\uf1b3 "},
+    {"res", u8"\uf1b3 "},
+    {"resources", u8"\uf1b3 "},
+    {"resource", u8"\uf1b3 "},
+    {"static", u8"\uf74e "},
+    {"public", u8"\uf1ad "},
+    {"media", u8"\uf1c5 "},
+    {"images", u8"\uf1c5 "},
+    {"img", u8"\uf1c5 "},
+    {"icons", u8"\uf1c5 "},
+    {"fonts", u8"\uf031 "},
+    {"sounds", u8"\uf001 "},
+    {"audio", u8"\uf001 "},
+    {"video", u8"\uf03d "},
+    {"videos", u8"\uf03d "},
+    {"styles", u8"\ue749 "},
+    {"style", u8"\ue749 "},
+    {"css", u8"\ue749 "},
+    {"scss", u8"\ue749 "},
+    {"themes", u8"\uf53f "},
+    {"theme", u8"\uf53f "},
+
+    // 配置
+    {"config", u8"\uf013 "},
+    {"configs", u8"\uf013 "},
+    {"conf", u8"\uf013 "},
+    {"settings", u8"\uf013 "},
+    {"setting", u8"\uf013 "},
+    {"env", u8"\uf462 "},
+    {"envs", u8"\uf462 "},
+    {"secrets", u8"\uf023 "},
+    {"certs", u8"\uf023 "},
+    {"certificates", u8"\uf023 "},
+    {"keys", u8"\uf084 "},
+    {"ssh", u8"\uf023 "},
+
+    // 文档
+    {"doc", u8"\uf02d "},
+    {"docs", u8"\uf02d "},
+    {"documentation", u8"\uf02d "},
+    {"wiki", u8"\uf02d "},
+    {"man", u8"\uf02d "},
+    {"manual", u8"\uf02d "},
+
+    // 测试
+    {"tests", u8"\uf0ae "},
+    {"test", u8"\uf0ae "},
+    {"testing", u8"\uf0ae "},
+    {"spec", u8"\uf0ae "},
+    {"specs", u8"\uf0ae "},
+    {"__tests__", u8"\uf0ae "},
+    {"__test__", u8"\uf0ae "},
+    {"__mocks__", u8"\uf0ae "},
+    {"fixtures", u8"\uf0ae "},
+
+    // 示例
+    {"examples", u8"\uf0c3 "},
+    {"example", u8"\uf0c3 "},
+    {"samples", u8"\uf0c3 "},
+    {"sample", u8"\uf0c3 "},
+    {"demo", u8"\uf0c3 "},
+    {"demos", u8"\uf0c3 "},
+    {"playground", u8"\uf0c3 "},
+
+    // 构建/发布
+    {"dist", u8"\uf0ee "},
+    {"release", u8"\uf0ee "},
+    {"releases", u8"\uf0ee "},
+    {"deploy", u8"\uf0ee "},
+    {"deployment", u8"\uf0ee "},
+    {"staging", u8"\uf0ee "},
+    {"production", u8"\uf0ee "},
+    {"prod", u8"\uf0ee "},
+
+    // 二进制/库
+    {"bin", u8"\uf0e7 "},
+    {"binary", u8"\uf0e7 "},
+    {"binaries", u8"\uf0e7 "},
+    {"lib", u8"\uf121 "},
+    {"libs", u8"\uf121 "},
+    {"libraries", u8"\uf121 "},
+    {"packages", u8"\ue615 "},
+    {"pkg", u8"\ue615 "},
+    {"modules", u8"\uf121 "},
+    {"plugins", u8"\uf121 "},
+    {"plugin", u8"\uf121 "},
+    {"extensions", u8"\uf121 "},
+    {"addons", u8"\uf121 "},
+    {"vendor", u8"\uf7d9 "},
+    {"third_party", u8"\uf7d9 "},
+    {"external", u8"\uf7d9 "},
+    {"deps", u8"\uf7d9 "},
+    {"dependencies", u8"\uf7d9 "},
+
+    // 数据
+    {"data", u8"\uf1c0 "},
+    {"database", u8"\uf1c0 "},
+    {"db", u8"\uf1c0 "},
+    {"migrations", u8"\uf1c0 "},
+    {"seeds", u8"\uf1c0 "},
+    {"seed", u8"\uf1c0 "},
+    {"schemas", u8"\uf1c0 "},
+    {"schema", u8"\uf1c0 "},
+
+    // 日志/缓存/临时
+    {"logs", u8"\uf24a "},
+    {"log", u8"\uf24a "},
+    {"cache", u8"\uf0a0 "},
+    {"tmp", u8"\uf0a0 "},
+    {"temp", u8"\uf0a0 "},
+    {"temporary", u8"\uf0a0 "},
+
+    // 国际化
+    {"i18n", u8"\ufac2 "},
+    {"locale", u8"\ufac2 "},
+    {"locales", u8"\ufac2 "},
+    {"lang", u8"\ufac2 "},
+    {"langs", u8"\ufac2 "},
+    {"translations", u8"\ufac2 "},
+    {"l10n", u8"\ufac2 "},
+
+    // 工作流/CI
+    {"workflows", u8"\uf4de "},
+    {"workflow", u8"\uf4de "},
+    {".github", u8"\ue5fb "},
+    {".gitlab", u8"\uf296 "},
+    {".circleci", u8"\uf4de "},
+    {".ci", u8"\uf4de "},
+
+    // Docker/容器
+    {"docker", u8"\uf308 "},
+    {"containers", u8"\uf308 "},
+    {"compose", u8"\uf308 "},
+    {"kubernetes", u8"\uf1b2 "},
+    {"k8s", u8"\uf1b2 "},
+    {"helm", u8"\uf1b2 "},
+    {"kustomize", u8"\uf1b2 "},
+
+    // Web/前端
+    {"components", u8"\uf1b3 "},
+    {"component", u8"\uf1b3 "},
+    {"pages", u8"\uf0ac "},
+    {"page", u8"\uf0ac "},
+    {"views", u8"\uf0ac "},
+    {"view", u8"\uf0ac "},
+    {"layouts", u8"\uf1b3 "},
+    {"layout", u8"\uf1b3 "},
+    {"routes", u8"\uf0ac "},
+    {"router", u8"\uf0ac "},
+    {"store", u8"\uf1b3 "},
+    {"stores", u8"\uf1b3 "},
+    {"composables", u8"\uf1b3 "},
+    {"services", u8"\uf013 "},
+    {"service", u8"\uf013 "},
+    {"api", u8"\uf013 "},
+    {"apis", u8"\uf013 "},
+
+    // 后端
+    {"controllers", u8"\uf013 "},
+    {"models", u8"\uf1c0 "},
+    {"model", u8"\uf1c0 "},
+    {"repositories", u8"\uf1c0 "},
+    {"handlers", u8"\uf013 "},
+
+    // 隐藏目录
+    {".git", u8"\ue5fb "},
+    {".vscode", u8"\ue70c "},
+    {".idea", u8"\ue7b5 "},
+    {".svn", u8"\ue5fb "},
+    {".hg", u8"\ue5fb "},
+    {".npm", u8"\ue60f "},
+    {".yarn", u8"\ue718 "},
+    {".pnpm", u8"\ue718 "},
+    {".cargo", u8"\ue7a8 "},
+    {".rustup", u8"\ue7a8 "},
+    {".python", u8"\uf81f "},
+    {".conda", u8"\uf81f "},
+    {".virtualenv", u8"\uf81f "},
+    {".node-gyp", u8"\ue60f "},
+    {".nuget", u8"\ue61a "},
+    {".m2", u8"\ue256 "},
+    {".gradle", u8"\ue73f "},
+    {".cache", u8"\uf0a0 "},
+    {".config", u8"\uf013 "},
+    {".local", u8"\uf013 "},
+    {".ssh", u8"\uf023 "},
+    {".gnupg", u8"\uf023 "},
+    {".docker", u8"\uf308 "},
+    {".terraform", u8"\uf1b2 "},
+    {".aws", u8"\uf270 "},
+    {".azure", u8"\uf270 "},
+    {".gcloud", u8"\uf270 "},
+
+    // 重要项目目录
+    {"node_modules", u8"\ue60f "},
+    {"__pycache__", u8"\uf81f "},
+    {".mypy_cache", u8"\uf81f "},
+    {".pytest_cache", u8"\uf81f "},
+    {"target", u8"\ue7a8 "},
+    {"debug", u8"\uf0e7 "},
+    {"coverage", u8"\uf0ae "},
+    {"profiling", u8"\uf0ae "},
+    {"benchmarks", u8"\uf0ae "},
+    {"benchmark", u8"\uf0ae "},
+    {"githooks", u8"\ue7a1 "},
+    {"hooks", u8"\ue7a1 "},
+    {"patches", u8"\uf4de "},
+    {"patch", u8"\uf4de "},
+    {"protobuf", u8"\uf1c0 "},
+    {"proto", u8"\uf1c0 "},
+    {"webassembly", u8"\ufb41 "},
+    {"wasm", u8"\ufb41 "},
+
+    // 框架目录
+    {"directives", u8"\uf1b3 "},
+    {"filters", u8"\uf1b3 "},
+    {"guards", u8"\uf023 "},
+    {"interceptors", u8"\uf013 "},
+    {"middleware", u8"\uf1b3 "},
+    {"pipes", u8"\uf1b3 "},
+    {"providers", u8"\uf013 "},
+
+    // Python
+    {".venv", u8"\uf81f "},
+    {"venv", u8"\uf81f "},
+    {"virtualenv", u8"\uf81f "},
+
+    // Flutter / Dart
+    {".dart_tool", u8"\ue798 "},
+    {".pub-cache", u8"\ue798 "},
+
+    // Ruby
+    {".gem", u8"\ue73c "},
+    {".bundle", u8"\ue73c "},
+
+    // 移动端
+    {"android", u8"\uf17b "},
+    {"ios", u8"\uf179 "},
+    {"platforms", u8"\uf17b "},
+    {"adapters", u8"\uf1b3 "},
+    {"decorators", u8"\uf1b3 "},
+    {"factories", u8"\uf0ad "},
+    {"helpers", u8"\uf0ad "},
+    {"jobs", u8"\uf0ae "},
+    {"listeners", u8"\uf0ae "},
+    {"mailers", u8"\uf0e0 "},
+    {"notifications", u8"\uf0f3 "},
+    {"policies", u8"\uf023 "},
+    {"presenters", u8"\uf1b3 "},
+    {"queries", u8"\uf1c0 "},
+    {"serializers", u8"\uf1b3 "},
+    {"subscribers", u8"\uf0ae "},
+    {"tasks", u8"\uf0ae "},
+    {"uploads", u8"\uf093 "},
+    {"validators", u8"\uf0ae "},
+
+    // CI/CD
+    {"actions", u8"\uf4de "},
+    {".github/workflows", u8"\uf4de "},
+    {"pipelines", u8"\uf4de "},
+
+    // Terraform / Infra
+    {"terraform", u8"\uf1b2 "},
+
+    // Nix
+    {".nix", u8"\uf313 "},
+};
+
+const std::vector<std::pair<std::string, std::string>> kFolderKeywordIcons = {
+    {"test", u8"\uf24e "},
+    {"spec", u8"\uf24e "},
+    {"doc", u8"\uf02d "},
+    {"sample", u8"\uf0c3 "},
+    {"demo", u8"\uf0c3 "},
+    {"script", u8"\ue795 "},
+    {"tool", u8"\uf0ad "},
+    {"asset", u8"\uf1b3 "},
+    {"resource", u8"\uf1b3 "},
+    {"config", u8"\uf013 "},
+    {"setting", u8"\uf013 "},
+    {"template", u8"\uf249 "},
+    {"cache", u8"\uf0a0 "},
+    {"tmp", u8"\uf0a0 "},
+    {"log", u8"\uf24a "},
+    {"build", u8"\uf0ad "},
+    {"deploy", u8"\uf0ee "},
+    {"release", u8"\uf0ee "},
+    {"docker", u8"\uf308 "},
+    {"container", u8"\uf308 "},
+    {"kube", u8"\uf1b2 "},
+    {"nginx", u8"\uf233 "},
+    {"apache", u8"\uf233 "},
+    {"locale", u8"\ufac2 "},
+    {"i18n", u8"\ufac2 "},
+    {"lang", u8"\ufac2 "},
+    {"migrate", u8"\uf1c0 "},
+    {"seed", u8"\uf1c0 "},
+    {"schema", u8"\uf1c0 "},
+    {"workflow", u8"\uf4de "},
+    {"ci", u8"\uf4de "},
+    {"cd", u8"\uf4de "},
+    {"archive", u8"\uf410 "},
+    {"backup", u8"\uf410 "},
+    {"temp", u8"\uf0a0 "},
+    {"secret", u8"\uf023 "},
+    {"private", u8"\uf023 "},
+    {"cert", u8"\uf023 "},
+    {"key", u8"\uf084 "},
+    {"snippet", u8"\uf249 "},
+    {"benchmark", u8"\uf0ae "},
+    {"coverage", u8"\uf0ae "},
+    {"node_module", u8"\ue60f "},
+    {"vendor", u8"\uf7d9 "},
+    {"plugin", u8"\uf121 "},
+    {"extension", u8"\uf121 "},
+};
+
+const IconMap kExactFileIcons = {
+    // 构建系统
+    {"cmakelists.txt", u8"\ue615 "},
+    {"makefile", u8"\uf489 "},
+    {"gnumakefile", u8"\uf489 "},
+    {"meson.build", u8"\ue615 "},
+    {"meson_options.txt", u8"\ue615 "},
+    {"build.bazel", u8"\ue615 "},
+    {"workspace", u8"\ue615 "},
+    {"justfile", u8"\uf489 "},
+    {"taskfile.yml", u8"\uf489 "},
+    {"rakefile", u8"\ue73c "},
+    {"gemfile", u8"\ue73c "},
+    {"gemfile.lock", u8"\ue73c "},
+    {"pipfile", u8"\uf81f "},
+    {"pipfile.lock", u8"\uf81f "},
+    {"setup.py", u8"\uf81f "},
+    {"setup.cfg", u8"\uf81f "},
+    {"vagrantfile", u8"\uf308 "},
+
+    // 文档
+    {"readme.md", u8"\uf48a "},
+    {"readme", u8"\uf48a "},
+    {"readme.txt", u8"\uf48a "},
+    {"readme.rst", u8"\uf48a "},
+    {"license", u8"\uf02d "},
+    {"license.md", u8"\uf02d "},
+    {"license.txt", u8"\uf02d "},
+    {"copying", u8"\uf02d "},
+    {"authors", u8"\uf0c0 "},
+    {"contributors", u8"\uf0c0 "},
+    {"contributing.md", u8"\uf0c0 "},
+    {"code_of_conduct.md", u8"\uf0c0 "},
+    {"changelog", u8"\uf0f6 "},
+    {"changelog.md", u8"\uf0f6 "},
+    {"changes", u8"\uf0f6 "},
+    {"news", u8"\uf0f6 "},
+    {"history", u8"\uf0f6 "},
+    {"todo", u8"\uf0ae "},
+    {"todo.md", u8"\uf0ae "},
+
+    // Git
+    {".gitignore", u8"\ue7a1 "},
+    {".gitattributes", u8"\ue7a1 "},
+    {".gitmodules", u8"\ue7a1 "},
+    {".gitkeep", u8"\ue7a1 "},
+    {".mailmap", u8"\ue7a1 "},
+
+    // Docker/容器
+    {"dockerfile", u8"\uf308 "},
+    {"docker-compose.yml", u8"\uf308 "},
+    {"docker-compose.yaml", u8"\uf308 "},
+    {"docker-compose.override.yml", u8"\uf308 "},
+    {".dockerignore", u8"\uf308 "},
+
+    // Node.js
+    {"package.json", u8"\ue60f "},
+    {"package-lock.json", u8"\ue615 "},
+    {"yarn.lock", u8"\ue718 "},
+    {"pnpm-lock.yaml", u8"\ue718 "},
+    {".npmrc", u8"\ue60f "},
+    {".nvmrc", u8"\ue60f "},
+    {".node-version", u8"\ue60f "},
+    {"tsconfig.json", u8"\ue628 "},
+    {"tsconfig.base.json", u8"\ue628 "},
+    {"jsconfig.json", u8"\ue74e "},
+    {"next.config.js", u8"\ue7ba "},
+    {"next.config.mjs", u8"\ue7ba "},
+    {"next.config.ts", u8"\ue7ba "},
+    {"nuxt.config.js", u8"\ufd42 "},
+    {"nuxt.config.ts", u8"\ufd42 "},
+    {"vite.config.js", u8"\ue74e "},
+    {"vite.config.ts", u8"\ue74e "},
+    {"vite.config.mjs", u8"\ue74e "},
+    {"webpack.config.js", u8"\ue74e "},
+    {"webpack.config.ts", u8"\ue74e "},
+    {"rollup.config.js", u8"\ue74e "},
+    {"rollup.config.mjs", u8"\ue74e "},
+    {"esbuild.config.js", u8"\ue74e "},
+    {"babel.config.js", u8"\ue74e "},
+    {".babelrc", u8"\ue74e "},
+    {".eslintrc", u8"\ue74e "},
+    {".eslintrc.js", u8"\ue74e "},
+    {".eslintrc.json", u8"\ue74e "},
+    {".eslintrc.yml", u8"\ue74e "},
+    {"eslint.config.js", u8"\ue74e "},
+    {".prettierrc", u8"\ue60f "},
+    {".prettierrc.js", u8"\ue60f "},
+    {".prettierrc.json", u8"\ue60f "},
+    {".stylelintrc", u8"\ue749 "},
+    {".editorconfig", u8"\ue615 "},
+    {"postcss.config.js", u8"\ue749 "},
+    {"tailwind.config.js", u8"\ue749 "},
+    {"tailwind.config.ts", u8"\ue749 "},
+    {"svelte.config.js", u8"\ueed2 "},
+    {"astro.config.mjs", u8"\ueed2 "},
+    {"vitest.config.ts", u8"\uf24e "},
+    {"jest.config.js", u8"\uf24e "},
+    {"jest.config.ts", u8"\uf24e "},
+    {"karma.conf.js", u8"\uf24e "},
+    {"mocha.opts", u8"\uf24e "},
+    {"cypress.json", u8"\uf24e "},
+    {"playwright.config.ts", u8"\uf24e "},
+
+    // Go
+    {"go.mod", u8"\ue626 "},
+    {"go.sum", u8"\ue626 "},
+    {"go.work", u8"\ue626 "},
+    {"go.work.sum", u8"\ue626 "},
+
+    // Python
+    {"requirements.txt", u8"\uf81f "},
+    {"requirements-dev.txt", u8"\uf81f "},
+    {"pyproject.toml", u8"\uf81f "},
+    {"tox.ini", u8"\uf81f "},
+    {"noxfile.py", u8"\uf81f "},
+    {"conftest.py", u8"\uf24e "},
+    {"manage.py", u8"\uf81f "},
+    {"celery.py", u8"\uf81f "},
+    {"gunicorn.conf.py", u8"\uf81f "},
+    {".flake8", u8"\uf12a "},
+    {".pylintrc", u8"\uf12a "},
+    {"mypy.ini", u8"\uf12a "},
+    {".mypy.ini", u8"\uf12a "},
+    {"isort.cfg", u8"\uf12a "},
+    {"ruff.toml", u8"\uf12a "},
+
+    // Rust
+    {"cargo.toml", u8"\ue7a8 "},
+    {"cargo.lock", u8"\ue7a8 "},
+    {"rust-toolchain.toml", u8"\ue7a8 "},
+    {"rustfmt.toml", u8"\ue7a8 "},
+    {".rustfmt.toml", u8"\ue7a8 "},
+    {"clippy.toml", u8"\ue7a8 "},
+
+    // Java/JVM
+    {"pom.xml", u8"\ue256 "},
+    {"build.gradle", u8"\ue73f "},
+    {"build.gradle.kts", u8"\ue73f "},
+    {"settings.gradle", u8"\ue73f "},
+    {"settings.gradle.kts", u8"\ue73f "},
+    {"gradle.properties", u8"\ue73f "},
+    {"gradlew", u8"\ue73f "},
+    {"androidmanifest.xml", u8"\uf17b "},
+    {"build.xml", u8"\ue256 "},
+    {"project.clj", u8"\ue768 "},
+
+    // PHP
+    {"composer.json", u8"\uf41d "},
+    {"composer.lock", u8"\uf41d "},
+    {"artisan", u8"\uf41d "},
+    {".php_cs", u8"\uf41d "},
+    {".php_cs.dist", u8"\uf41d "},
+    {"phpunit.xml", u8"\uf24e "},
+    {"phpstan.neon", u8"\uf12a "},
+
+    // Ruby
+    {".ruby-version", u8"\ue73c "},
+    {".rspec", u8"\uf24e "},
+    {".rubocop.yml", u8"\uf12a "},
+    {"capfile", u8"\ue73c "},
+
+    // .NET
+    {"nuget.config", u8"\ue61a "},
+    {"global.json", u8"\ue61a "},
+    {"directory.build.props", u8"\ue61a "},
+    {"launchsettings.json", u8"\ue61a "},
+    {"appsettings.json", u8"\uf83d "},
+    {"web.config", u8"\uf83d "},
+
+    // Angular
+    {"angular.json", u8"\uf7b6 "},
+    {".angular-cli.json", u8"\uf7b6 "},
+
+    // Terraform/Cloud
+    {"terraform.tfvars", u8"\uf1b2 "},
+    {"main.tf", u8"\uf1b2 "},
+    {"variables.tf", u8"\uf1b2 "},
+    {"outputs.tf", u8"\uf1b2 "},
+    {"providers.tf", u8"\uf1b2 "},
+    {"backend.tf", u8"\uf1b2 "},
+
+    // CI/CD
+    {".travis.yml", u8"\uf4de "},
+    {".gitlab-ci.yml", u8"\uf4de "},
+    {"jenkinsfile", u8"\uf4de "},
+    {"bitbucket-pipelines.yml", u8"\uf4de "},
+
+    // Shell
+    {".bashrc", u8"\ue795 "},
+    {".zshrc", u8"\ue795 "},
+    {".bash_profile", u8"\ue795 "},
+    {".profile", u8"\ue795 "},
+    {".zprofile", u8"\ue795 "},
+    {".vimrc", u8"\ue62b "},
+    {".nvimrc", u8"\ue62b "},
+    {".tmux.conf", u8"\ue795 "},
+    {".inputrc", u8"\ue795 "},
+    {"starship.toml", u8"\ue795 "},
+
+    // 锁文件
+    {"poetry.lock", u8"\uf81f "},
+    {"pdm.lock", u8"\uf81f "},
+    {"uv.lock", u8"\uf81f "},
+    {"bun.lockb", u8"\ue718 "},
+
+    // 环境变量
+    {".env", u8"\uf462 "},
+    {".env.local", u8"\uf462 "},
+    {".env.development", u8"\uf462 "},
+    {".env.production", u8"\uf462 "},
+    {".env.test", u8"\uf462 "},
+    {".env.staging", u8"\uf462 "},
+    {".env.example", u8"\uf462 "},
+    {".env.sample", u8"\uf462 "},
+    {".env.dist", u8"\uf462 "},
+
+    // 项目配置
+    {"renovate.json", u8"\uf013 "},
+    {".releaserc", u8"\uf0ee "},
+    {"sonar-project.properties", u8"\uf12a "},
+    {".pre-commit-config.yaml", u8"\uf013 "},
+    {"commitlint.config.js", u8"\uf013 "},
+
+    // Ignore 文件
+    {".eslintignore", u8"\ue7a1 "},
+    {".prettierignore", u8"\ue7a1 "},
+    {".cfignore", u8"\ue7a1 "},
+    {".helmignore", u8"\ue7a1 "},
+
+    // Docker 变体
+    {"dockerfile.prod", u8"\uf308 "},
+    {"dockerfile.dev", u8"\uf308 "},
+    {"dockerfile.staging", u8"\uf308 "},
+    {"dockerfile.test", u8"\uf308 "},
+    {"docker-compose.prod.yml", u8"\uf308 "},
+    {"docker-compose.dev.yml", u8"\uf308 "},
+    {"docker-bake.hcl", u8"\uf308 "},
+
+    // Makefile 变体
+    {"makefile.linux", u8"\uf489 "},
+    {"makefile.mac", u8"\uf489 "},
+    {"makefile.win", u8"\uf489 "},
+    {"bsdmakefile", u8"\uf489 "},
+
+    // VSCode
+    {".vscode/settings.json", u8"\ue70c "},
+    {".vscode/extensions.json", u8"\ue70c "},
+    {".vscode/launch.json", u8"\ue70c "},
+    {".vscode/tasks.json", u8"\ue70c "},
+
+    // Git 配置
+    {".gitconfig", u8"\ue7a1 "},
+    {".gitignore.global", u8"\ue7a1 "},
+    {".git-blame-ignore-revs", u8"\ue7a1 "},
+
+    // YAML/Config linter
+    {".yamllint", u8"\uf12a "},
+    {".markdownlint.json", u8"\uf12a "},
+    {".markdownlint.yaml", u8"\uf12a "},
+    {".hadolint.yaml", u8"\uf12a "},
+
+    // 现代 JS/TS 配置
+    {"bunfig.toml", u8"\ue718 "},
+    {"turbo.json", u8"\ue74e "},
+    {"nx.json", u8"\ue74e "},
+    {"lerna.json", u8"\ue60f "},
+    {"changeset/config.json", u8"\uf013 "},
+
+    // Python 变体
+    {"uv.toml", u8"\uf81f "},
+    {"pdm.toml", u8"\uf81f "},
+
+    // Terraform / OpenTofu
+    {".terraform.lock.hcl", u8"\uf1b2 "},
+    {"tofu.tfvars", u8"\uf1b2 "},
+};
+
+const IconMap kExtensionIcons = {
+    // C/C++
+    {".cpp", u8"\ue61d "},
+    {".cc", u8"\ue61d "},
+    {".cxx", u8"\ue61d "},
+    {".ixx", u8"\ue61d "},
+    {".cppm", u8"\ue61d "},
+    {".c", u8"\ue61e "},
+    {".hpp", u8"\uf0fd "},
+    {".h", u8"\uf0fd "},
+    {".hh", u8"\uf0fd "},
+    {".hxx", u8"\uf0fd "},
+    {".inl", u8"\uf0fd "},
+    {".tcc", u8"\uf0fd "},
+
+    // Python
+    {".py", u8"\uf03c "},
+    {".pyw", u8"\uf03c "},
+    {".pyi", u8"\uf03c "},
+    {".pyx", u8"\uf03c "},
+    {".pxd", u8"\uf03c "},
+    {".pyd", u8"\uf03c "},
+    {".ipynb", u8"\uf03c "},
+
+    // JavaScript/TypeScript
+    {".js", u8"\ue74e "},
+    {".mjs", u8"\ue74e "},
+    {".cjs", u8"\ue74e "},
+    {".ts", u8"\ue628 "},
+    {".tsx", u8"\ue7ba "},
+    {".jsx", u8"\ue7ba "},
+    {".d.ts", u8"\ue628 "},
+    {".mts", u8"\ue628 "},
+    {".cts", u8"\ue628 "},
+    {".d.mts", u8"\ue628 "},
+    {".d.cts", u8"\ue628 "},
+
+    // Go
+    {".go", u8"\ue627 "},
+
+    // Rust
+    {".rs", u8"\ue7a8 "},
+
+    // Java/JVM
+    {".java", u8"\ue256 "},
+    {".kt", u8"\ue634 "},
+    {".kts", u8"\ue634 "},
+    {".scala", u8"\ue737 "},
+    {".groovy", u8"\ue775 "},
+    {".gradle", u8"\ue73f "},
+    {".clj", u8"\ue768 "},
+    {".cljs", u8"\ue76a "},
+    {".cljc", u8"\ue768 "},
+
+    // Apple
+    {".swift", u8"\ufbe3 "},
+    {".m", u8"\ue71e "},
+    {".mm", u8"\ue71e "},
+    {".xcodeproj", u8"\ue711 "},
+    {".xcworkspace", u8"\ue711 "},
+    {".pbxproj", u8"\ue711 "},
+    {".storyboard", u8"\ue711 "},
+    {".xib", u8"\ue711 "},
+    {".plist", u8"\uf83d "},
+
+    // .NET
+    {".cs", u8"\ue61a "},
+    {".csx", u8"\ue61a "},
+    {".vb", u8"\ue61a "},
+    {".fs", u8"\ue7a7 "},
+    {".fsx", u8"\ue7a7 "},
+    {".fsi", u8"\ue7a7 "},
+    {".xaml", u8"\ue61a "},
+    {".axaml", u8"\ue61a "},
+    {".csproj", u8"\ue61a "},
+    {".vbproj", u8"\ue61a "},
+    {".fsproj", u8"\ue7a7 "},
+    {".sln", u8"\ue70c "},
+    {".slnx", u8"\ue70c "},
+    {".props", u8"\ue70c "},
+    {".targets", u8"\ue70c "},
+
+    // 其他语言
+    {".lua", u8"\ue620 "},
+    {".hs", u8"\ue777 "},
+    {".lhs", u8"\ue777 "},
+    {".coffee", u8"\uf0f4 "},
+    {".nim", u8"\uf6a4 "},
+    {".jl", u8"\uf640 "},
+    {".vala", u8"\ue6b4 "},
+    {".hx", u8"\ue60e "},
+    {".asm", u8"\uf471 "},
+    {".s", u8"\uf471 "},
+    {".dart", u8"\ue798 "},
+    {".rb", u8"\ue73c "},
+    {".erb", u8"\ue73c "},
+    {".haml", u8"\ue73c "},
+    {".slim", u8"\ue73c "},
+    {".liquid", u8"\ue73c "},
+    {".php", u8"\ue73d "},
+    {".phtml", u8"\ue73d "},
+    {".erl", u8"\ue7b1 "},
+    {".hrl", u8"\ue7b1 "},
+    {".ex", u8"\ue7b1 "},
+    {".exs", u8"\ue7b1 "},
+    {".heex", u8"\ue7b1 "},
+    {".leex", u8"\ue7b1 "},
+    {".eex", u8"\ue7b1 "},
+    {".mix", u8"\ue7b1 "},
+    {".r", u8"\uf25d "},
+    {".rmd", u8"\uf25d "},
+    {".matlab", u8"\uf25d "},
+    {".zig", u8"\uf6a4 "},
+    {".v", u8"\uf6a4 "},
+    {".sv", u8"\uf6a4 "},
+    {".sol", u8"\uf449 "},
+    {".move", u8"\uf449 "},
+    {".cairo", u8"\uf449 "},
+    {".wasm", u8"\ufb41 "},
+    {".sqlx", u8"\uf1c0 "},
+    {".pl", u8"\ue769 "},
+    {".pm", u8"\ue769 "},
+    {".raku", u8"\ue769 "},
+    {".tcl", u8"\uf489 "},
+    {".awk", u8"\uf489 "},
+    {".sed", u8"\uf489 "},
+
+    // Haskell / FP
+    {".cabal", u8"\ue777 "},
+    {".hpack", u8"\ue777 "},
+
+    // Nix / 函数式配置
+    {".nix", u8"\uf313 "},
+    {".dhall", u8"\uf313 "},
+
+    // WebGPU
+    {".wgsl", u8"\uf449 "},
+
+    // 标记 & 配置
+    {".json", u8"\ufb25 "},
+    {".json5", u8"\ufb25 "},
+    {".jsonc", u8"\ufb25 "},
+    {".yml", u8"\ufb25 "},
+    {".yaml", u8"\ufb25 "},
+    {".env", u8"\uf462 "},
+    {".envrc", u8"\uf462 "},
+    {".xml", u8"\ufabf "},
+    {".toml", u8"\ue615 "},
+    {".ini", u8"\uf013 "},
+    {".conf", u8"\uf83d "},
+    {".cfg", u8"\uf83d "},
+    {".properties", u8"\uf83d "},
+    {".md", u8"\uf48a "},
+    {".markdown", u8"\uf48a "},
+    {".rst", u8"\uf48a "},
+    {".adoc", u8"\uf48a "},
+    {".org", u8"\uf48a "},
+    {".tex", u8"\uf02d "},
+    {".cls", u8"\uf02d "},
+    {".bib", u8"\uf02d "},
+    {".sty", u8"\uf02d "},
+    {".bst", u8"\uf02d "},
+    {".dtx", u8"\uf02d "},
+    {".ins", u8"\uf02d "},
+    {".cmake", u8"\ue615 "},
+    {".lock", u8"\ue618 "},
+    {".babelrc", u8"\ue74e "},
+    {".eslintrc", u8"\ue74e "},
+    {".stylelintrc", u8"\ue749 "},
+    {".prettierrc", u8"\ue60f "},
+    {".dockerignore", u8"\uf308 "},
+    {".editorconfig", u8"\ue615 "},
+    {".gitignore", u8"\ue7a1 "},
+    {".gitattributes", u8"\ue7a1 "},
+    {".ignore", u8"\ue7a1 "},
+    {".npmignore", u8"\ue7a1 "},
+    {".hgignore", u8"\ue7a1 "},
+    {".tfvars", u8"\uf1b2 "},
+    {".tf", u8"\uf1b2 "},
+    {".tfstate", u8"\uf1b2 "},
+    {".proto", u8"\uf1c0 "},
+    {".graphql", u8"\uf449 "},
+    {".gql", u8"\uf449 "},
+    {".prisma", u8"\uf1c0 "},
+    {".wsdl", u8"\ufabf "},
+    {".xsd", u8"\ufabf "},
+    {".dtd", u8"\ufabf "},
+    {".xsl", u8"\ufabf "},
+    {".xslt", u8"\ufabf "},
+
+    // 文档
+    {".txt", u8"\uf15c "},
+    {".pdf", u8"\uf1c1 "},
+    {".doc", u8"\uf1c2 "},
+    {".docx", u8"\uf1c2 "},
+    {".xls", u8"\uf1c3 "},
+    {".xlsx", u8"\uf1c3 "},
+    {".ppt", u8"\uf1c4 "},
+    {".pptx", u8"\uf1c4 "},
+    {".odt", u8"\uf1c2 "},
+    {".ods", u8"\uf1c3 "},
+    {".odp", u8"\uf1c4 "},
+    {".epub", u8"\uf02d "},
+    {".rtf", u8"\uf15c "},
+    {".pages", u8"\uf15c "},
+    {".numbers", u8"\uf1c3 "},
+    {".key", u8"\uf1c4 "},
+    {".mobi", u8"\uf02d "},
+    {".azw", u8"\uf02d "},
+    {".azw3", u8"\uf02d "},
+    {".cff", u8"\uf1c0 "},
+
+    // 图片
+    {".png", u8"\uf1c5 "},
+    {".jpg", u8"\uf1c5 "},
+    {".jpeg", u8"\uf1c5 "},
+    {".gif", u8"\uf1c5 "},
+    {".svg", u8"\uf1c5 "},
+    {".bmp", u8"\uf1c5 "},
+    {".ico", u8"\uf1c5 "},
+    {".webp", u8"\uf1c5 "},
+    {".tiff", u8"\uf1c5 "},
+    {".tif", u8"\uf1c5 "},
+    {".avif", u8"\uf1c5 "},
+    {".heic", u8"\uf1c5 "},
+    {".heif", u8"\uf1c5 "},
+    {".raw", u8"\uf1c5 "},
+    {".psd", u8"\uf1c5 "},
+    {".ai", u8"\uf1c5 "},
+    {".eps", u8"\uf1c5 "},
+    {".sketch", u8"\uf1c5 "},
+    {".fig", u8"\uf1c5 "},
+    {".xd", u8"\uf1c5 "},
+    {".blend", u8"\uf1c5 "},
+    {".fbx", u8"\uf1c5 "},
+    {".3ds", u8"\uf1c5 "},
+    {".obj", u8"\uf1c5 "},
+    {".gltf", u8"\uf1c5 "},
+    {".glb", u8"\uf1c5 "},
+    {".stl", u8"\uf1c5 "},
+    {".dae", u8"\uf1c5 "},
+
+    // 视频
+    {".mp4", u8"\uf03d "},
+    {".mov", u8"\uf03d "},
+    {".mkv", u8"\uf03d "},
+    {".avi", u8"\uf03d "},
+    {".wmv", u8"\uf03d "},
+    {".flv", u8"\uf03d "},
+    {".webm", u8"\uf03d "},
+    {".m4v", u8"\uf03d "},
+    {".mpeg", u8"\uf03d "},
+    {".mpg", u8"\uf03d "},
+    {".3gp", u8"\uf03d "},
+
+    // 音频
+    {".mp3", u8"\uf001 "},
+    {".wav", u8"\uf001 "},
+    {".flac", u8"\uf001 "},
+    {".ogg", u8"\uf001 "},
+    {".aac", u8"\uf001 "},
+    {".wma", u8"\uf001 "},
+    {".m4a", u8"\uf001 "},
+    {".opus", u8"\uf001 "},
+    {".mid", u8"\uf001 "},
+    {".midi", u8"\uf001 "},
+
+    // 字体
+    {".ttf", u8"\uf031 "},
+    {".otf", u8"\uf031 "},
+    {".woff", u8"\uf031 "},
+    {".woff2", u8"\uf031 "},
+    {".eot", u8"\uf031 "},
+
+    // 压缩/包
+    {".zip", u8"\uf410 "},
+    {".tar", u8"\uf410 "},
+    {".gz", u8"\uf410 "},
+    {".7z", u8"\uf410 "},
+    {".rar", u8"\uf410 "},
+    {".xz", u8"\uf410 "},
+    {".bz2", u8"\uf410 "},
+    {".lz", u8"\uf410 "},
+    {".lzma", u8"\uf410 "},
+    {".zst", u8"\uf410 "},
+    {".cab", u8"\uf410 "},
+    {".iso", u8"\uf410 "},
+    {".dmg", u8"\uf179 "},
+    {".pkg", u8"\uf410 "},
+    {".deb", u8"\uf17c "},
+    {".rpm", u8"\uf17c "},
+    {".snap", u8"\uf17c "},
+    {".apk", u8"\uf17b "},
+    {".ipa", u8"\uf179 "},
+    {".appimage", u8"\uf0e7 "},
+    {".msi", u8"\uf0e7 "},
+    {".exe", u8"\uf0e7 "},
+
+    // 脚本/可执行
+    {".sh", u8"\uf489 "},
+    {".bash", u8"\uf489 "},
+    {".zsh", u8"\uf489 "},
+    {".fish", u8"\uf489 "},
+    {".bat", u8"\uf489 "},
+    {".cmd", u8"\uf489 "},
+    {".ps1", u8"\uf489 "},
+    {".psm1", u8"\uf489 "},
+
+    // 数据/数据库
+    {".db", u8"\uf1c0 "},
+    {".sqlite", u8"\uf1c0 "},
+    {".sqlite3", u8"\uf1c0 "},
+    {".sql", u8"\uf1c0 "},
+    {".csv", u8"\uf1c3 "},
+    {".tsv", u8"\uf1c3 "},
+    {".parquet", u8"\uf1c3 "},
+    {".avro", u8"\uf1c3 "},
+    {".jsonl", u8"\uf1c3 "},
+    {".ndjson", u8"\uf1c3 "},
+    {".arrow", u8"\uf1c3 "},
+    {".orc", u8"\uf1c3 "},
+    {".hdf5", u8"\uf1c0 "},
+    {".h5", u8"\uf1c0 "},
+    {".mat", u8"\uf1c0 "},
+    {".npy", u8"\uf1c0 "},
+    {".npz", u8"\uf1c0 "},
+    {".pkl", u8"\uf1c0 "},
+    {".pickle", u8"\uf1c0 "},
+    {".rds", u8"\uf1c0 "},
+    {".rdata", u8"\uf1c0 "},
+    {".dta", u8"\uf1c0 "},
+    {".sas7bdat", u8"\uf1c0 "},
+    {".xpt", u8"\uf1c3 "},
+    {".mdb", u8"\uf1c0 "},
+    {".accdb", u8"\uf1c0 "},
+
+    // Web
+    {".html", u8"\uf13b "},
+    {".htm", u8"\uf13b "},
+    {".xhtml", u8"\uf13b "},
+    {".css", u8"\ue749 "},
+    {".scss", u8"\ue749 "},
+    {".sass", u8"\ue749 "},
+    {".less", u8"\ue749 "},
+    {".styl", u8"\ue749 "},
+    {".postcss", u8"\ue749 "},
+    {".vue", u8"\ufd42 "},
+    {".svelte", u8"\ueed2 "},
+    {".astro", u8"\ueed2 "},
+    {".asp", u8"\ue73d "},
+    {".aspx", u8"\ue73d "},
+    {".jsp", u8"\ue256 "},
+    {".ejs", u8"\ue74e "},
+    {".hbs", u8"\ue74e "},
+    {".mustache", u8"\ue74e "},
+    {".pug", u8"\ue74e "},
+    {".twig", u8"\ue73d "},
+
+    // 系统/服务
+    {".service", u8"\uf013 "},
+    {".socket", u8"\uf013 "},
+    {".timer", u8"\uf013 "},
+    {".mount", u8"\uf013 "},
+    {".desktop", u8"\uf0e7 "},
+    {".directory", u8"\uf0e7 "},
+    {".policy", u8"\uf013 "},
+    {".rules", u8"\uf013 "},
+    {".reg", u8"\uf83d "},
+    {".inf", u8"\uf83d "},
+    {".spec", u8"\uf24e "},
+    {".patch", u8"\uf4de "},
+    {".diff", u8"\uf4de "},
+
+    // DevOps / Infra
+    {".hcl", u8"\uf1b2 "},
+    {".nomad", u8"\uf1b2 "},
+    {".bicep", u8"\uf270 "},
+    {".pkr", u8"\uf1b2 "},
+    {".pkr.hcl", u8"\uf1b2 "},
+
+    // 安全/凭证
+    {".gpg", u8"\uf023 "},
+    {".sig", u8"\uf023 "},
+    {".asc", u8"\uf023 "},
+    {".pgp", u8"\uf023 "},
+    {".crt", u8"\uf023 "},
+    {".pem", u8"\uf023 "},
+    {".cer", u8"\uf023 "},
+    {".der", u8"\uf023 "},
+    {".p12", u8"\uf023 "},
+    {".pfx", u8"\uf023 "},
+    {".jks", u8"\uf023 "},
+    {".key", u8"\uf084 "},
+    {".pub", u8"\uf084 "},
+    {".csr", u8"\uf084 "},
+
+    // 配置/系统
+    {".chezmoi", u8"\uf462 "},
+    {".chezmoiexternal", u8"\uf462 "},
+};
+
+const std::vector<std::pair<std::string, std::string>> kFileKeywordIcons = {
+    {"test", u8"\uf24e "},
+    {"spec", u8"\uf24e "},
+    {"mock", u8"\uf24e "},
+    {"fixture", u8"\uf24e "},
+    {"config", u8"\uf013 "},
+    {"setting", u8"\uf013 "},
+    {"sample", u8"\uf0c3 "},
+    {"example", u8"\uf0c3 "},
+    {"demo", u8"\uf0c3 "},
+    {"changelog", u8"\uf0f6 "},
+    {"todo", u8"\uf0ae "},
+    {"lint", u8"\uf12a "},
+    {"docker", u8"\uf308 "},
+    {"compose", u8"\uf308 "},
+    {"kube", u8"\uf1b2 "},
+    {"nginx", u8"\uf233 "},
+    {"apache", u8"\uf233 "},
+    {"vimrc", u8"\ue62b "},
+    {"zshrc", u8"\ue795 "},
+    {"bashrc", u8"\ue795 "},
+    {"log", u8"\uf24a "},
+    {"lock", u8"\ue618 "},
+    {"readme", u8"\uf48a "},
+    {"license", u8"\uf02d "},
+    {"makefile", u8"\uf489 "},
+    {"cmake", u8"\ue615 "},
+    {"vagrant", u8"\uf308 "},
+    {"terraform", u8"\uf1b2 "},
+    {"ansible", u8"\uf1b2 "},
+    {"jenkins", u8"\uf4de "},
+    {"webpack", u8"\ue74e "},
+    {"vite", u8"\ue74e "},
+    {"rollup", u8"\ue74e "},
+    {"esbuild", u8"\ue74e "},
+    {"babel", u8"\ue74e "},
+    {"eslint", u8"\ue74e "},
+    {"prettier", u8"\ue60f "},
+    {"jest", u8"\uf24e "},
+    {"mocha", u8"\uf24e "},
+    {"karma", u8"\uf24e "},
+    {"cypress", u8"\uf24e "},
+    {"playwright", u8"\uf24e "},
+    {"vitest", u8"\uf24e "},
+    {"storybook", u8"\uf0c3 "},
+    {"tailwind", u8"\ue749 "},
+    {"postcss", u8"\ue749 "},
+    {"prisma", u8"\uf1c0 "},
+    {"graphql", u8"\uf449 "},
+    {"env", u8"\uf462 "},
+    {"service", u8"\uf013 "},
+    {"worker", u8"\uf013 "},
+    {"middleware", u8"\uf013 "},
+    {"controller", u8"\uf013 "},
+    {"handler", u8"\uf013 "},
+    {"model", u8"\uf1c0 "},
+    {"schema", u8"\uf1c0 "},
+    {"migration", u8"\uf1c0 "},
+    {"secret", u8"\uf023 "},
+    {"credential", u8"\uf023 "},
+    {"token", u8"\uf023 "},
+    {"cert", u8"\uf023 "},
+    {"password", u8"\uf023 "},
+    {"ignore", u8"\ue7a1 "},
+    {"seed", u8"\uf1c0 "},
+    {"route", u8"\uf0ac "},
+    {"router", u8"\uf0ac "},
+    {"store", u8"\uf1b3 "},
+    {"hook", u8"\uf1b3 "},
+    {"util", u8"\uf0ad "},
+    {"helper", u8"\uf0ad "},
+    {"constant", u8"\uf013 "},
+    {"type", u8"\uf013 "},
+    {"interface", u8"\uf013 "},
+    {"enum", u8"\uf013 "},
+};
+
+const std::vector<std::string> kBinaryExtensions = {
+    ".o", ".obj", ".a", ".so", ".dylib", ".dll", ".lib",
+    ".ko", ".sys", ".drv",
+    ".pyc", ".pyo", ".class", ".jar", ".war",
+    ".nib",
+    ".node",
+};
+
+std::string ToLower(std::string value) {
+    std::transform(value.begin(), value.end(), value.begin(),
+                   [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+    return value;
+}
+
+template <typename Table>
+std::string MatchKeywordIcon(const std::string& lower_name, const Table& table) {
+    for (const auto& [keyword, icon] : table) {
+        if (lower_name.find(keyword) != std::string::npos) {
+            return icon;
+        }
+    }
+    return {};
+}
+
+bool HasExtension(const std::string& ext, const std::vector<std::string>& list) {
+    return std::find(list.begin(), list.end(), ext) != list.end();
+}
+
+bool IsExecutable(const std::filesystem::path& path) {
+    std::error_code ec;
+    auto perms = std::filesystem::status(path, ec).permissions();
+    if (ec) {
+        return false;
+    }
+    return ((perms & std::filesystem::perms::owner_exec) != std::filesystem::perms::none) ||
+           ((perms & std::filesystem::perms::group_exec) != std::filesystem::perms::none) ||
+           ((perms & std::filesystem::perms::others_exec) != std::filesystem::perms::none);
+}
+
+}  // namespace
+
+std::string GetFolderIcon(const std::filesystem::path& path) {
+    const auto name = ToLower(path.filename().string());
+    if (auto it = kFolderIcons.find(name); it != kFolderIcons.end()) {
+        return it->second;
+    }
+    if (!name.empty() && name.front() == '.') {
+        return u8"\uf023 ";
+    }
+    if (auto keyword_icon = MatchKeywordIcon(name, kFolderKeywordIcons); !keyword_icon.empty()) {
+        return keyword_icon;
+    }
+    return DEFAULT_FOLDER_ICON;
+}
+
+std::string GetFileIcon(const std::filesystem::path& path) {
+    const auto filename = ToLower(path.filename().string());
+    if (auto it = kExactFileIcons.find(filename); it != kExactFileIcons.end()) {
+        return it->second;
+    }
+
+    const auto ext = ToLower(path.extension().string());
+    if (auto it = kExtensionIcons.find(ext); it != kExtensionIcons.end()) {
+        return it->second;
+    }
+    if (auto keyword_icon = MatchKeywordIcon(filename, kFileKeywordIcons); !keyword_icon.empty()) {
+        return keyword_icon;
+    }
+
+    if (HasExtension(ext, kBinaryExtensions)) {
+        return u8"\uf471 ";
+    }
+
+    if (!path.has_extension() && IsExecutable(path)) {
+        return u8"\uf144 ";
+    }
+
+    return DEFAULT_FILE_ICON;
+}
+
+std::string GetIconForPath(const std::filesystem::path& path, bool is_directory) {
+    return is_directory ? GetFolderIcon(path) : GetFileIcon(path);
+}
+
+}  // namespace Icons
+}  // namespace FTB

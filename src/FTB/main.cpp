@@ -8,26 +8,31 @@
 #include <iostream>
 #include <thread>
 
-#include "../include/FTB/CLIArgs.hpp"
-#include "../include/FTB/MainUI.hpp"
-#include "../include/FTB/ClipboardManager.hpp"
-#include "../include/FTB/FileManager.hpp"
-#include "../include/FTB/Powerline.hpp"
-#include "../include/FTB/ThreadGuard.hpp"
-#include "../include/FTB/ConfigManager.hpp"
-#include "../include/FTB/ThemeManager.hpp"
-#include "../include/FTB/AsyncFileManager.hpp"
-#include "../include/FTB/KeyBindings.hpp"
-#include "../include/FTB/detail_element.hpp"
-#include "../include/FTB/StatusMessage.hpp"
-#include "../include/FTB/SystemClipboard.hpp"
-#include "../include/FTB/TextSelection.hpp"
-#include "../include/FTB/HandleManager/EventHandler.hpp"
+#include "../include/config/CLIArgs.hpp"
+#include "../include/core/MainUI.hpp"
+#include "../include/browser/ClipboardManager.hpp"
+#include "../include/browser/FileManager.hpp"
+#include "../include/renderer/Powerline.hpp"
+#include "../include/config/ThreadGuard.hpp"
+#include "../include/config/ConfigManager.hpp"
+#include "../include/config/ThemeManager.hpp"
+#include "../include/browser/AsyncFileManager.hpp"
+#include "../include/browser/TaskSystem.hpp"
+#include "../include/config/KeyBindings.hpp"
+#include "../include/renderer/detail_element.hpp"
+#include "../include/utils/StatusMessage.hpp"
+#include "../include/utils/PerfLogger.hpp"
+#include "../include/utils/SystemClipboard.hpp"
+#include "../include/renderer/TextSelection.hpp"
+#include "../include/ops/EventHandler.hpp"
+#include "../include/dialog/TabBarRenderer.hpp"
+#include "../include/dialog/OpenerPickerDialog.hpp"
+#include "../include/dialog/OpenerInputDialog.hpp"
 #ifdef FTB_ENABLE_SSH
-#include "../include/UI/SSHDialog.hpp"
+#include "../include/dialog/SSHDialog.hpp"
 #endif
 #ifdef FTB_ENABLE_PLUGINS
-#include "../include/FTB/PluginManager.hpp"
+#include "../include/ops/PluginManager.hpp"
 #endif
 
 using namespace ftxui;
@@ -59,8 +64,14 @@ static void setupSignalHandlers() {
 
 int main(int argc, char* argv[])
 {
+    std::cout << "\033[?25l" << std::flush;
+
     setupSignalHandlers();
     auto cli_args = parse_args(argc, argv);
+
+    if (cli_args.enable_logging) {
+        FTB::PerfLogger::Enable();
+    }
 
     if (cli_args.show_help) {
         print_help(argv[0]);
@@ -81,6 +92,10 @@ int main(int argc, char* argv[])
     }
 
     {
+        FTB::OpenerManager::Instance().LoadConfig(config_manager->GetConfig().opener);
+    }
+
+    {
         FTB::ThemeManager::GetInstance();
         // 应用上次保存的主题
         const auto& saved_theme = config_manager->GetConfig().theme.name;
@@ -98,6 +113,10 @@ int main(int argc, char* argv[])
 
     {
         FTB::GlobalAsyncFileManager::initialize();
+    }
+
+    {
+        TaskSystem::getInstance(); // Ensure singleton is constructed
     }
 
     // ---- 主状态 ----
@@ -123,12 +142,13 @@ int main(int argc, char* argv[])
     }
     state.filteredContents = state.allContents;
 
+    state.tabManager.createTab(state.currentPath);
+
     auto screen = ScreenInteractive::Fullscreen();
     state.screen = &screen;
+    screen.SetCursor(Screen::Cursor{0, 0, Screen::Cursor::Hidden});
 
     screen.ForceHandleCtrlZ(false);
-
-    std::cout << "\033[?25l" << std::flush;
 
     // ---- UI 刷新控制 ----
 
@@ -146,7 +166,7 @@ int main(int argc, char* argv[])
     // ---- 主渲染器 ----
 
     auto renderer = Renderer([&] {
-        auto [ipp, dw, pw, cw] = ComputeLayout();
+        auto [ipp, dw, pw, cw] = ComputeLayout(state.tabManager.count());
         state.items_per_page = ipp;
         state.detail_width = dw;
         state.parent_width = pw;
@@ -171,10 +191,24 @@ int main(int argc, char* argv[])
 
         auto parent_col = BuildParentColumn(state) | size(WIDTH, EQUAL, state.parent_width);
         auto current_col = BuildCurrentColumn(state) | size(WIDTH, EQUAL, cw);
-        auto preview_col = CreateDetailElement(state.cached_current_entries, state.selected, state.currentPath)
+        int preview_idx = state.selected;
+        if (state.selected >= 0 && state.selected < static_cast<int>(state.filteredContents.size())) {
+            const std::string& sel_name = state.filteredContents[state.selected];
+            for (size_t ei = 0; ei < state.cached_current_entries.size(); ++ei) {
+                if (state.cached_current_entries[ei].name == sel_name) {
+                    preview_idx = static_cast<int>(ei);
+                    break;
+                }
+            }
+        }
+        auto preview_col = CreateDetailElement(state.cached_current_entries, preview_idx, state.currentPath,
+                                               state.preview_scroll_y, state.preview_scroll_x)
             | size(WIDTH, EQUAL, state.detail_width);
 
+        auto tab_bar = UI::BuildTabBar(state);
+
         auto main_content = vbox({
+            tab_bar,
             hbox({
                 parent_col,
                 BuildColumnSeparator(),
@@ -218,12 +252,23 @@ int main(int argc, char* argv[])
     auto final_component = CatchEvent(renderer, [&](Event event) {
         if (event == Event::Custom) {
             screen.SetCursor(Screen::Cursor{0, 0, Screen::Cursor::Hidden});
-            std::cout << "\033[?25l" << std::flush;
         }
 
-        // ---- 鼠标事件处理 (三列拖拽选择) ----
+        // ---- 鼠标事件处理 (三列拖拽选择 + 标签栏点击) ----
         if (event.is_mouse()) {
             auto& mouse = event.mouse();
+
+            // Tab bar click (y == 0)
+            if (mouse.button == Mouse::Left && mouse.motion == Mouse::Pressed && mouse.y == 0) {
+                int tabIdx = UI::GetTabAtX(mouse.x);
+                if (tabIdx >= 0 && tabIdx != state.tabManager.activeIndex()) {
+                    state.saveTabState();
+                    state.tabManager.switchTo(tabIdx);
+                    state.loadTabState();
+                }
+                return true;
+            }
+
             int sep_w = FTB::GetColumnSeparatorWidth();
 
             if (mouse.button == Mouse::Left && mouse.motion == Mouse::Pressed) {
@@ -247,6 +292,16 @@ int main(int argc, char* argv[])
                 }
                 return true;
             }
+            // Mouse wheel: scroll preview panel
+            if (mouse.button == Mouse::WheelUp) {
+                if (state.preview_scroll_y > 0)
+                    state.preview_scroll_y = std::max(0, state.preview_scroll_y - 3);
+                return true;
+            }
+            if (mouse.button == Mouse::WheelDown) {
+                state.preview_scroll_y += 3;
+                return true;
+            }
         }
 
         if (state.vim_mode_active && state.vimEditor != nullptr) {
@@ -261,7 +316,45 @@ int main(int argc, char* argv[])
             return true;
         }
 
+        // Tab switching (only when no panel/search/vim active)
+        if (state.active_panel == ActivePanel::None && !state.search_mode && !state.vim_mode_active) {
+            if (event == Event::Character(']')) {
+                state.saveTabState();
+                state.tabManager.nextTab();
+                state.loadTabState();
+                return true;
+            }
+            if (event == Event::Character('[')) {
+                state.saveTabState();
+                state.tabManager.prevTab();
+                state.loadTabState();
+                return true;
+            }
+        }
+
         if (HandleNavigationEvent(state, event)) return true;
+
+        // Preview panel scroll shortcuts
+        if (state.active_panel == ActivePanel::None && !state.search_mode && !state.vim_mode_active) {
+            if (event == Event::AltJ) {
+                state.preview_scroll_y += 3;
+                return true;
+            }
+            if (event == Event::AltK) {
+                if (state.preview_scroll_y > 0)
+                    state.preview_scroll_y = std::max(0, state.preview_scroll_y - 3);
+                return true;
+            }
+            if (event == Event::AltH) {
+                if (state.preview_scroll_x > 0)
+                    state.preview_scroll_x = std::max(0, state.preview_scroll_x - 5);
+                return true;
+            }
+            if (event == Event::AltL) {
+                state.preview_scroll_x += 5;
+                return true;
+            }
+        }
 
         if (event == Event::CtrlR) {
             config_manager->ReloadConfig();

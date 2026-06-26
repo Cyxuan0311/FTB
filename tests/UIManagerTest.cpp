@@ -2,7 +2,7 @@
 #include "../include/UIManager.hpp"
 #include "../include/FileManager.hpp"
 #include "../include/DirectoryHistory.hpp"  // 使用新的历史记录模块
-#include "../include/FTB/Editor/NanoEditor.hpp"
+#include "../include/editor/NanoEditor.hpp"
 #include <vector>
 #include <string>
 #include <atomic>

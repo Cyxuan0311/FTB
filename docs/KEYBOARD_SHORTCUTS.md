@@ -26,10 +26,26 @@
 
 | Key | Action |
 |-----|--------|
-| `Ctrl+Y` | Copy selected item |
-| `Ctrl+X` | Cut selected item |
-| `Ctrl+V` | Paste from clipboard |
+| `y` | Copy selected item |
+| `x` | Cut selected item |
+| `p` | Paste from clipboard |
 | `Delete` / `Ctrl+D` | Delete selected item |
+
+## Preview Panel Scrolling
+
+| Key | Action |
+|-----|--------|
+| `Alt+J` | Scroll preview down |
+| `Alt+K` | Scroll preview up |
+| `Alt+H` | Scroll preview left |
+| `Alt+L` | Scroll preview right |
+| Mouse Wheel | Scroll preview up/down |
+
+## File Opening
+
+| Key | Action |
+|-----|--------|
+| `Enter` | Open file with default system program |
 
 ## Command Mode
 
@@ -37,6 +53,9 @@ Press `Ctrl+B` to enter prefix mode, then type a command:
 
 | Command | Alias | Action |
 |---------|-------|--------|
+| `open` | `op` | Open with picker dialog |
+| `openwith` | `ow` | Manual specify program |
+| `opencfg` | `oc` | Configure openers |
 | `theme` | `th` | Open theme selector |
 | `rename` | `rn` | Rename selected item |
 | `newfile` | `nf` | Create new file |

@@ -78,6 +78,7 @@ endif()
 
 # 核心源文件
 set(FTB_CORE_SOURCES
+    src/FTB/AnsiParser.cpp
     src/FTB/ArchivePreview.cpp
     src/FTB/AsyncFileManager.cpp
     src/FTB/FuzzyFinder.cpp
@@ -86,15 +87,26 @@ set(FTB_CORE_SOURCES
     src/FTB/ClipboardManager.cpp
     src/FTB/ConfigManager.cpp
     src/FTB/DirectoryHistory.cpp
+    src/FTB/FileListRenderer.cpp
     src/FTB/FileManager.cpp
     src/FTB/FileSizeCalculator.cpp
     src/FTB/ImagePreview.cpp
+    src/FTB/MarkdownPreview.cpp
+    src/FTB/SpreadsheetPreview.cpp
+    src/FTB/MediaPreview.cpp
+    src/FTB/PdfPreview.cpp
+    src/FTB/DocPreview.cpp
+    src/FTB/HexPreview.cpp
     src/FTB/MainUI.cpp
     src/FTB/JumpFileContext.cpp
     src/FTB/KeyBindings.cpp
     src/FTB/ObjectPool.cpp
     src/FTB/Powerline.cpp
+    src/FTB/Navigation.cpp
+    src/FTB/PanelCommands.cpp
+    src/FTB/PreviewCache.cpp
     src/FTB/SortMode.cpp
+    src/FTB/StatusBarRenderer.cpp
     src/FTB/TextSelection.cpp
     src/FTB/ThreadGuard.cpp
     src/FTB/ThemeManager.cpp
@@ -105,6 +117,8 @@ set(FTB_CORE_SOURCES
     src/FTB/Editor/SyntaxHighlighter.cpp
     src/FTB/Editor/SyntaxHighlighterTreeSitter.cpp
     src/FTB/Editor/NanoEditor.cpp
+    src/FTB/TabManager.cpp
+    src/FTB/OpenerManager.cpp
 )
 
 # 核心UI对话框
@@ -124,6 +138,12 @@ list(APPEND FTB_CORE_SOURCES
     src/UI/PluginDialog.cpp
     src/UI/UIStylePanel.cpp
     src/UI/SortDialog.cpp
+    src/UI/NewTabDialog.cpp
+    src/UI/TabBarRenderer.cpp
+    src/UI/ClipboardDialog.cpp
+    src/UI/OpenerPickerDialog.cpp
+    src/UI/OpenerInputDialog.cpp
+    src/UI/OpenerConfigDialog.cpp
 )
 
 # 可选模块源文件

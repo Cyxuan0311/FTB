@@ -1,0 +1,167 @@
+#include "preview/PreviewCache.hpp"
+
+#include <chrono>
+#include <thread>
+#include <algorithm>
+
+#include "config/ConfigManager.hpp"
+#include "browser/SortMode.hpp"
+
+namespace FTB {
+
+PreviewCache& PreviewCache::Instance() {
+    static PreviewCache instance;
+    return instance;
+}
+
+PreviewData PreviewCache::Copy() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return data_;
+}
+
+void PreviewCache::Invalidate() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    data_.key.clear();
+}
+
+void PreviewCache::Update(const std::vector<FileManager::DirEntryInfo>& entries,
+                          int selected, const std::string& currentPath) {
+    std::string new_key = currentPath + ":" + std::to_string(selected);
+
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (data_.key == new_key) return;
+    }
+
+    PreviewData new_data;
+    new_data.key = new_key;
+
+    if (selected < 0 || selected >= static_cast<int>(entries.size())) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        data_ = std::move(new_data);
+        return;
+    }
+
+    const FileManager::DirEntryInfo& entry = entries[selected];
+    new_data.selectedName = entry.name;
+    new_data.is_dir = entry.is_dir;
+    new_data.exists = entry.exists;
+    new_data.is_symlink = entry.is_symlink;
+    new_data.is_executable = entry.is_executable;
+    new_data.is_regular = entry.is_regular;
+    new_data.file_size = entry.file_size;
+    new_data.mod_time = entry.mod_time;
+    new_data.icon = entry.icon;
+
+    std::lock_guard<std::mutex> lock(mutex_);
+    data_ = std::move(new_data);
+}
+
+void PreviewCache::EnsureDirLoaded(const std::string& dirPath) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (data_.dir_loaded) return;
+    data_.dir_loaded = true;
+
+    std::thread([this, dirPath]() {
+        try {
+            auto entries = FileManager::getDirectoryEntries(dirPath);
+            {
+                auto& cfg = FTB::ConfigManager::GetInstance()->GetConfig();
+                auto mode = FTB::SortModeFromString(cfg.style.sort_mode);
+                FTB::SortEntries(entries, mode);
+            }
+            std::lock_guard<std::mutex> lock2(mutex_);
+            data_.dir_contents = std::move(entries);
+            data_.dir_sorted = true;
+        } catch (...) {
+            std::lock_guard<std::mutex> lock2(mutex_);
+            data_.dir_contents.clear();
+        }
+    }).detach();
+}
+
+void PreviewCache::EnsureTextLoaded(const std::string& filePath, uintmax_t fileSize) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (data_.text_loaded) return;
+    data_.text_loaded = true;
+
+    auto& cfg = ConfigManager::GetInstance()->GetConfig();
+    int max_file_size_kb = cfg.preview.max_text_file_size_kb;
+    int max_lines = cfg.preview.max_text_lines;
+    int chunk_size = cfg.preview.chunk_size_lines;
+
+    if (max_file_size_kb > 0 && fileSize > static_cast<uintmax_t>(max_file_size_kb) * 1024) {
+        return;
+    }
+
+    int end_line = (max_lines > 0) ? max_lines : (chunk_size > 0 ? chunk_size : 100000);
+
+    std::thread([this, filePath, end_line]() {
+        try {
+            auto content = FileManager::readFileContent(filePath, 1, end_line);
+            std::lock_guard<std::mutex> lock2(mutex_);
+            data_.text_preview = std::move(content);
+            data_.text_total_lines = end_line;
+        } catch (...) {
+            std::lock_guard<std::mutex> lock2(mutex_);
+            data_.text_preview.clear();
+        }
+    }).detach();
+}
+
+void PreviewCache::LoadMoreTextLines(const std::string& filePath, int from_line, int count) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (data_.text_total_lines >= from_line + count) return;
+
+    std::thread([this, filePath, from_line, count]() {
+        try {
+            auto more = FileManager::readFileContent(filePath, from_line, from_line + count - 1);
+            std::lock_guard<std::mutex> lock2(mutex_);
+            if (!more.empty()) {
+                data_.text_preview += more;
+                data_.text_total_lines = from_line + count - 1;
+            }
+        } catch (...) {}
+    }).detach();
+}
+
+void PreviewCache::EnsureArchiveLoaded(const std::string& filePath) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (data_.archive_loaded) return;
+    data_.archive_loaded = true;
+
+    std::thread([this, filePath]() {
+        auto entries = ListArchiveContents(filePath);
+        std::lock_guard<std::mutex> lock2(mutex_);
+        data_.archive_contents = std::move(entries);
+    }).detach();
+}
+
+void PreviewCache::SyncDirData(PreviewData& out) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    out.dir_contents = data_.dir_contents;
+    out.dir_sorted = data_.dir_sorted;
+    out.dir_loaded = data_.dir_loaded;
+}
+
+void PreviewCache::SyncTextData(PreviewData& out) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    out.text_preview = data_.text_preview;
+    out.text_loaded = data_.text_loaded;
+}
+
+void PreviewCache::SyncArchiveData(PreviewData& out) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    out.archive_contents = data_.archive_contents;
+    out.archive_loaded = data_.archive_loaded;
+}
+
+FTB::Editor::SyntaxHighlighter& PreviewCache::Highlighter() {
+    return highlighter_;
+}
+
+void InvalidatePreviewCache() {
+    PreviewCache::Instance().Invalidate();
+}
+
+}

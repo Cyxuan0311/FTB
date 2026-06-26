@@ -1,5 +1,5 @@
 #include "gtest/gtest.h"
-#include "../include/FTB/Editor/NanoEditor.hpp"
+#include "../include/editor/NanoEditor.hpp"
 #include <ftxui/component/event.hpp>
 #include <vector>
 #include <string>

@@ -31,11 +31,13 @@ A terminal-based file browser, built with C++17 and [FTXUI](https://github.com/A
 - **Right**: Context-aware preview panel (file metadata, text with syntax highlighting, image rendering, directory contents)
 
 ### File Operations
-- Copy (Ctrl+Y), Cut (Ctrl+X), Paste (Ctrl+V)
+- Copy (y), Cut (x), Paste (p)
 - Delete (Delete / Ctrl+D)
 - Create new file / folder (via command mode)
 - Rename (via command mode)
 - Clipboard management with visual indicator
+- Open files with default system program (Enter)
+- Configurable openers with rules-based matching (Ctrl+B → op/ow)
 
 ### Vim-Like Keybindings
 - `j`/`k` or Arrow keys to navigate
@@ -185,13 +187,15 @@ chmod +x ./build.sh
 | `j` / `Down` | Move down |
 | `k` / `Up` | Move up |
 | `h` / `Left` | Parent directory |
-| `l` / `Right` / `Enter` | Enter directory / open file |
+| `l` / `Right` / `Enter` | Enter directory / open file with default program |
 | `/` | Search |
 | `Ctrl+B` | Command mode |
-| `Ctrl+Y` | Copy |
-| `Ctrl+X` | Cut |
-| `Ctrl+V` | Paste |
+| `y` | Copy |
+| `x` | Cut |
+| `p` | Paste |
 | `Delete` / `Ctrl+D` | Delete |
+| `Alt+J` / `Alt+K` | Preview scroll down / up |
+| `Alt+H` / `Alt+L` | Preview scroll left / right |
 | `Ctrl+R` | Reload config |
 | `Ctrl+C` | Quit |
 | `Escape` | Close panel / clear search |
