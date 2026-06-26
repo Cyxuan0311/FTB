@@ -16,6 +16,8 @@ namespace fs = std::filesystem;
 
 namespace FTB {
 
+static constexpr size_t kMaxPreviewBytes = 10 * 1024 * 1024;  // 10MB per preview cap
+
 struct PreviewData {
     std::string key;
     std::string selectedName;
@@ -36,6 +38,10 @@ struct PreviewData {
     bool archive_loaded = false;
     int text_total_lines = 0;
     int text_file_lines = -1;
+
+    std::string loaded_text_path;
+    std::string loaded_dir_path;
+    std::string loaded_archive_path;
 };
 
 class PreviewCache {

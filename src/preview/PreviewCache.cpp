@@ -22,7 +22,7 @@ PreviewData PreviewCache::Copy() {
 
 void PreviewCache::Invalidate() {
     std::lock_guard<std::mutex> lock(mutex_);
-    data_.key.clear();
+    data_ = PreviewData{};
 }
 
 void PreviewCache::Update(const std::vector<FileManager::DirEntryInfo>& entries,
@@ -67,6 +67,7 @@ void PreviewCache::EnsureDirLoaded(const std::string& dirPath) {
     std::lock_guard<std::mutex> lock(mutex_);
     if (data_.dir_loaded) return;
     data_.dir_loaded = true;
+    data_.loaded_dir_path = dirPath;
     PERF_LOG("cache", "EnsureDirLoaded: " + dirPath);
 
     std::thread([this, dirPath]() {
@@ -79,12 +80,13 @@ void PreviewCache::EnsureDirLoaded(const std::string& dirPath) {
                 FTB::SortEntries(entries, mode);
             }
             std::lock_guard<std::mutex> lock2(mutex_);
+            if (data_.loaded_dir_path != dirPath) return;
             data_.dir_contents = std::move(entries);
             data_.dir_sorted = true;
             PERF_LOG("cache", "EnsureDirLoaded thread done: " + dirPath);
         } catch (...) {
             std::lock_guard<std::mutex> lock2(mutex_);
-            data_.dir_contents.clear();
+            if (data_.loaded_dir_path == dirPath) data_.dir_contents.clear();
         }
     }).detach();
 }
@@ -94,6 +96,7 @@ void PreviewCache::EnsureTextLoaded(const std::string& filePath, uintmax_t fileS
     std::lock_guard<std::mutex> lock(mutex_);
     if (data_.text_loaded) return;
     data_.text_loaded = true;
+    data_.loaded_text_path = filePath;
     PERF_LOG("cache", "EnsureTextLoaded: " + filePath);
 
     auto& cfg = ConfigManager::GetInstance()->GetConfig();
@@ -113,12 +116,13 @@ void PreviewCache::EnsureTextLoaded(const std::string& filePath, uintmax_t fileS
         try {
             auto content = FileManager::readFileContent(filePath, 1, end_line);
             std::lock_guard<std::mutex> lock2(mutex_);
+            if (data_.loaded_text_path != filePath) return;
             data_.text_preview = std::move(content);
             data_.text_total_lines = end_line;
             PERF_LOG("cache", "EnsureTextLoaded thread done: " + filePath);
         } catch (...) {
             std::lock_guard<std::mutex> lock2(mutex_);
-            data_.text_preview.clear();
+            if (data_.loaded_text_path == filePath) data_.text_preview.clear();
         }
     }).detach();
 }
@@ -127,12 +131,26 @@ void PreviewCache::LoadMoreTextLines(const std::string& filePath, int from_line,
     PERF_LOG("cache", "LoadMoreTextLines: " + filePath + " from_line=" + std::to_string(from_line));
     std::lock_guard<std::mutex> lock(mutex_);
     if (data_.text_total_lines >= from_line + count) return;
+    if (data_.loaded_text_path != filePath) {
+        PERF_LOG("cache", "LoadMoreTextLines skipped (stale path)");
+        return;
+    }
+    if (data_.text_preview.size() >= kMaxPreviewBytes) {
+        PERF_LOG("cache", "LoadMoreTextLines skipped (preview exceeds " + std::to_string(kMaxPreviewBytes) + " bytes)");
+        return;
+    }
 
     std::thread([this, filePath, from_line, count]() {
         try {
             auto more = FileManager::readFileContent(filePath, from_line, from_line + count - 1);
             std::lock_guard<std::mutex> lock2(mutex_);
+            if (data_.loaded_text_path != filePath) return;
+            if (data_.text_preview.size() >= kMaxPreviewBytes) return;
             if (!more.empty()) {
+                size_t remaining = kMaxPreviewBytes - data_.text_preview.size();
+                if (more.size() > remaining) {
+                    more.resize(remaining);
+                }
                 data_.text_preview += more;
                 data_.text_total_lines = from_line + count - 1;
             }
@@ -144,10 +162,12 @@ void PreviewCache::EnsureArchiveLoaded(const std::string& filePath) {
     std::lock_guard<std::mutex> lock(mutex_);
     if (data_.archive_loaded) return;
     data_.archive_loaded = true;
+    data_.loaded_archive_path = filePath;
 
     std::thread([this, filePath]() {
         auto entries = ListArchiveContents(filePath);
         std::lock_guard<std::mutex> lock2(mutex_);
+        if (data_.loaded_archive_path != filePath) return;
         data_.archive_contents = std::move(entries);
     }).detach();
 }

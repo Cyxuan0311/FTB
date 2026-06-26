@@ -44,19 +44,19 @@ Connection::SSHConnection* getSSHConnection() { return g_ssh_conn; }
 // 用于保护缓存操作的互斥锁
 std::mutex cache_mutex;
 
-// 优化的LRU缓存 - 根据系统内存动态调整大小
-// 目录缓存：较大容量，较长TTL（目录结构变化较少）
+// 优化的LRU缓存 - 严格控制内存用量
+// 目录缓存：较小容量（内容缓存较多，目录列表通常不会频繁切换）
 std::unique_ptr<FTB::LRUCache<std::string, DirectoryCache>> lru_dir_cache = 
-    std::make_unique<FTB::LRUCache<std::string, DirectoryCache>>(2000, std::chrono::seconds(600));
-// 大小缓存：最大容量，中等TTL（文件大小相对稳定）
+    std::make_unique<FTB::LRUCache<std::string, DirectoryCache>>(100, std::chrono::seconds(600));
+// 大小缓存：中等容量（每个条目仅8字节）
 std::unique_ptr<FTB::LRUCache<std::string, uintmax_t>> lru_size_cache = 
-    std::make_unique<FTB::LRUCache<std::string, uintmax_t>>(10000, std::chrono::seconds(900));
-// 内容缓存：较小容量，较短TTL（文件内容可能频繁变化）
+    std::make_unique<FTB::LRUCache<std::string, uintmax_t>>(2000, std::chrono::seconds(900));
+// 内容缓存：极小容量（文件内容可能很大，限制条目数控制内存）
 std::unique_ptr<FTB::LRUCache<std::string, std::string>> lru_content_cache = 
-    std::make_unique<FTB::LRUCache<std::string, std::string>>(1000, std::chrono::seconds(120));
-// DirEntryInfo列表缓存：中等容量，中等TTL
+    std::make_unique<FTB::LRUCache<std::string, std::string>>(50, std::chrono::seconds(120));
+// DirEntryInfo列表缓存：较小容量（每个条目附带多个字符串）
 std::unique_ptr<FTB::LRUCache<std::string, std::vector<DirEntryInfo>>> lru_entry_cache = 
-    std::make_unique<FTB::LRUCache<std::string, std::vector<DirEntryInfo>>>(500, std::chrono::seconds(300));
+    std::make_unique<FTB::LRUCache<std::string, std::vector<DirEntryInfo>>>(50, std::chrono::seconds(300));
 
 // 缓存统计信息
 std::atomic<size_t> cache_hits{0};
@@ -723,7 +723,9 @@ std::string readFileContent(const std::string & filePath, size_t startLine, size
     }
     file.close();
     
-    // 将结果缓存到LRU缓存中
+    if (result.size() > 10 * 1024 * 1024) {
+        result.resize(10 * 1024 * 1024);
+    }
     lru_content_cache->put(cache_key, result);
     
     return result;
@@ -959,6 +961,25 @@ size_t cleanupExpiredCaches() {
     lru_dir_cache->cleanup_expired();
     lru_size_cache->cleanup_expired();
     lru_content_cache->cleanup_expired();
+    
+    // 限制 path_access_count 大小，防止无限增长
+    {
+        std::lock_guard<std::mutex> pt_lock(path_tracking_mutex);
+        if (path_access_count.size() > 1000) {
+            // 保留访问次数最多的 500 个，其余清除
+            std::vector<std::pair<std::string, uint32_t>> sorted;
+            sorted.reserve(path_access_count.size());
+            for (const auto& [p, c] : path_access_count) {
+                sorted.emplace_back(p, c.load());
+            }
+            std::partial_sort(sorted.begin(), sorted.begin() + 500, sorted.end(),
+                [](const auto& a, const auto& b) { return a.second > b.second; });
+            path_access_count.clear();
+            for (size_t i = 0; i < 500 && i < sorted.size(); ++i) {
+                path_access_count[sorted[i].first].store(sorted[i].second);
+            }
+        }
+    }
     
     return total_cleaned;
 }
