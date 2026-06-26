@@ -49,6 +49,11 @@ enum class Language {
     PROTO,
     MESON,
     POWERSHELL,
+    DART,
+    JULIA,
+    ERLANG,
+    CLOJURE,
+    FSHARP,
 };
 
 // 语法高亮的 token 类型

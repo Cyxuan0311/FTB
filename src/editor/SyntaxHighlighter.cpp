@@ -501,6 +501,86 @@ void SyntaxHighlighter::InitializePatterns() {
         "write-host", "write-output", "write-error", "get-content", "set-content",
         "get-childitem", "test-path", "new-object", "select-object", "where-object"
     };
+
+    // ===== Dart =====
+    keyword_patterns_[Language::DART] = {
+        "abstract", "as", "assert", "async", "await", "break", "case", "catch", "class", "const",
+        "continue", "covariant", "default", "deferred", "do", "dynamic", "else", "enum", "export",
+        "extends", "extension", "external", "factory", "false", "final", "finally", "for", "Function",
+        "get", "hide", "if", "implements", "import", "in", "interface", "is", "late", "library",
+        "mixin", "new", "null", "on", "operator", "part", "required", "rethrow", "return", "set",
+        "show", "static", "super", "switch", "sync", "this", "throw", "true", "try", "typedef",
+        "var", "void", "while", "with", "yield"
+    };
+    type_patterns_[Language::DART] = {
+        "int", "double", "num", "bool", "String", "dynamic", "Never", "Null", "Object", "void",
+        "Record", "Future", "Stream", "Iterable", "List", "Set", "Map", "Comparable", "Pattern",
+        "RegExp", "Symbol", "DateTime", "Duration", "Error", "Exception", "StackTrace",
+        "Type", "Uri", "Never", "num"
+    };
+
+    // ===== Julia =====
+    keyword_patterns_[Language::JULIA] = {
+        "abstract", "baremodule", "begin", "break", "catch", "ccall", "const", "continue", "do",
+        "else", "elseif", "end", "enum", "export", "finally", "for", "function", "global", "if",
+        "import", "in", "let", "local", "macro", "module", "mutable", "primitive", "public", "quote",
+        "return", "struct", "try", "type", "using", "where", "while",
+        "true", "false", "nothing", "missing"
+    };
+    type_patterns_[Language::JULIA] = {
+        "Int8", "Int16", "Int32", "Int64", "Int128", "UInt8", "UInt16", "UInt32", "UInt64", "UInt128",
+        "Float16", "Float32", "Float64", "BigInt", "BigFloat", "String", "Char", "Bool", "Symbol",
+        "Array", "Vector", "Matrix", "Tuple", "NamedTuple", "Dict", "Set", "Pair", "Complex",
+        "Rational", "Regex", "Nothing", "Missing", "Any", "Union", "TypeVar", "AbstractArray",
+        "AbstractString", "Number", "Real", "AbstractFloat", "Integer", "Signed", "Unsigned"
+    };
+
+    // ===== Erlang =====
+    keyword_patterns_[Language::ERLANG] = {
+        "after", "and", "andalso", "band", "begin", "bnot", "bor", "bsl", "bsr", "bxor", "case",
+        "catch", "cond", "div", "end", "fun", "if", "let", "not", "of", "or", "orelse", "query",
+        "receive", "rem", "try", "when", "xor",
+        "module", "export", "import", "record", "define", "include", "include_lib", "behaviour",
+        "spec", "callback", "type", "opaque",
+        "true", "false", "ok", "error", "undefined"
+    };
+    type_patterns_[Language::ERLANG] = {
+        "list", "tuple", "atom", "string", "integer", "float", "binary", "map", "pid", "port",
+        "reference", "fun", "boolean", "char", "term", "any", "maybe_improper_list",
+        "nonempty_list", "nonempty_string"
+    };
+
+    // ===== Clojure =====
+    keyword_patterns_[Language::CLOJURE] = {
+        "def", "defn", "defmacro", "defprotocol", "defrecord", "deftype", "defmulti", "defmethod",
+        "let", "letfn", "do", "if", "if-not", "when", "when-not", "when-let", "when-first",
+        "cond", "condp", "case", "for", "loop", "recur", "fn", "throw", "try", "catch", "finally",
+        "monitor-enter", "monitor-exit", "import", "ns", "in-ns", "refer", "alias", "use", "require",
+        "binding", "with-open", "with-local-vars", "doseq", "dotimes", "while", "comment",
+        "true", "false", "nil"
+    };
+    type_patterns_[Language::CLOJURE] = {
+        "Integer", "Long", "Float", "Double", "String", "Boolean", "List", "Vector", "HashMap",
+        "Set", "Ratio", "Symbol", "Keyword", "Atom", "Ref", "Agent", "Delay", "Promise",
+        "Future", "Var", "Namespace", "MultiFn", "Protocol", "Type", "Record"
+    };
+
+    // ===== F# =====
+    keyword_patterns_[Language::FSHARP] = {
+        "abstract", "and", "as", "assert", "async", "base", "begin", "class", "default", "delegate",
+        "do", "done", "downcast", "downto", "elif", "else", "end", "exception", "extern", "false",
+        "finally", "fixed", "for", "fun", "function", "global", "if", "in", "inherit", "inline",
+        "interface", "internal", "lazy", "let", "match", "member", "module", "mutable", "namespace",
+        "new", "not", "null", "of", "open", "or", "override", "private", "public", "rec", "return",
+        "sig", "static", "struct", "then", "to", "true", "try", "type", "upcast", "use", "val",
+        "void", "when", "while", "with", "yield"
+    };
+    type_patterns_[Language::FSHARP] = {
+        "int", "float", "bool", "char", "string", "unit", "byte", "decimal", "double", "single",
+        "int16", "int32", "int64", "uint16", "uint32", "uint64", "nativeint", "unativeint",
+        "bigint", "obj", "exn", "seq", "list", "array", "option", "Map", "Set", "Async", "Task",
+        "Result", "Choice", "ValueOption"
+    };
 }
 
 // ---- 语言检测 ----
@@ -512,11 +592,21 @@ Language SyntaxHighlighter::DetectLanguage(const std::string& filename) {
     // 精确文件名匹配
     if (lower == "cmakelists.txt" || lower == "cmakecache.txt") return Language::CMAKE;
     if (lower == "dockerfile" || lower == "containerfile") return Language::DOCKERFILE;
-    if (lower == "makefile" || lower == "gnumakefile") return Language::MAKEFILE;
+    if (lower == "makefile" || lower == "gnumakefile" || lower == "makefile.am" || lower == "makefile.in") return Language::MAKEFILE;
+    if (lower == "justfile") return Language::MAKEFILE;
     if (lower == "meson.build" || lower == "meson_options.txt") return Language::MESON;
     if (lower == "vagrantfile") return Language::RUBY;
     if (lower == "rakefile" || lower == "gemfile") return Language::RUBY;
+    if (lower == "gemfile.lock") return Language::RUBY;
     if (lower == "jenkinsfile") return Language::SHELL;
+    if (lower == ".env" || lower.rfind(".env.", 0) == 0) return Language::SHELL;
+    if (lower == "gradlew" || lower == "gradlew.bat") return Language::SHELL;
+    if (lower == "go.mod" || lower == "go.sum" || lower == "go.work") return Language::GO;
+    if (lower == "yarn.lock") return Language::YAML;
+    if (lower == ".clang-format" || lower == ".clang-tidy" || lower == ".clangd") return Language::YAML;
+    if (lower.rfind("dockerfile.", 0) == 0) return Language::DOCKERFILE; // Dockerfile.alpine, etc.
+    if (lower == "rebar.config" || lower == "rebar.lock") return Language::ERLANG;
+    if (lower == ".gitignore" || lower == ".dockerignore" || lower == ".npmignore") return Language::NONE;
 
     // 扩展名匹配
     auto dot = lower.rfind('.');
@@ -540,7 +630,7 @@ Language SyntaxHighlighter::DetectLanguage(const std::string& filename) {
         if (ext == ".lua") return Language::LUA;
         if (ext == ".sh" || ext == ".bash" || ext == ".zsh" || ext == ".fish") return Language::SHELL;
         if (ext == ".sql") return Language::SQL;
-        if (ext == ".html" || ext == ".htm") return Language::HTML;
+        if (ext == ".html" || ext == ".htm" || ext == ".vue" || ext == ".svelte") return Language::HTML;
         if (ext == ".xml" || ext == ".xhtml" || ext == ".svg" || ext == ".xsd" || ext == ".xsl") return Language::XML;
         if (ext == ".css" || ext == ".scss" || ext == ".sass" || ext == ".less") return Language::CSS;
         if (ext == ".json" || ext == ".jsonc") return Language::JSON;
@@ -559,6 +649,11 @@ Language SyntaxHighlighter::DetectLanguage(const std::string& filename) {
         if (ext == ".nim" || ext == ".nims" || ext == ".nimble") return Language::NIM;
         if (ext == ".proto") return Language::PROTO;
         if (ext == ".ps1" || ext == ".psm1" || ext == ".psd1") return Language::POWERSHELL;
+        if (ext == ".dart") return Language::DART;
+        if (ext == ".jl") return Language::JULIA;
+        if (ext == ".erl" || ext == ".hrl") return Language::ERLANG;
+        if (ext == ".clj" || ext == ".cljs" || ext == ".cljc" || ext == ".edn") return Language::CLOJURE;
+        if (ext == ".fs" || ext == ".fsx" || ext == ".fsi") return Language::FSHARP;
     }
 
     return Language::NONE;
@@ -604,6 +699,11 @@ std::string SyntaxHighlighter::GetLanguageName(Language lang) {
         case Language::PROTO: return "Proto";
         case Language::MESON: return "Meson";
         case Language::POWERSHELL: return "PowerShell";
+        case Language::DART: return "Dart";
+        case Language::JULIA: return "Julia";
+        case Language::ERLANG: return "Erlang";
+        case Language::CLOJURE: return "Clojure";
+        case Language::FSHARP: return "F#";
         default: return "";
     }
 }
@@ -933,14 +1033,16 @@ bool SyntaxHighlighter::IsComment(const std::string& line, size_t pos, Language 
     // # 注释: Python, Ruby, Perl, YAML, TOML, Shell
     if (lang == Language::PYTHON || lang == Language::RUBY || lang == Language::PERL ||
         lang == Language::YAML || lang == Language::TOML || lang == Language::SHELL ||
-        lang == Language::BASH || lang == Language::R || lang == Language::NIM) {
+        lang == Language::BASH || lang == Language::R || lang == Language::NIM ||
+        lang == Language::JULIA) {
         return line[pos] == '#';
     }
-    // // 注释: C, C++, Go, Java, Rust, JS, TS, C#, Swift, Kotlin, Scala, Zig, Dart
+    // // 注释: C, C++, Go, Java, Rust, JS, TS, C#, Swift, Kotlin, Scala, Zig, Dart, F#
     if (lang == Language::C || lang == Language::CPP || lang == Language::GO ||
         lang == Language::JAVA || lang == Language::RUST || lang == Language::JAVASCRIPT ||
         lang == Language::TYPESCRIPT || lang == Language::CSHARP || lang == Language::SWIFT ||
-        lang == Language::KOTLIN || lang == Language::SCALA || lang == Language::ZIG) {
+        lang == Language::KOTLIN || lang == Language::SCALA || lang == Language::ZIG ||
+        lang == Language::DART || lang == Language::FSHARP) {
         return pos + 1 < line.length() && line[pos] == '/' && line[pos + 1] == '/';
     }
     // -- 注释: SQL, Haskell, Lua, Elixir
@@ -959,6 +1061,14 @@ bool SyntaxHighlighter::IsComment(const std::string& line, size_t pos, Language 
     // CMake: # 注释
     if (lang == Language::CMAKE) {
         return line[pos] == '#';
+    }
+    // Erlang: % 注释
+    if (lang == Language::ERLANG) {
+        return line[pos] == '%';
+    }
+    // Clojure: ; 注释
+    if (lang == Language::CLOJURE) {
+        return line[pos] == ';';
     }
     return false;
 }

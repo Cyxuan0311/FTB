@@ -34,6 +34,21 @@
 #ifdef BUILD_TREE_SITTER_TYPESCRIPT
 #include <tree_sitter/tree-sitter-typescript.h>
 #endif
+#ifdef BUILD_TREE_SITTER_DART
+#include <tree_sitter/tree-sitter-dart.h>
+#endif
+#ifdef BUILD_TREE_SITTER_JULIA
+#include <tree_sitter/tree-sitter-julia.h>
+#endif
+#ifdef BUILD_TREE_SITTER_ERLANG
+#include <tree_sitter/tree-sitter-erlang.h>
+#endif
+#ifdef BUILD_TREE_SITTER_CLOJURE
+#include <tree_sitter/tree-sitter-clojure.h>
+#endif
+#ifdef BUILD_TREE_SITTER_FSHARP
+#include <tree_sitter/tree-sitter-fsharp.h>
+#endif
 #endif
 
 using namespace ftxui;
@@ -354,6 +369,43 @@ void SyntaxHighlighterTreeSitter::InitializeLanguages() {
     }
 #endif
 
+#ifdef BUILD_TREE_SITTER_DART
+    if (auto* lang = tree_sitter_dart()) {
+        language_map_["dart"] = lang;
+    }
+#endif
+
+#ifdef BUILD_TREE_SITTER_JULIA
+    if (auto* lang = tree_sitter_julia()) {
+        language_map_["julia"] = lang;
+        language_map_["jl"] = lang;
+    }
+#endif
+
+#ifdef BUILD_TREE_SITTER_ERLANG
+    if (auto* lang = tree_sitter_erlang()) {
+        language_map_["erl"] = lang;
+        language_map_["hrl"] = lang;
+    }
+#endif
+
+#ifdef BUILD_TREE_SITTER_CLOJURE
+    if (auto* lang = tree_sitter_clojure()) {
+        language_map_["clj"] = lang;
+        language_map_["cljs"] = lang;
+        language_map_["cljc"] = lang;
+        language_map_["edn"] = lang;
+    }
+#endif
+
+#ifdef BUILD_TREE_SITTER_FSHARP
+    if (auto* lang = tree_sitter_fsharp()) {
+        language_map_["fs"] = lang;
+        language_map_["fsx"] = lang;
+        language_map_["fsi"] = lang;
+    }
+#endif
+
 #else
     // tree-sitter 未启用，无需初始化
 #endif
@@ -419,6 +471,11 @@ void SyntaxHighlighterTreeSitter::SetLanguage(Language lang) {
         case Language::NIM:         file_type = "nim"; break;
         case Language::PROTO:       file_type = "proto"; break;
         case Language::POWERSHELL:  file_type = "ps1"; break;
+        case Language::DART:        file_type = "dart"; break;
+        case Language::JULIA:       file_type = "julia"; break;
+        case Language::ERLANG:      file_type = "erl"; break;
+        case Language::CLOJURE:     file_type = "clj"; break;
+        case Language::FSHARP:      file_type = "fs"; break;
         default: return;
     }
     SetFileType(file_type);
