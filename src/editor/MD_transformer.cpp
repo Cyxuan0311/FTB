@@ -1,4 +1,5 @@
 #include "editor/MD_transformer.hpp"
+#include "utils/UnicodeUtil.hpp"
 #include <ftxui/dom/elements.hpp>
 #include <regex>
 #include <algorithm>
@@ -15,155 +16,23 @@ namespace Editor {
 
 // UTF-8 解码，返回 Unicode 码点和字节数
 int MDTransformer::DecodeUtf8(const char* s, uint32_t* codepoint) {
-    unsigned char c = (unsigned char)*s;
-    
-    if (c < 0x80) {
-        // 单字节字符（ASCII）
-        *codepoint = c;
-        return 1;
-    } else if ((c & 0xE0) == 0xC0) {
-        // 2 字节字符
-        *codepoint = ((c & 0x1F) << 6) | ((unsigned char)s[1] & 0x3F);
-        return 2;
-    } else if ((c & 0xF0) == 0xE0) {
-        // 3 字节字符
-        *codepoint = ((c & 0x0F) << 12) | 
-                     (((unsigned char)s[1] & 0x3F) << 6) | 
-                     ((unsigned char)s[2] & 0x3F);
-        return 3;
-    } else if ((c & 0xF8) == 0xF0) {
-        // 4 字节字符
-        *codepoint = ((c & 0x07) << 18) | 
-                     (((unsigned char)s[1] & 0x3F) << 12) | 
-                     (((unsigned char)s[2] & 0x3F) << 6) | 
-                     ((unsigned char)s[3] & 0x3F);
-        return 4;
-    }
-    
-    // 无效的 UTF-8 序列
-    *codepoint = 0xFFFD;  // 替换字符
-    return 1;
+    return UnicodeUtil::DecodeUtf8(s, codepoint);
 }
 
 // 判断是否为 East Asian Wide/Fullwidth 字符（直接移植自 flow_formatter.c）
 bool MDTransformer::IsEastAsianWide(uint32_t codepoint) {
-    // CJK 统一表意文字（常用汉字）
-    if ((codepoint >= 0x4E00 && codepoint <= 0x9FFF) ||     // CJK Unified Ideographs
-        (codepoint >= 0x3400 && codepoint <= 0x4DBF) ||     // CJK Extension A
-        (codepoint >= 0x20000 && codepoint <= 0x2A6DF) ||   // CJK Extension B
-        (codepoint >= 0x2A700 && codepoint <= 0x2B73F) ||   // CJK Extension C
-        (codepoint >= 0x2B740 && codepoint <= 0x2B81F) ||   // CJK Extension D
-        (codepoint >= 0x2B820 && codepoint <= 0x2CEAF) ||   // CJK Extension E
-        (codepoint >= 0xF900 && codepoint <= 0xFAFF) ||     // CJK Compatibility Ideographs
-        (codepoint >= 0x2F800 && codepoint <= 0x2FA1F)) {   // CJK Compatibility Supplement
-        return true;
-    }
-    
-    // 全角字符
-    if ((codepoint >= 0xFF01 && codepoint <= 0xFF60) ||     // Fullwidth Forms
-        (codepoint >= 0xFFE0 && codepoint <= 0xFFE6)) {
-        return true;
-    }
-    
-    // Hangul Syllables (韩文音节)
-    if (codepoint >= 0xAC00 && codepoint <= 0xD7A3) {
-        return true;
-    }
-    
-    // Hiragana & Katakana (日文平假名和片假名)
-    if ((codepoint >= 0x3040 && codepoint <= 0x309F) ||     // Hiragana
-        (codepoint >= 0x30A0 && codepoint <= 0x30FF)) {     // Katakana
-        return true;
-    }
-    
-    // 其他 East Asian 宽字符
-    if ((codepoint >= 0x1100 && codepoint <= 0x115F) ||     // Hangul Jamo
-        (codepoint >= 0x2E80 && codepoint <= 0x2EFF) ||     // CJK Radicals Supplement
-        (codepoint >= 0x2F00 && codepoint <= 0x2FDF) ||     // Kangxi Radicals
-        (codepoint >= 0x3000 && codepoint <= 0x303F) ||     // CJK Symbols and Punctuation
-        (codepoint >= 0x3200 && codepoint <= 0x32FF) ||     // Enclosed CJK Letters
-        (codepoint >= 0x3300 && codepoint <= 0x33FF)) {     // CJK Compatibility
-        return true;
-    }
-    
-    return false;
+    return UnicodeUtil::IsEastAsianWide(codepoint);
 }
 
 // 判断是否为宽字符 emoji（直接移植自 flow_emoji.c）
 bool MDTransformer::IsWideEmoji(uint32_t codepoint) {
-    // Emoji & Symbols
-    if ((codepoint >= 0x1F300 && codepoint <= 0x1F9FF) ||   // Misc Symbols and Pictographs
-        (codepoint >= 0x1F600 && codepoint <= 0x1F64F) ||   // Emoticons
-        (codepoint >= 0x1F680 && codepoint <= 0x1F6FF) ||   // Transport and Map
-        (codepoint >= 0x2600 && codepoint <= 0x26FF) ||     // Misc symbols
-        (codepoint >= 0x2700 && codepoint <= 0x27BF) ||     // Dingbats
-        (codepoint >= 0x1FA00 && codepoint <= 0x1FA6F) ||   // Extended Pictographic
-        (codepoint >= 0x1F900 && codepoint <= 0x1F9FF)) {   // Supplemental Symbols and Pictographs
-        return true;
-    }
-    return false;
+    return UnicodeUtil::IsWideEmoji(codepoint);
 }
 
 // 计算显示宽度（精确处理 East Asian 字符、emoji、ANSI 代码）
 // 直接移植自 flow_formatter.c 的 calculate_display_width
 int MDTransformer::CalculateDisplayWidth(const std::string& text) {
-    if (text.empty()) return 0;
-    
-    int width = 0;
-    const char* p = text.c_str();
-    
-    while (*p) {
-        // 处理 ANSI 转义序列：\033[ ... m（不计入宽度）
-        if (*p == '\033' && p[1] == '[') {
-            p += 2;  // 跳过 \033[
-            // 跳过所有参数和终止符 'm'
-            while (*p && *p != 'm') {
-                p++;
-            }
-            if (*p == 'm') {
-                p++;  // 跳过 'm'
-            }
-            continue;  // ANSI 代码不计入宽度
-        }
-        
-        // 处理普通字符
-        uint32_t codepoint;
-        int bytes = DecodeUtf8(p, &codepoint);
-        
-        if (bytes == 0 || bytes > 4) {
-            // 无效的 UTF-8 序列，跳过
-            p++;
-            continue;
-        }
-        
-        // 首先检查是否为宽字符 emoji（在终端中占 2 个显示宽度）
-        if (IsWideEmoji(codepoint)) {
-            width += 2;
-        } else if (IsEastAsianWide(codepoint)) {
-            // East Asian Wide 字符占 2 个显示宽度（中文字符等）
-            width += 2;
-        } else if (codepoint >= 0x20 && codepoint < 0x7F) {
-            // 可打印 ASCII 字符占 1 个宽度
-            width += 1;
-        } else if (codepoint == 0x09) {
-            // Tab 字符占 8 个宽度（可调整）
-            width += 8;
-        } else if (codepoint == 0x200D) {
-            // Zero Width Joiner (ZWJ) - 用于组合 emoji，不计入宽度
-            width += 0;
-        } else if (codepoint >= 0xFE00 && codepoint <= 0xFE0F) {
-            // Variation Selectors - 用于 emoji 变体，不计入宽度
-            width += 0;
-        } else if (codepoint >= 0x80) {
-            // 其他 Unicode 字符默认占 1 个宽度
-            width += 1;
-        }
-        // 控制字符（< 0x20，除了 Tab）不计入宽度
-        
-        p += bytes;
-    }
-    
-    return width;
+    return UnicodeUtil::CalculateDisplayWidth(text);
 }
 
 // ==================== 构造与析构 ====================
