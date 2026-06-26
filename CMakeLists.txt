@@ -78,85 +78,98 @@ endif()
 
 # 核心源文件
 set(FTB_CORE_SOURCES
-    src/FTB/AnsiParser.cpp
-    src/FTB/ArchivePreview.cpp
-    src/FTB/AsyncFileManager.cpp
-    src/FTB/FuzzyFinder.cpp
-    src/FTB/BinaryFileHandler.cpp
-    src/FTB/CLIArgs.cpp
-    src/FTB/ClipboardManager.cpp
-    src/FTB/ConfigManager.cpp
-    src/FTB/DirectoryHistory.cpp
-    src/FTB/FileListRenderer.cpp
-    src/FTB/FileManager.cpp
-    src/FTB/FileSizeCalculator.cpp
-    src/FTB/ImagePreview.cpp
-    src/FTB/MarkdownPreview.cpp
-    src/FTB/SpreadsheetPreview.cpp
-    src/FTB/MediaPreview.cpp
-    src/FTB/PdfPreview.cpp
-    src/FTB/DocPreview.cpp
-    src/FTB/HexPreview.cpp
-    src/FTB/MainUI.cpp
-    src/FTB/JumpFileContext.cpp
-    src/FTB/KeyBindings.cpp
-    src/FTB/ObjectPool.cpp
-    src/FTB/Powerline.cpp
-    src/FTB/Navigation.cpp
-    src/FTB/PanelCommands.cpp
-    src/FTB/PreviewCache.cpp
-    src/FTB/SortMode.cpp
-    src/FTB/StatusBarRenderer.cpp
-    src/FTB/TextSelection.cpp
-    src/FTB/ThreadGuard.cpp
-    src/FTB/ThemeManager.cpp
-    src/FTB/PluginManager.cpp
-    src/FTB/detail_element.cpp
-    src/FTB/HandleManager/EventHandler.cpp
-    src/FTB/Editor/MD_transformer.cpp
-    src/FTB/Editor/SyntaxHighlighter.cpp
-    src/FTB/Editor/SyntaxHighlighterTreeSitter.cpp
-    src/FTB/Editor/NanoEditor.cpp
-    src/FTB/TabManager.cpp
-    src/FTB/OpenerManager.cpp
+    # core
+    src/core/AnsiParser.cpp
+    src/core/FuzzyFinder.cpp
+    src/core/JumpFileContext.cpp
+    src/core/MainUI.cpp
+    src/core/Navigation.cpp
+    src/core/PanelCommands.cpp
+    src/core/TabManager.cpp
+    # browser
+    src/browser/AsyncFileManager.cpp
+    src/browser/BinaryFileHandler.cpp
+    src/browser/ClipboardManager.cpp
+    src/browser/DirectoryHistory.cpp
+    src/browser/FileManager.cpp
+    src/browser/FileSizeCalculator.cpp
+    src/browser/SortMode.cpp
+    src/browser/TaskSystem.cpp
+    # preview
+    src/preview/ArchivePreview.cpp
+    src/preview/DocPreview.cpp
+    src/preview/HexPreview.cpp
+    src/preview/ImagePreview.cpp
+    src/preview/MarkdownPreview.cpp
+    src/preview/MediaPreview.cpp
+    src/preview/AudioPreview.cpp
+    src/preview/PdfPreview.cpp
+    src/preview/PreviewCache.cpp
+    src/preview/SpreadsheetPreview.cpp
+    # renderer
+    src/renderer/FileListRenderer.cpp
+    src/renderer/Powerline.cpp
+    src/renderer/StatusBarRenderer.cpp
+    src/renderer/TextSelection.cpp
+    src/renderer/detail_element.cpp
+    # utils
+    src/utils/UnicodeUtil.cpp
+    # config
+    src/config/CLIArgs.cpp
+    src/config/ConfigManager.cpp
+    src/config/KeyBindings.cpp
+    src/config/ObjectPool.cpp
+    src/config/ThemeManager.cpp
+    src/config/ThreadGuard.cpp
+    # ops
+    src/ops/EventHandler.cpp
+    src/ops/OpenerManager.cpp
+    src/ops/PluginManager.cpp
+    # editor
+    src/editor/MD_transformer.cpp
+    src/editor/NanoEditor.cpp
+    src/editor/SyntaxHighlighter.cpp
+    src/editor/SyntaxHighlighterTreeSitter.cpp
 )
 
-# 核心UI对话框
+# 对话框
 list(APPEND FTB_CORE_SOURCES
-    src/UI/HelpDialog.cpp
-    src/UI/ThemeDialog.cpp
-    src/UI/LayoutPanel.cpp
-    src/UI/RenameDialog.cpp
-    src/UI/NewFileDialog.cpp
-    src/UI/NewFolderDialog.cpp
-    src/UI/DeleteDialog.cpp
-    src/UI/FilePreviewDialog.cpp
-    src/UI/FolderDetailsDialog.cpp
-    src/UI/JumpDirectoryDialog.cpp
-    src/UI/CalendarPanel.cpp
-    src/UI/FuzzyFinderDialog.cpp
-    src/UI/PluginDialog.cpp
-    src/UI/UIStylePanel.cpp
-    src/UI/SortDialog.cpp
-    src/UI/NewTabDialog.cpp
-    src/UI/TabBarRenderer.cpp
-    src/UI/ClipboardDialog.cpp
-    src/UI/OpenerPickerDialog.cpp
-    src/UI/OpenerInputDialog.cpp
-    src/UI/OpenerConfigDialog.cpp
+    src/dialog/CalendarPanel.cpp
+    src/dialog/ClipboardDialog.cpp
+    src/dialog/DeleteDialog.cpp
+    src/dialog/FilePreviewDialog.cpp
+    src/dialog/FolderDetailsDialog.cpp
+    src/dialog/FuzzyFinderDialog.cpp
+    src/dialog/HelpDialog.cpp
+    src/dialog/JumpDirectoryDialog.cpp
+    src/dialog/LayoutPanel.cpp
+    src/dialog/NewFileDialog.cpp
+    src/dialog/NewFolderDialog.cpp
+    src/dialog/NewTabDialog.cpp
+    src/dialog/OpenerConfigDialog.cpp
+    src/dialog/OpenerInputDialog.cpp
+    src/dialog/OpenerPickerDialog.cpp
+    src/dialog/PluginDialog.cpp
+    src/dialog/RenameDialog.cpp
+    src/dialog/BatchRenameDialog.cpp
+    src/dialog/SortDialog.cpp
+    src/dialog/TabBarRenderer.cpp
+    src/dialog/TaskPanelDialog.cpp
+    src/dialog/ThemeDialog.cpp
+    src/dialog/UIStylePanel.cpp
 )
 
 # 可选模块源文件
 if(FTB_ENABLE_SSH)
     list(APPEND FTB_CORE_SOURCES
-        src/Connection/SSHConnection.cpp
-        src/UI/SSHDialog.cpp
+        src/remote/SSHConnection.cpp
+        src/dialog/SSHDialog.cpp
     )
 endif()
 
 if(FTB_ENABLE_ICONS)
     list(APPEND FTB_CORE_SOURCES
-        src/FTB/IconMapper.cpp
+        src/renderer/IconMapper.cpp
     )
 endif()
 
@@ -257,7 +270,12 @@ install(TARGETS FTB FTB_core
 )
 
 # 安装头文件
-install(DIRECTORY include/FTB/ DESTINATION include/FTB)
+install(DIRECTORY
+    include/core include/browser include/preview
+    include/renderer include/editor include/config
+    include/ops include/utils include/dialog include/remote
+    DESTINATION include/FTB
+)
 
 # --- 添加卸载目标 ---
 set(INSTALL_MANIFEST "${CMAKE_CURRENT_BINARY_DIR}/install_manifest.txt")
