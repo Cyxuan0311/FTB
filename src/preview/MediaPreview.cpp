@@ -30,7 +30,7 @@ bool MediaPreview::IsMediaFile(const std::string& filename) {
     if (dot == std::string::npos) return false;
     std::string ext = filename.substr(dot);
     for (auto& c : ext) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return ext == ".gif" || ext == ".mp4" || ext == ".mov" || ext == ".webm" || ext == ".avi" || ext == ".webp";
+    return (ext == ".gif" || ext == ".mp4" || ext == ".mov" || ext == ".webm" || ext == ".avi" || ext == ".webp");
 }
 
 bool MediaPreview::IsEnabled() {
@@ -41,7 +41,6 @@ void MediaPreview::ToggleEnabled() {
     s_enabled = !s_enabled;
 }
 
-// ---- 去除 timg 输出中 AnsiStringToElement 不支持的转义序列 ----
 static std::string StripUnsupportedAnsi(const std::string& input) {
     std::string output;
     output.reserve(input.size());
@@ -58,14 +57,12 @@ static std::string StripUnsupportedAnsi(const std::string& input) {
                     i++;
                     break;
                 } else if (c == 'l' || c == 'h' || c == 'r' || c == 'n') {
-                    // 跳过光标控制、滚屏等非 SGR 序列
                     i++;
                     break;
                 }
                 i++;
             }
             if (is_sgr) {
-                // 保留 SGR 序列
                 output.append(input, start, i - start);
             }
         } else {
@@ -120,7 +117,6 @@ void MediaPreview::LoadAsync(const std::string& filePath, int panel_width) {
         }
     }
 
-    // Kill any previous timg process (e.g. from a file the user quickly scrolled past)
     {
         std::lock_guard<std::mutex> lock(s_cache_mutex);
         if (s_child_pid > 0) {
@@ -145,9 +141,6 @@ void MediaPreview::LoadAsync(const std::string& filePath, int panel_width) {
             }
             bool is_video = (ext == ".mp4" || ext == ".mov" || ext == ".webm" || ext == ".avi");
 
-            // Use ffmpeg only for video formats to fast-seek past intro frames.
-            // For still images (webp, gif), use timg directly since ffmpeg may not
-            // support decoding them.
             std::string cmd;
             if (is_video && s_ffmpeg_available) {
                 cmd = "ffmpeg -ss 5 -i \"" + filePath + "\" -vframes 1 -f image2pipe -vcodec ppm - 2>/dev/null | timg -pq " + g + " - 2>/dev/null";
@@ -180,12 +173,16 @@ void MediaPreview::LoadAsync(const std::string& filePath, int panel_width) {
             }
 
             if (pid == 0) {
-                // ---- child ----
                 ::close(pipefd[0]);
                 ::dup2(pipefd[1], STDOUT_FILENO);
                 int fd = ::open("/dev/null", O_WRONLY);
                 if (fd != -1) {
                     ::dup2(fd, STDERR_FILENO);
+                    ::close(fd);
+                }
+                fd = ::open("/dev/null", O_RDONLY);
+                if (fd != -1) {
+                    ::dup2(fd, STDIN_FILENO);
                     ::close(fd);
                 }
                 for (int i = 3; i < 1024; i++) ::close(i);
@@ -194,7 +191,6 @@ void MediaPreview::LoadAsync(const std::string& filePath, int panel_width) {
                 ::_exit(1);
             }
 
-            // ---- parent ----
             ::close(pipefd[1]);
             {
                 std::lock_guard<std::mutex> lock(s_cache_mutex);
@@ -212,7 +208,6 @@ void MediaPreview::LoadAsync(const std::string& filePath, int panel_width) {
             int status;
             ::waitpid(pid, &status, 0);
 
-            // Clear our PID if still set
             {
                 std::lock_guard<std::mutex> lock(s_cache_mutex);
                 if (s_child_pid == pid) s_child_pid = 0;
@@ -228,7 +223,6 @@ void MediaPreview::LoadAsync(const std::string& filePath, int panel_width) {
                 if (ok && !result.empty()) {
                     std::string cleaned = StripUnsupportedAnsi(result);
                     s_cache.output = std::move(cleaned);
-                } else {
                 }
                 s_cache.completed = true;
                 s_cache.loaded = true;
@@ -271,4 +265,4 @@ void MediaPreview::PlayFullscreen(const std::string& filePath, ftxui::ScreenInte
     }
 }
 
-}
+}  // namespace FTB
