@@ -5,6 +5,7 @@
 #include <map>
 #include <vector>
 #include <memory>
+#include <unordered_set>
 #include <ftxui/dom/elements.hpp>
 #include "ops/OpenerManager.hpp"
 
@@ -245,6 +246,9 @@ public:
     FTBConfig GetDefaultConfig() const;
     void ResetToDefault();
 
+    void LoadNoPreviewConfig();
+    bool IsNoPreviewExtension(const std::string& ext) const;
+
     // 书签操作
     bool AddBookmark(const std::string& name, const std::string& path);
     bool RemoveBookmark(const std::string& name);
@@ -276,6 +280,7 @@ private:
     bool config_loaded_;
     std::map<std::string, ftxui::Color> predefined_colors_;
     std::vector<SSHRecord> ssh_records_;
+    std::unordered_set<std::string> no_preview_extensions_;
 };
 
 // ---- 获取面板边框装饰器（读取 config.ui.panel_border） ----

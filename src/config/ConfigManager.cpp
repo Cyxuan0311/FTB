@@ -264,6 +264,8 @@ bool ConfigManager::LoadConfig(const std::string& config_path) {
         return false;
     }
 
+    LoadNoPreviewConfig();
+
     config_loaded_ = true;
     ApplyColorConfig();
     return true;
@@ -460,6 +462,42 @@ bool ConfigManager::ValidateConfig() const {
     if (config_.refresh.ui_refresh_interval_ms <= 0)
         return false;
     return true;
+}
+
+void ConfigManager::LoadNoPreviewConfig() {
+    no_preview_extensions_.clear();
+
+    std::string noavail_path = fs::path(config_path_).parent_path().string() + "/noavilable.json";
+
+    if (!fs::exists(noavail_path)) {
+        fs::create_directories(fs::path(noavail_path).parent_path());
+        std::ofstream file(noavail_path);
+        if (file.is_open()) {
+            json j;
+            j["no_preview_extensions"] = json::array();
+            file << j.dump(2) << std::endl;
+        }
+        return;
+    }
+
+    std::ifstream file(noavail_path);
+    if (!file.is_open()) return;
+
+    try {
+        json j;
+        file >> j;
+        if (j.contains("no_preview_extensions") && j["no_preview_extensions"].is_array()) {
+            for (const auto& ext : j["no_preview_extensions"]) {
+                if (ext.is_string()) {
+                    no_preview_extensions_.insert(ext.get<std::string>());
+                }
+            }
+        }
+    } catch (...) {}
+}
+
+bool ConfigManager::IsNoPreviewExtension(const std::string& ext) const {
+    return no_preview_extensions_.find(ext) != no_preview_extensions_.end();
 }
 
 void ConfigManager::ApplyColorConfig() {

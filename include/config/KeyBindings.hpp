@@ -49,6 +49,7 @@ public:
         MediaPlay,
         PdfToggleSource,
         DocToggleSource,
+        AudioToggleEnabled,
         HexToggleEnabled,
         GoHome,
         GoDownloads,
@@ -60,6 +61,8 @@ public:
         OpenPicker,
         OpenManual,
         OpenConfig,
+        Tasks,
+        BatchRename,
 #ifdef FTB_ENABLE_SSH
         SSH,
 #endif

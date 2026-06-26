@@ -63,6 +63,9 @@ std::map<std::string, KeyBindings::PanelCommand> KeyBindings::InitCommandMap() {
     m["doc"]        = PanelCommand::DocToggleSource;
     m["docx"]       = PanelCommand::DocToggleSource;
     m["pandoc"]     = PanelCommand::DocToggleSource;
+    m["aud"]        = PanelCommand::AudioToggleEnabled;
+    m["audio"]      = PanelCommand::AudioToggleEnabled;
+    m["eyed3"]      = PanelCommand::AudioToggleEnabled;
     m["hex"]        = PanelCommand::HexToggleEnabled;
     m["xxd"]        = PanelCommand::HexToggleEnabled;
     m["gh"]         = PanelCommand::GoHome;
@@ -82,6 +85,11 @@ std::map<std::string, KeyBindings::PanelCommand> KeyBindings::InitCommandMap() {
     m["ow"]         = PanelCommand::OpenManual;
     m["opencfg"]    = PanelCommand::OpenConfig;
     m["oc"]         = PanelCommand::OpenConfig;
+    m["tasks"]      = PanelCommand::Tasks;
+    m["task"]       = PanelCommand::Tasks;
+    m["ts"]         = PanelCommand::Tasks;
+    m["batchrename"] = PanelCommand::BatchRename;
+    m["br"]         = PanelCommand::BatchRename;
 #ifdef FTB_ENABLE_SSH
     m["ssh"]        = PanelCommand::SSH;
 #endif
@@ -285,6 +293,7 @@ std::vector<std::pair<std::string, std::string>> KeyBindings::GetCommandList() c
     list.push_back({"jump / j",          "Jump to directory"});
     list.push_back({"fdfind / fd",       "Fuzzy find files"});
     list.push_back({"rename / rn",       "Rename item"});
+    list.push_back({"batchrename / br",  "Batch rename with regex"});
     list.push_back({"newfile / nf",      "Create new file"});
     list.push_back({"newfolder / nd",    "Create new folder"});
     list.push_back({"preview / p",       "File preview"});
@@ -297,6 +306,7 @@ std::vector<std::pair<std::string, std::string>> KeyBindings::GetCommandList() c
     list.push_back({"statusstyle / ss",  "Status bar style"});
     list.push_back({"sort / so",         "Sort mode settings"});
     list.push_back({"plugin / pl",       "Plugin manager"});
+    list.push_back({"tasks / task / ts",    "Show task manager"});
     list.push_back({"clipboard / cb",       "Show clipboard details"});
     list.push_back({"clr / cc",             "Clear clipboard"});
     list.push_back({"mdsource / mds",      "Toggle MD preview source"});
