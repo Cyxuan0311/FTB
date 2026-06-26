@@ -1,4 +1,5 @@
 #include "renderer/TextSelection.hpp"
+#include "utils/UnicodeUtil.hpp"
 
 namespace FTB {
 
@@ -74,15 +75,18 @@ std::string SelectionRelease() {
     std::string result;
     for (int i = line_start; i <= line_end; ++i) {
         const auto& line = s.lines[i];
-        int line_len = static_cast<int>(line.size());
+        size_t byte_start = UnicodeUtil::ByteOffsetFromDisplayColumn(line, col_start);
+        size_t byte_end   = UnicodeUtil::ByteOffsetFromDisplayColumn(line, col_end + 1);
+        if (byte_start > line.size()) byte_start = line.size();
+        if (byte_end > line.size()) byte_end = line.size();
         if (i == line_start && i == line_end) {
-            if (col_start < line_len)
-                result += line.substr(col_start, std::min(col_end - col_start + 1, line_len - col_start));
+            if (byte_start < byte_end)
+                result += line.substr(byte_start, byte_end - byte_start);
         } else if (i == line_start) {
-            if (col_start < line_len)
-                result += line.substr(col_start);
+            if (byte_start < line.size())
+                result += line.substr(byte_start);
         } else if (i == line_end) {
-            result += line.substr(0, std::min(col_end + 1, line_len));
+            result += line.substr(0, byte_end);
         } else {
             result += line;
         }

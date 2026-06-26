@@ -13,6 +13,7 @@
 #include "browser/ClipboardManager.hpp"
 #include "config/KeyBindings.hpp"
 #include "browser/FileManager.hpp"
+#include "browser/TaskSystem.hpp"
 #include "config/ConfigManager.hpp"
 #ifdef FTB_ENABLE_PLUGINS
 #include "ops/PluginManager.hpp"
@@ -221,6 +222,21 @@ Element BuildNormalStatusBar(MainState& state) {
         } else if (!pos_info.empty()) {
             right_segments.push_back(FTB::PowerlineSegmentRight(
                 pos_info, status_bg, TC("position"), TC("main_bg"), sb_cfg.use_bold, left_sep
+            ));
+        }
+    }
+
+    {
+        auto& ts = TaskSystem::getInstance();
+        size_t active = ts.active_count();
+        if (active > 0) {
+            size_t queue = ts.queue_depth();
+            std::string task_label = "Tasks: " + std::to_string(active);
+            if (queue > 0) {
+                task_label += "+" + std::to_string(queue);
+            }
+            right_segments.push_back(FTB::PowerlineSegmentRight(
+                " " + task_label, status_bg, TC("syn_keyword"), TC("main_bg"), sb_cfg.use_bold, left_sep
             ));
         }
     }

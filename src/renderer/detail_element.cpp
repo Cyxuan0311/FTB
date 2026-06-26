@@ -21,6 +21,7 @@
 #include "preview/MarkdownPreview.hpp"
 #include "preview/SpreadsheetPreview.hpp"
 #include "preview/MediaPreview.hpp"
+#include "preview/AudioPreview.hpp"
 #include "preview/PdfPreview.hpp"
 #include "preview/DocPreview.hpp"
 #include "preview/HexPreview.hpp"
@@ -29,6 +30,7 @@
 #include "browser/SortMode.hpp"
 #include "editor/SyntaxHighlighter.hpp"
 #include "renderer/TextSelection.hpp"
+#include "utils/UnicodeUtil.hpp"
 
 namespace fs = std::filesystem;
 
@@ -40,18 +42,19 @@ namespace FTB {
 static Element RenderLineWithSelection(const std::string& line,
                                        FTB::Editor::Language lang,
                                        int sel_x1, int sel_x2) {
-    sel_x1 = std::max(0, sel_x1);
-    sel_x2 = std::min(static_cast<int>(line.size()) - 1, sel_x2);
+    // sel_x1/sel_x2 are display column positions. Convert to byte offsets.
+    size_t byte_x1 = UnicodeUtil::ByteOffsetFromDisplayColumn(line, std::max(0, sel_x1));
+    size_t byte_x2 = UnicodeUtil::ByteOffsetFromDisplayColumn(line, std::max(0, sel_x2 + 1));
 
     if (lang == FTB::Editor::Language::NONE) {
         ftxui::Elements parts;
         ftxui::Color fg = TC("main_fg");
-        if (sel_x1 > 0)
-            parts.push_back(text(line.substr(0, sel_x1)) | ftxui::color(fg));
-        if (sel_x1 <= sel_x2)
-            parts.push_back(text(line.substr(sel_x1, sel_x2 - sel_x1 + 1)) | ftxui::color(fg) | bgcolor(TC("selection_bg")));
-        if (sel_x2 + 1 < static_cast<int>(line.size()))
-            parts.push_back(text(line.substr(sel_x2 + 1)) | ftxui::color(fg));
+        if (byte_x1 > 0)
+            parts.push_back(text(line.substr(0, byte_x1)) | ftxui::color(fg));
+        if (byte_x1 <= byte_x2 && byte_x1 < line.size())
+            parts.push_back(text(line.substr(byte_x1, byte_x2 - byte_x1)) | ftxui::color(fg) | bgcolor(TC("selection_bg")));
+        if (byte_x2 < line.size())
+            parts.push_back(text(line.substr(byte_x2)) | ftxui::color(fg));
         return hbox(std::move(parts));
     }
 
@@ -87,7 +90,7 @@ static Element RenderLineWithSelection(const std::string& line,
 
         int byte_start = static_cast<int>(pos);
         int byte_end = static_cast<int>(pos + clen - 1);
-        if (byte_end >= sel_x1 && byte_start <= sel_x2)
+        if (byte_end >= static_cast<int>(byte_x1) && byte_start < static_cast<int>(byte_x2))
             el = el | bgcolor(TC("selection_bg"));
 
         parts.push_back(std::move(el));
@@ -131,18 +134,21 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
     bool is_md_file_preview = MarkdownPreview::IsMarkdownFile(data.selectedName);
     bool is_spreadsheet = SpreadsheetPreview::IsSpreadsheetFile(data.selectedName);
     bool is_media = MediaPreview::IsMediaFile(data.selectedName);
+    bool is_audio = AudioPreview::IsAudioFile(data.selectedName);
     bool is_pdf = PdfPreview::IsPdfFile(data.selectedName);
     bool is_doc = DocPreview::IsDocFile(data.selectedName);
 
     std::string preview_label = " Preview";
     if (HexPreview::IsBinaryFile(data.selectedName) && HexPreview::IsEnabled()
-        && !is_spreadsheet && !is_media && !is_pdf && !is_doc)
+        && !is_spreadsheet && !is_media && !is_audio && !is_pdf && !is_doc)
         preview_label += " (hex)";
+    if (is_audio && AudioPreview::IsEnabled()) preview_label += " (aud)";
     if (is_md_file_preview && MarkdownPreview::ShowSource()) preview_label += " (src)";
     if (is_spreadsheet && SpreadsheetPreview::ShowSource()) preview_label += " (src)";
     if (is_pdf && PdfPreview::ShowSource()) preview_label += " (src)";
     if (is_doc && DocPreview::ShowSource()) preview_label += " (src)";
     if (is_media && !MediaPreview::IsEnabled()) preview_label += " (disabled)";
+    if (is_audio && !AudioPreview::IsEnabled()) preview_label += " (disabled)";
     info_elements.push_back(
         hbox({
             text(preview_label) | color(TC("title")) | bold,
@@ -188,6 +194,13 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
 
     if (!data.mod_time.empty()) {
         info_elements.push_back(text("  " + data.mod_time) | color(TC("time")));
+    }
+
+    if (FTB::ConfigManager::GetInstance()->IsNoPreviewExtension(ext)) {
+        info_elements.push_back(separator() | color(TC("main_border")));
+        info_elements.push_back(text("  Preview not available") | color(TC("dim")) | dim);
+        info_elements.push_back(separator() | color(TC("main_border")));
+        return vbox(info_elements) | bgcolor(TC("main_bg")) | flex | yframe;
     }
 
     if (data.is_dir && data.exists) {
@@ -279,7 +292,7 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
     bool is_hex_binary = !data.is_dir && data.is_regular
         && HexPreview::IsBinaryFile(data.selectedName)
         && !is_image && !is_archive
-        && !is_spreadsheet && !is_media && !is_pdf && !is_doc;
+        && !is_spreadsheet && !is_media && !is_audio && !is_pdf && !is_doc;
 
     if (is_archive) {
         std::string archivePath = (fs::path(currentPath) / data.selectedName).string();
@@ -437,6 +450,24 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
         }
     }
 
+    if (is_audio && AudioPreview::IsEnabled()) {
+        std::string fp = (fs::path(currentPath) / data.selectedName).string();
+        AudioPreview::LoadAsync(fp, preview_panel_width);
+        AudioCache ac;
+        if (AudioPreview::GetCached(fp, ac)) {
+            if (!ac.output.empty()) {
+                info_elements.push_back(separator() | color(TC("main_border")));
+                info_elements.push_back(FTB::AnsiStringToElement(ac.output) | flex);
+            } else {
+                info_elements.push_back(separator() | color(TC("main_border")));
+                info_elements.push_back(text("  Audio file (use Ctrl+B aud to toggle)") | color(TC("dim")) | dim);
+            }
+        } else {
+            info_elements.push_back(separator() | color(TC("main_border")));
+            info_elements.push_back(text("  Loading audio preview...") | color(TC("dim")) | dim);
+        }
+    }
+
     if (is_doc) {
         std::string fp = (fs::path(currentPath) / data.selectedName).string();
         bool pandoc_used = false;
@@ -516,7 +547,7 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
     bool text_preview_eligible = cfg_preview.max_text_file_size_kb == 0
         || data.file_size <= static_cast<uintmax_t>(cfg_preview.max_text_file_size_kb) * 1024;
 
-    if (!data.is_dir && data.is_regular && text_preview_eligible && !is_image && !is_archive && !is_spreadsheet && !is_media && !is_pdf && !is_doc && !is_hex_binary) {
+    if (!data.is_dir && data.is_regular && text_preview_eligible && !is_image && !is_archive && !is_spreadsheet && !is_media && !is_audio && !is_pdf && !is_doc && !is_hex_binary) {
         std::string fp = (fs::path(currentPath) / data.selectedName).string();
 
         bool is_markdown = MarkdownPreview::IsMarkdownFile(data.selectedName);
@@ -590,14 +621,16 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
                     }
                     if (displayed >= max_lines) break;
 
-                    // Apply horizontal scroll
-                    if (scroll_x > 0 && static_cast<int>(line.size()) > scroll_x)
-                        line = line.substr(scroll_x);
-                    else if (scroll_x > 0)
+                    // Apply horizontal scroll (scroll_x is display columns, convert to byte offset)
+                    if (scroll_x > 0 && UnicodeUtil::CalculateDisplayWidth(line) > scroll_x) {
+                        size_t byte_off = UnicodeUtil::ByteOffsetFromDisplayColumn(line, scroll_x);
+                        line = line.substr(byte_off);
+                    } else if (scroll_x > 0) {
                         line = "";
+                    }
 
-                    if (cfg_preview.truncate_long_lines && static_cast<int>(line.size()) > usable_line_width)
-                        line = line.substr(0, usable_line_width - 3) + "...";
+                    if (cfg_preview.truncate_long_lines && UnicodeUtil::CalculateDisplayWidth(line) > usable_line_width)
+                        line = UnicodeUtil::Utf8Truncate(line, usable_line_width - 3) + "...";
 
                     g_preview_sel.lines.push_back(line);
 
