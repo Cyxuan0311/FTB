@@ -99,6 +99,7 @@ struct PluginContext {
     int64_t selected_size = 0;          // File size in bytes
     std::string selected_mime;          // MIME type (if known)
     nlohmann::json args;               // Arguments passed to the plugin
+    int panel_width = 0;               // Preview panel width
 };
 
 // ─── Plugin Result ───────────────────────────────────────────────────
@@ -119,6 +120,31 @@ struct StatusBarSegment {
     std::string bg_color;       // Background color (hex or name)
     bool bold = false;
     std::string align = "left"; // "left" or "right"
+};
+
+// ─── Previewer Definition ─────────────────────────────────────────────
+// Returned by a Previewer-type plugin's entry() function.
+// The plugin defines how to run an external command; C++ caches the
+// definition and executes the command directly for each preview request.
+
+struct PreviewerDefinition {
+    std::string command;                   // External command path
+    std::vector<std::string> args;         // Args with {file}/{width} placeholders
+    std::string label;                     // Preview label (e.g. "Glow")
+    bool ansi_output = true;
+    int timeout_ms = 10000;
+    bool loaded = false;                   // Has been fetched from plugin
+};
+
+// ─── Plugin Preview Result ────────────────────────────────────────────
+// Polled by the renderer on each frame until completed.
+
+struct PluginPreviewResult {
+    std::string output;
+    std::string label;
+    bool loaded = false;
+    bool completed = false;
+    bool failed = false;
 };
 
 // ─── Plugin Instance ─────────────────────────────────────────────────
@@ -191,6 +217,13 @@ public:
     std::string FindPreviewer(const std::string& mime_type,
                                const std::string& file_ext) const;
 
+    // Preview execution (async + cached)
+    void ExecutePluginPreview(const std::string& name,
+                               const PluginContext& ctx,
+                               int panel_width);
+    bool PollPluginPreview(const std::string& name,
+                            PluginPreviewResult& out);
+
     // Fetcher matching
     std::string FindFetcher(const std::string& mime_type) const;
 
@@ -254,6 +287,25 @@ private:
     void LoadEnabledState();
     std::string ResolvePluginPath(const std::string& name) const;
     bool ValidatePlugin(const std::string& dir) const;
+
+    // Previewer helpers
+    PreviewerDefinition LoadPreviewerDefinition(const std::string& name, const PluginContext& ctx = {});
+    void CancelPluginPreview();
+
+    std::map<std::string, PreviewerDefinition> previewer_definitions_;
+    mutable std::mutex preview_mutex_;
+
+    struct PluginPreviewEntry {
+        std::string plugin_name;
+        std::string file_path;
+        std::string output;
+        std::string label;
+        bool loaded = false;
+        bool completed = false;
+        bool failed = false;
+        pid_t child_pid = 0;
+    };
+    PluginPreviewEntry preview_entry_;
 };
 
 }  // namespace FTB
