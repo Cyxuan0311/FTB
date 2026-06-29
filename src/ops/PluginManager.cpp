@@ -6,6 +6,10 @@
 #include <algorithm>
 #include <cstdlib>
 #include <regex>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <csignal>
+#include <fcntl.h>
 
 namespace fs = std::filesystem;
 
@@ -230,8 +234,8 @@ bool PluginInstance::CompileTypeScript() {
         {"\\((\\w+):\\s*[A-Za-z_]\\w*(?:\\[\\])?\\s*\\)", "($1)"},
         // Remove first param in multi-param functions: `(x: Type, y: Type)`
         {"\\(\\s*(\\w+):\\s*[A-Za-z_]\\w*(?:\\[\\])?,\\s*", "($1, "},
-        // Remove middle params: `, x: Type` - only uppercase types to avoid matching object literal properties like `, bold: false`
-        {",\\s*(\\w+):\\s*[A-Z]\\w*(?:\\[\\])?(?:\\s*=\\s*[^,)]+)?", ",$1"},
+        // Remove middle params: `, x: Type` - match uppercase types + known primitives; avoid matching object literal properties
+        {",\\s*(\\w+):\\s*(?:[A-Z]\\w*|string|number|boolean|bigint|symbol)(?:\\[\\])?(?:\\s*=\\s*[^,)]+)?", ",$1"},
         // Remove variable type annotations: `const x: Type =`
         {"(const|let|var)\\s+(\\w+):\\s*[A-Za-z_]\\w*(?:\\[\\])?\\s*=", "$1 $2 ="},
     };
