@@ -9,33 +9,35 @@ namespace FTB::UI {
 using namespace ftxui;
 
 Element RenderDeleteConfirmPanel(MainState& state, int tw, int /*th*/) {
-    int pw = std::min(55, tw - 4);
+    int pw = std::min(50, tw - 4);
 
     Elements els;
 
+    els.push_back(text(" Delete") | color(TC("title")) | bold);
+    els.push_back(separator() | color(TC("main_border")));
+    els.push_back(text(""));
+
     if (!state.batch_selected.empty()) {
-        els.push_back(
-            text(" Delete " + std::to_string(state.batch_selected.size()) + " items?")
-            | color(TC("error")) | bold
-        );
-        els.push_back(separator());
+        els.push_back(hbox({
+            text(" "),
+            text("Delete " + std::to_string(state.batch_selected.size()) + " items?") | color(TC("error")),
+        }));
+        els.push_back(text(""));
 
         int count = 0;
         for (int idx : state.batch_selected) {
             if (idx >= 0 && idx < static_cast<int>(state.filteredContents.size())) {
                 if (count >= 5) {
-                    els.push_back(
-                        text("  ... and " + std::to_string(state.batch_selected.size() - 5) + " more")
-                        | color(TC("dim")) | dim
-                    );
+                    els.push_back(hbox({
+                        text(" "),
+                        text("\u2514 ... and " + std::to_string(state.batch_selected.size() - 5) + " more") | color(TC("dim")) | dim,
+                    }));
                     break;
                 }
-                els.push_back(
-                    hbox({
-                        text("  "),
-                        text(state.filteredContents[idx]) | color(TC("main_fg"))
-                    })
-                );
+                els.push_back(hbox({
+                    text(" "),
+                    text("\u251c " + state.filteredContents[idx]) | color(TC("main_fg")),
+                }));
                 count++;
             }
         }
@@ -49,19 +51,32 @@ Element RenderDeleteConfirmPanel(MainState& state, int tw, int /*th*/) {
         }
 
         std::string type_label = is_dir ? "directory" : "file";
-        els.push_back(
-            text(" Delete " + type_label + "?") | color(TC("error")) | bold
-        );
-        els.push_back(separator());
-        els.push_back(
-            hbox({ text("  ") | color(TC("dim")),
-                   text(item_name) | color(TC("main_fg")) | bold })
-        );
+        els.push_back(hbox({
+            text(" "),
+            text("Delete " + type_label + "?") | color(TC("error")),
+        }));
+        els.push_back(text(""));
+        els.push_back(hbox({
+            text(" "),
+            text("\u2192 ") | color(TC("indicator")),
+            text(item_name) | color(TC("main_fg")) | bold,
+        }));
     }
 
     els.push_back(text(""));
-    els.push_back(text(state.panel_message) | color(TC("error")));
-    els.push_back(text(" Enter=Confirm  Esc=Cancel") | color(TC("dim")) | dim);
+    els.push_back(!state.panel_message.empty()
+        ? text(" " + state.panel_message) | color(TC("error"))
+        : text(""));
+    els.push_back(!state.panel_message.empty() ? text("") : text(""));
+    els.push_back(hbox({
+        text(" "),
+        text("[Enter]") | color(TC("dim")) | dim,
+        text(" Confirm") | color(TC("dim")) | dim,
+        text("    "),
+        text("[Esc]") | color(TC("dim")) | dim,
+        text(" Cancel") | color(TC("dim")) | dim,
+        filler(),
+    }));
 
     return vbox(std::move(els)) | bgcolor(TC("main_bg")) | GetPanelBorder() |
            size(WIDTH, EQUAL, pw) | center;

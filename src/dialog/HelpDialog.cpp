@@ -5,11 +5,21 @@ namespace FTB::UI {
 
 using namespace ftxui;
 
+static std::string PrefixDisplayName() {
+    auto name = FTB::KeyBindings::GetInstance().GetPrefixKeyName();
+    if (name.size() >= 4 && name.substr(0, 3) == "Alt")
+        return "Alt+" + name.substr(3);
+    if (name.size() >= 4 && name.substr(0, 4) == "Ctrl")
+        return "Ctrl+" + name.substr(4);
+    return name;
+}
+
 Element RenderHelpPanel(MainState& state, int tw, int th) {
     int pw = std::min(60, tw - 4);
     int ph = std::min(30, th - 4);
     auto& keybindings = FTB::KeyBindings::GetInstance();
     auto commands = keybindings.GetCommandList();
+    std::string prefix = PrefixDisplayName();
 
     // Visible content rows = panel height - tab_bar(1) - separator(1) - footer(1)
     int visible_rows = std::max(5, ph - 3);
@@ -22,8 +32,12 @@ Element RenderHelpPanel(MainState& state, int tw, int th) {
     auto tab1 = text(" Commands ") | (state.help_tab == 1
         ? bgcolor(TC("selection_bg")) | color(TC("selection_fg")) | bold
         : color(TC("dim")));
+    auto tab2 = text(" Prefix Key ") | (state.help_tab == 2
+        ? bgcolor(TC("selection_bg")) | color(TC("selection_fg")) | bold
+        : color(TC("dim")));
     tab_bar.push_back(tab0);
     tab_bar.push_back(tab1);
+    tab_bar.push_back(tab2);
     tab_bar.push_back(text(" "));
 
     // Build content based on tab
@@ -61,25 +75,25 @@ Element RenderHelpPanel(MainState& state, int tw, int th) {
         all_content.push_back(text("   Alt+L             Scroll right") | color(TC("main_fg")));
         all_content.push_back(text("   Mouse Wheel       Scroll up/down") | color(TC("main_fg")));
         all_content.push_back(text(""));
-        all_content.push_back(text(" File Opening (Ctrl+B)") | color(TC("title")) | bold);
+        all_content.push_back(text(" File Opening (" + prefix + ")") | color(TC("title")) | bold);
         all_content.push_back(text("   Enter             Open file with default program") | color(TC("main_fg")));
-        all_content.push_back(text("   Ctrl+B e/v        Open with built-in editor") | color(TC("main_fg")));
-        all_content.push_back(text("   Ctrl+B op         Open with picker dialog") | color(TC("main_fg")));
-        all_content.push_back(text("   Ctrl+B ow         Manual specify program") | color(TC("main_fg")));
-        all_content.push_back(text("   Ctrl+B oc         Configure openers") | color(TC("main_fg")));
+        all_content.push_back(text("   " + prefix + " e/v        Open with built-in editor") | color(TC("main_fg")));
+        all_content.push_back(text("   " + prefix + " op         Open with picker dialog") | color(TC("main_fg")));
+        all_content.push_back(text("   " + prefix + " ow         Manual specify program") | color(TC("main_fg")));
+        all_content.push_back(text("   " + prefix + " oc         Configure openers") | color(TC("main_fg")));
         all_content.push_back(text(""));
         all_content.push_back(text(" Search") | color(TC("title")) | bold);
         all_content.push_back(text("   /                 Start search (type to filter)") | color(TC("main_fg")));
         all_content.push_back(text("   Escape            Clear search") | color(TC("main_fg")));
         all_content.push_back(text("   n / N             Next / Prev match") | color(TC("main_fg")));
         all_content.push_back(text(""));
-        all_content.push_back(text(" Commands (Ctrl+B)") | color(TC("title")) | bold);
-        all_content.push_back(text("   Ctrl+B            Enter :command prefix mode") | color(TC("main_fg")));
+        all_content.push_back(text(" Commands (" + prefix + ")") | color(TC("title")) | bold);
+        all_content.push_back(text("   " + prefix + "            Enter :command prefix mode") | color(TC("main_fg")));
         all_content.push_back(text("   Tab               Complete command") | color(TC("main_fg")));
         all_content.push_back(text("   Enter             Execute command") | color(TC("main_fg")));
         all_content.push_back(text("   Escape            Cancel command") | color(TC("main_fg")));
         all_content.push_back(text(""));
-        all_content.push_back(text(" Editor (Ctrl+B :e/:v)") | color(TC("title")) | bold);
+        all_content.push_back(text(" Editor (" + prefix + " :e/:v)") | color(TC("title")) | bold);
         all_content.push_back(text("   Ctrl+O            Save file") | color(TC("main_fg")));
         all_content.push_back(text("   Ctrl+X            Exit editor") | color(TC("main_fg")));
         all_content.push_back(text("   Ctrl+K            Cut current line") | color(TC("main_fg")));
@@ -99,9 +113,9 @@ Element RenderHelpPanel(MainState& state, int tw, int th) {
         all_content.push_back(text(" Other") | color(TC("title")) | bold);
         all_content.push_back(text("   Ctrl+R            Reload config") | color(TC("main_fg")));
         all_content.push_back(text("   Ctrl+C (outside)  Quit FTB") | color(TC("main_fg")));
-    } else {
+    } else if (state.help_tab == 1) {
         all_content.push_back(text(""));
-        all_content.push_back(text(" Type :command after Ctrl+B, e.g. Ctrl+B th <Enter>") | color(TC("dim")) | dim);
+        all_content.push_back(text(" Type :command after " + prefix + ", e.g. " + prefix + " th <Enter>") | color(TC("dim")) | dim);
         all_content.push_back(text(""));
         for (const auto& [cmd, desc] : commands) {
             all_content.push_back(hbox({
@@ -110,6 +124,29 @@ Element RenderHelpPanel(MainState& state, int tw, int th) {
                 text(desc) | color(TC("main_fg")),
             }));
         }
+    } else {
+        auto keys = FTB::KeyBindings::GetInstance().GetAvailablePrefixKeys();
+        all_content.push_back(text(""));
+        all_content.push_back(text(" Current prefix key: " + prefix) | color(TC("title")) | bold);
+        all_content.push_back(text(""));
+        for (const auto& k : keys) {
+            std::string line = "   " + k.display_name;
+            line += std::string(std::max(1, 10 - static_cast<int>(k.display_name.size())), ' ');
+            if (k.is_current) {
+                line += "  (current)";
+                all_content.push_back(text(line) | color(TC("selection_fg")) | bold);
+            } else if (!k.is_safe) {
+                line += "  [X] " + k.conflict_note;
+                all_content.push_back(text(line) | color(TC("marker_cut")));
+            } else {
+                line += "  [v]";
+                all_content.push_back(text(line) | color(TC("main_fg")));
+            }
+        }
+        all_content.push_back(text(""));
+        all_content.push_back(text(" Change: edit ~/.config/ftb/ftb.json") | color(TC("dim")) | dim);
+        all_content.push_back(text("   \"keybindings\": { \"prefix\": \"CtrlA\" }") | color(TC("dim")) | dim);
+        all_content.push_back(text(" Then press Ctrl+R to reload config") | color(TC("dim")) | dim);
     }
     all_content.push_back(text(""));
     all_content.push_back(text(" Tab=Switch  Up/Dn=Scroll  q/Esc=Close") | color(TC("dim")) | dim);
@@ -144,7 +181,7 @@ bool HandleHelpEvent(MainState& state, const Event& event) {
     int visible_rows = std::max(5, ph - 3);
 
     if (event == Event::Tab) {
-        state.help_tab = 1 - state.help_tab;
+        state.help_tab = (state.help_tab + 1) % 3;
         state.help_scroll = 0;
         return true;
     }

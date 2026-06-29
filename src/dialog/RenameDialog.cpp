@@ -9,17 +9,37 @@ namespace FTB::UI {
 using namespace ftxui;
 
 Element RenderRenamePanel(MainState& state, int tw, int /*th*/) {
-    int pw = std::min(55, tw - 4);
+    int pw = std::min(50, tw - 4);
     std::string original_name;
     if (state.selected >= 0 && state.selected < static_cast<int>(state.filteredContents.size()))
         original_name = state.filteredContents[state.selected];
     return vbox({
         text(" Rename") | color(TC("title")) | bold,
-        separator(),
-        hbox({ text(" Original: ") | color(TC("dim")), text(original_name) | color(TC("main_fg")) }),
-        hbox({ text(" New name: ") | color(TC("main_fg")), text(state.panel_input + "\u258f") | color(TC("find_keyword")) }),
-        text(state.panel_message) | color(TC("error")),
-        text(" Enter=Confirm  Esc=Cancel") | color(TC("dim")) | dim,
+        separator() | color(TC("main_border")),
+        text(""),
+        hbox({
+            text(" "),
+            text(original_name) | color(TC("dim")),
+        }),
+        text(""),
+        hbox({
+            text(" "),
+            text(state.panel_input + "\u258f") | color(TC("find_keyword")),
+        }),
+        text(""),
+        (!state.panel_message.empty()
+            ? text(" " + state.panel_message) | color(TC("error"))
+            : text("")),
+        (!state.panel_message.empty() ? text("") : text("")),
+        hbox({
+            text(" "),
+            text("[Enter]") | color(TC("dim")) | dim,
+            text(" Confirm") | color(TC("dim")) | dim,
+            text("    "),
+            text("[Esc]") | color(TC("dim")) | dim,
+            text(" Cancel") | color(TC("dim")) | dim,
+            filler(),
+        }),
     }) | bgcolor(TC("main_bg")) | GetPanelBorder() |
            size(WIDTH, EQUAL, pw) | center;
 }

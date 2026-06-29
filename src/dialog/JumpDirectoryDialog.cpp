@@ -96,27 +96,46 @@ static void UpdateSuggestion(MainState& state) {
 } // anonymous namespace
 
 Element RenderJumpDirectoryPanel(MainState& state, int tw, int /*th*/) {
-    int pw = std::min(55, tw - 4);
+    int pw = std::min(50, tw - 4);
     Elements els;
     els.push_back(text(" Jump to Directory") | color(TC("title")) | bold);
-    els.push_back(separator());
+    els.push_back(separator() | color(TC("main_border")));
+    els.push_back(text(""));
 
     if (!state.panel_suggestion.empty()) {
         els.push_back(hbox({
-            text(" Path: ") | color(TC("main_fg")),
+            text(" "),
             text(state.panel_input) | color(TC("find_keyword")),
             text("\u258f") | color(TC("find_keyword")),
             text(state.panel_suggestion) | color(TC("dim")) | dim,
         }));
     } else {
         els.push_back(hbox({
-            text(" Path: ") | color(TC("main_fg")),
+            text(" "),
             text(state.panel_input + "\u258f") | color(TC("find_keyword")),
         }));
     }
 
-    els.push_back(text(state.panel_message) | color(TC("error")));
-    els.push_back(text(" Enter=Jump  Tab=Complete  \u2192=Accept  Esc=Cancel") | color(TC("dim")) | dim);
+    els.push_back(text(""));
+    els.push_back(!state.panel_message.empty()
+        ? text(" " + state.panel_message) | color(TC("error"))
+        : text(""));
+    els.push_back(!state.panel_message.empty() ? text("") : text(""));
+    els.push_back(hbox({
+        text(" "),
+        text("[Enter]") | color(TC("dim")) | dim,
+        text(" Jump") | color(TC("dim")) | dim,
+        text("    "),
+        text("[Tab]") | color(TC("dim")) | dim,
+        text(" Complete") | color(TC("dim")) | dim,
+        text("    "),
+        text("[\u2192]") | color(TC("dim")) | dim,
+        text(" Accept") | color(TC("dim")) | dim,
+        text("    "),
+        text("[Esc]") | color(TC("dim")) | dim,
+        text(" Cancel") | color(TC("dim")) | dim,
+        filler(),
+    }));
     return vbox(els) | bgcolor(TC("main_bg")) | GetPanelBorder() |
            size(WIDTH, EQUAL, pw) | center;
 }

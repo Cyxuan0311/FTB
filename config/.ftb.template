@@ -70,11 +70,22 @@
     "save_connection_history": true,
     "max_connection_history": 10
   },
+  "keybindings": {
+    "prefix": "CtrlB"
+  },
   "logging": {
     "level": "info",
     "output_to_file": false,
     "log_file": "~/.config/ftb/ftb.log",
     "show_timestamp": true
+  },
+  "ai": {
+    "backend": "ollama",
+    "endpoint": "http://localhost:11434",
+    "model": "llama3.2",
+    "api_key": "",
+    "system_prompt": "",
+    "require_confirmation": true
   },
   "bookmarks": {
     "home": "~",
