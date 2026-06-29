@@ -2,7 +2,7 @@
 #include "core/MainUI.hpp"
 #include "config/ConfigManager.hpp"
 #include "preview/PreviewCache.hpp"
-#include "utils/PerfLogger.hpp"
+#include "utils/FilesystemUtil.hpp"
 #include <filesystem>
 #include <mutex>
 
@@ -36,7 +36,7 @@ bool TabClipboard::paste(const std::string& targetPath) {
         fs::path dst = fs::path(targetPath) / src.filename();
         try {
             if (cutMode) {
-                fs::rename(src, dst);
+                if (!FTB::renameWithFallback(src, dst)) return false;
             } else {
                 if (fs::is_directory(src)) {
                     fs::copy(src, dst, fs::copy_options::recursive);
@@ -66,7 +66,6 @@ std::string Tab::displayName() const {
 }
 
 void Tab::init(const std::string& path) {
-    PERF_LOG("tab", "Tab::init: " + path);
     currentPath = path;
     selected = 0;
     current_page = 0;
@@ -79,7 +78,6 @@ void Tab::init(const std::string& path) {
 }
 
 void Tab::refreshContents() {
-    PERF_LOG("tab", "Tab::refreshContents: " + currentPath);
     allContents = FileManager::getDirectoryContents(currentPath);
     filteredContents = allContents;
     total_pages = 1;
@@ -99,7 +97,6 @@ TabManager::TabManager() {
 }
 
 int TabManager::createTab(const std::string& path) {
-    PERF_LOG("tab", "createTab: " + path);
     Tab tab;
     tab.init(path);
     tabs_.push_back(std::move(tab));

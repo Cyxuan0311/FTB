@@ -183,6 +183,18 @@ static void JsonToLoggingConfig(const json& j, LoggingConfig& l) {
     if (j.contains("show_timestamp"))  j["show_timestamp"].get_to(l.show_timestamp);
 }
 
+static json KeyBindingsConfigToJson(const KeyBindingsConfig& k) {
+    return json{
+        {"prefix", k.prefix_key}
+    };
+}
+
+static void JsonToKeyBindingsConfig(const json& j, KeyBindingsConfig& k) {
+    if (j.contains("prefix") && j["prefix"].is_string()) {
+        j["prefix"].get_to(k.prefix_key);
+    }
+}
+
 static json PreviewConfigToJson(const PreviewConfig& p) {
     return json{
         {"max_text_file_size_kb", p.max_text_file_size_kb},
@@ -319,7 +331,26 @@ bool ConfigManager::SaveConfig(const std::string& config_path) {
     root["ssh"]     = SSHConfigToJson(config_.ssh);
     root["logging"] = LoggingConfigToJson(config_.logging);
     root["bookmarks"] = BookmarkConfigToJson(config_.bookmarks);
+    root["keybindings"] = KeyBindingsConfigToJson(config_.keybindings);
     root["preview"] = PreviewConfigToJson(config_.preview);
+    {
+        json keys_arr = json::array();
+        for (const auto& k : config_.ai.keys) {
+            keys_arr.push_back({
+                {"name", k.name},
+                {"backend", k.backend},
+                {"endpoint", k.endpoint},
+                {"api_key", k.api_key},
+                {"model", k.model}
+            });
+        }
+        root["ai"] = {
+            {"keys", keys_arr},
+            {"active_key", config_.ai.active_key},
+            {"system_prompt", config_.ai.system_prompt},
+            {"require_confirmation", config_.ai.require_confirmation}
+        };
+    }
 
     json ssh_records_json = json::array();
     for (const auto& rec : ssh_records_) {
@@ -405,8 +436,43 @@ bool ConfigManager::ParseConfigFile(const std::string& content) {
             }
         }
 
+        if (root.contains("keybindings")) {
+            JsonToKeyBindingsConfig(root["keybindings"], config_.keybindings);
+        }
+
         if (root.contains("preview")) {
             JsonToPreviewConfig(root["preview"], config_.preview);
+        }
+
+        if (root.contains("ai")) {
+            auto& a = root["ai"];
+            if (a.contains("keys") && a["keys"].is_array()) {
+                config_.ai.keys.clear();
+                for (const auto& k : a["keys"]) {
+                    AIKeyConfig kc;
+                    if (k.contains("name"))     k["name"].get_to(kc.name);
+                    if (k.contains("backend"))   k["backend"].get_to(kc.backend);
+                    if (k.contains("endpoint"))  k["endpoint"].get_to(kc.endpoint);
+                    if (k.contains("api_key"))   k["api_key"].get_to(kc.api_key);
+                    if (k.contains("model"))     k["model"].get_to(kc.model);
+                    config_.ai.keys.push_back(std::move(kc));
+                }
+            }
+            if (a.contains("active_key")) a["active_key"].get_to(config_.ai.active_key);
+            if (a.contains("system_prompt")) a["system_prompt"].get_to(config_.ai.system_prompt);
+            if (a.contains("require_confirmation")) a["require_confirmation"].get_to(config_.ai.require_confirmation);
+
+            // Backward compat: old single-key format → keys[0]
+            if (!a.contains("keys") && a.contains("backend")) {
+                config_.ai.keys.clear();
+                AIKeyConfig kc;
+                if (a.contains("backend"))   a["backend"].get_to(kc.backend);
+                if (a.contains("endpoint"))  a["endpoint"].get_to(kc.endpoint);
+                if (a.contains("model"))     a["model"].get_to(kc.model);
+                if (a.contains("api_key"))   a["api_key"].get_to(kc.api_key);
+                config_.ai.keys.push_back(std::move(kc));
+                config_.ai.active_key = 0;
+            }
         }
 
     } catch (const json::parse_error& e) {

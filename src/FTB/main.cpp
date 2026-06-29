@@ -24,6 +24,10 @@
 #include "../include/utils/PerfLogger.hpp"
 #include "../include/utils/SystemClipboard.hpp"
 #include "../include/renderer/TextSelection.hpp"
+#ifdef FTB_ENABLE_AI
+#include "../include/ai/SessionManager.hpp"
+#include "../include/dialog/AIDialog.hpp"
+#endif
 #include "../include/ops/EventHandler.hpp"
 #include "../include/dialog/TabBarRenderer.hpp"
 #include "../include/dialog/OpenerPickerDialog.hpp"
@@ -92,6 +96,11 @@ int main(int argc, char* argv[])
     }
 
     {
+        auto& kb = FTB::KeyBindings::GetInstance();
+        kb.SetPrefixKey(config_manager->GetConfig().keybindings.prefix_key);
+    }
+
+    {
         FTB::OpenerManager::Instance().LoadConfig(config_manager->GetConfig().opener);
     }
 
@@ -103,6 +112,16 @@ int main(int argc, char* argv[])
             FTB::ThemeManager::GetInstance()->ApplyTheme(saved_theme);
         }
     }
+
+#ifdef FTB_ENABLE_AI
+    {
+        const char* home = getenv("HOME");
+        std::string sessions_dir = home ? (std::string(home) + "/.config/ftb") : "/tmp/.config/ftb";
+        std::string sessions_path = sessions_dir + "/ai_sessions.json";
+        std::filesystem::create_directories(sessions_dir);
+        FTB::SessionManager::getInstance().load(sessions_path);
+    }
+#endif
 
 #ifdef FTB_ENABLE_PLUGINS
     {
@@ -149,6 +168,17 @@ int main(int argc, char* argv[])
     screen.SetCursor(Screen::Cursor{0, 0, Screen::Cursor::Hidden});
 
     screen.ForceHandleCtrlZ(false);
+
+    // ---- Start background plugin refresh ----
+
+#ifdef FTB_ENABLE_PLUGINS
+    {
+        auto pm = FTB::PluginManager::GetInstance();
+        pm->StartBackgroundRefresh([&screen]() {
+            screen.Post(Event::Custom);
+        });
+    }
+#endif
 
     // ---- UI 刷新控制 ----
 
@@ -269,6 +299,55 @@ int main(int argc, char* argv[])
                 return true;
             }
 
+#ifdef FTB_ENABLE_AI
+            if (state.active_panel == ActivePanel::AI) {
+                if (mouse.button == Mouse::WheelUp) {
+                    state.ai.log_scroll = std::max(0, state.ai.log_scroll - 3);
+                    state.ai.auto_scroll = false;
+                    return true;
+                }
+                if (mouse.button == Mouse::WheelDown) {
+                    int max_scroll = std::max(0, state.ai.total_display_lines - state.ai.conv_height);
+                    state.ai.log_scroll = std::min(max_scroll, state.ai.log_scroll + 3);
+                    state.ai.auto_scroll = (state.ai.log_scroll >= max_scroll);
+                    return true;
+                }
+
+                if (mouse.button == Mouse::Left) {
+                    if (mouse.motion == Mouse::Pressed) {
+                        state.ai.sel_dragging = true;
+                        int abs_line = state.ai.log_scroll + mouse.y - state.ai.conv_area_y;
+                        state.ai.sel_anchor_line = abs_line;
+                        state.ai.sel_current_line = abs_line;
+                        int abs_col = mouse.x - state.ai.conv_area_x;
+                        state.ai.sel_anchor_col = abs_col;
+                        state.ai.sel_current_col = abs_col;
+                        return true;
+                    }
+                    if (mouse.motion == Mouse::Moved && state.ai.sel_dragging) {
+                        int abs_line = state.ai.log_scroll + mouse.y - state.ai.conv_area_y;
+                        state.ai.sel_current_line = abs_line;
+                        int abs_col = mouse.x - state.ai.conv_area_x;
+                        state.ai.sel_current_col = abs_col;
+                        return true;
+                    }
+                    if (mouse.motion == Mouse::Released && state.ai.sel_dragging) {
+                        state.ai.sel_dragging = false;
+                        auto sel_text = FTB::UI::ExtractAISelectedText(state);
+                        if (!sel_text.empty()) {
+                            StatusMessage::Show("Copied to clipboard");
+                            std::thread([t = std::move(sel_text)]() {
+                                CopyToSystemClipboard(t);
+                            }).detach();
+                        }
+                        return true;
+                    }
+                }
+                // Don't fall through to column selection if AI panel is active
+                return true;
+            }
+#endif
+
             int sep_w = FTB::GetColumnSeparatorWidth();
 
             if (mouse.button == Mouse::Left && mouse.motion == Mouse::Pressed) {
@@ -292,7 +371,6 @@ int main(int argc, char* argv[])
                 }
                 return true;
             }
-            // Mouse wheel: scroll preview panel
             if (mouse.button == Mouse::WheelUp) {
                 if (state.preview_scroll_y > 0)
                     state.preview_scroll_y = std::max(0, state.preview_scroll_y - 3);
@@ -358,6 +436,8 @@ int main(int argc, char* argv[])
 
         if (event == Event::CtrlR) {
             config_manager->ReloadConfig();
+            FTB::KeyBindings::GetInstance().SetPrefixKey(config_manager->GetConfig().keybindings.prefix_key);
+            FTB::StatusMessage::Show("Config reloaded");
             return true;
         }
 
@@ -405,9 +485,23 @@ int main(int argc, char* argv[])
     screen.Loop(final_component);
     refresh_ui = false;
 
+#ifdef FTB_ENABLE_PLUGINS
+    FTB::PluginManager::GetInstance()->StopBackgroundRefresh();
+#endif
+
 #ifdef FTB_ENABLE_SSH
     if (state.ssh_connected) {
         UI::disconnectSSH(state);
+    }
+#endif
+
+#ifdef FTB_ENABLE_AI
+    {
+        if (state.ai_agent) {
+            state.ai_agent->syncToSessionManager();
+        }
+        FTB::SessionManager::getInstance().save(
+            FTB::SessionManager::getInstance().filePath());
     }
 #endif
 

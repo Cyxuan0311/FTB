@@ -1,4 +1,8 @@
 #include "core/MainUI.hpp"
+#ifdef FTB_ENABLE_AI
+#include "ai/AIAgent.hpp"
+#include "ai/SessionManager.hpp"
+#endif
 
 #include <cstdlib>
 #include <filesystem>
@@ -8,7 +12,6 @@
 #include <ftxui/dom/elements.hpp>
 
 #include "utils/StatusMessage.hpp"
-#include "utils/PerfLogger.hpp"
 #include "preview/MarkdownPreview.hpp"
 #include "preview/SpreadsheetPreview.hpp"
 #include "preview/MediaPreview.hpp"
@@ -55,6 +58,10 @@
 #ifdef FTB_ENABLE_SSH
 #include "dialog/SSHDialog.hpp"
 #endif
+#ifdef FTB_ENABLE_AI
+#include "dialog/AIDialog.hpp"
+#include "dialog/AIConfigDialog.hpp"
+#endif
 
 namespace fs = std::filesystem;
 
@@ -95,6 +102,10 @@ Element BuildPanelModal(MainState& state) {
 #endif
 #ifdef FTB_ENABLE_SSH
     case ActivePanel::SSH:            return UI::RenderSSHPanel(state, tw, th);
+#endif
+#ifdef FTB_ENABLE_AI
+    case ActivePanel::AI:             return UI::RenderAIPanel(state, tw, th);
+    case ActivePanel::AIConfig:       return UI::RenderAIConfigPanel(state, tw, th);
 #endif
     default:                          return text("");
     }
@@ -146,15 +157,20 @@ bool HandlePanelEvent(MainState& state, const Event& event) {
 #ifdef FTB_ENABLE_PLUGINS
     case ActivePanel::Plugin:         return UI::HandlePluginEvent(state, event);
 #endif
+#ifdef FTB_ENABLE_AI
+    case ActivePanel::AIConfig:        return UI::HandleAIConfigEvent(state, event);
+#endif
 #ifdef FTB_ENABLE_SSH
     case ActivePanel::SSH:            return UI::HandleSSHEvent(state, event);
+#endif
+#ifdef FTB_ENABLE_AI
+    case ActivePanel::AI:             return UI::HandleAIEvent(state, event);
 #endif
     default:                          return true;
     }
 }
 
 void OpenEditorForFile(MainState& state, const std::string& filePath) {
-    PERF_LOG("file", "OpenEditorForFile: " + filePath);
     if (state.vimEditor != nullptr) {
         FTB::NanoEditorPool::GetInstance().release(std::move(state.vimEditor));
     }
@@ -367,7 +383,6 @@ void HandlePanelCommand(MainState& state, FTB::KeyBindings::PanelCommand cmd) {
         break;
     }
     case FTB::KeyBindings::PanelCommand::GoHome: {
-        PERF_LOG("nav", "GoHome");
         const char* home_env = std::getenv("HOME");
         std::string home = home_env ? home_env : "";
         if (!home.empty()) {
@@ -387,7 +402,6 @@ void HandlePanelCommand(MainState& state, FTB::KeyBindings::PanelCommand cmd) {
         break;
     }
     case FTB::KeyBindings::PanelCommand::GoDownloads: {
-        PERF_LOG("nav", "GoDownloads");
         const char* home_env = std::getenv("HOME");
         std::string home = home_env ? home_env : "";
         if (!home.empty()) {
@@ -408,7 +422,6 @@ void HandlePanelCommand(MainState& state, FTB::KeyBindings::PanelCommand cmd) {
         break;
     }
     case FTB::KeyBindings::PanelCommand::GoConfig: {
-        PERF_LOG("nav", "GoConfig");
         const char* home_env = std::getenv("HOME");
         std::string home = home_env ? home_env : "";
         if (!home.empty()) {
@@ -437,7 +450,6 @@ void HandlePanelCommand(MainState& state, FTB::KeyBindings::PanelCommand cmd) {
         state.panel_suggestion.clear();
         state.active_panel = ActivePanel::NewTab; break;
     case FTB::KeyBindings::PanelCommand::CloseTab:
-        PERF_LOG("tab", "CloseTab");
         if (state.tabManager.canClose()) {
             state.saveTabState();
             state.tabManager.closeTab(state.tabManager.activeIndex());
@@ -448,13 +460,11 @@ void HandlePanelCommand(MainState& state, FTB::KeyBindings::PanelCommand cmd) {
         }
         break;
     case FTB::KeyBindings::PanelCommand::NextTab:
-        PERF_LOG("tab", "NextTab");
         state.saveTabState();
         state.tabManager.nextTab();
         state.loadTabState();
         break;
     case FTB::KeyBindings::PanelCommand::PrevTab:
-        PERF_LOG("tab", "PrevTab");
         state.saveTabState();
         state.tabManager.prevTab();
         state.loadTabState();
@@ -521,6 +531,34 @@ void HandlePanelCommand(MainState& state, FTB::KeyBindings::PanelCommand cmd) {
         state.panel_message.clear();
         state.active_panel = ActivePanel::SSH; break;
 #endif
+#ifdef FTB_ENABLE_AI
+    case FTB::KeyBindings::PanelCommand::AI:
+        state.panel_input.clear();
+        state.panel_message.clear();
+        if (!state.ai_agent) {
+            state.ai = std::move(AIPanelState{});
+            state.ai_agent = std::make_unique<AIAgent>(state);
+            auto& sm = SessionManager::getInstance();
+            state.ai.current_session_id = sm.activeSessionId();
+            if (auto* session = sm.getSession(sm.activeSessionId())) {
+                if (!session->messages.empty()) {
+                    state.ai_agent->loadSession(session->messages);
+                }
+            }
+        }
+        state.active_panel = ActivePanel::AI; break;
+    case FTB::KeyBindings::PanelCommand::AIConfig: {
+        auto& ai_cfg = ConfigManager::GetInstance()->GetConfigMutable().ai;
+        state.ai_config_tab = 0;
+        state.ai_config_selected = 0;
+        state.ai_config_field = 0;
+        state.ai_config_editing = false;
+        state.ai_config_active_key = ai_cfg.active_key;
+        state.ai_config_keys = ai_cfg.keys;
+        state.active_panel = ActivePanel::AIConfig;
+        break;
+    }
+#endif
     default:
         break;
     }
@@ -570,6 +608,10 @@ void RegisterPanelCommands(FTB::KeyBindings& keybindings, MainState& state) {
 #endif
 #ifdef FTB_ENABLE_SSH
     keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::SSH, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::SSH); });
+#endif
+#ifdef FTB_ENABLE_AI
+    keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::AI, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::AI); });
+    keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::AIConfig, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::AIConfig); });
 #endif
 }
 

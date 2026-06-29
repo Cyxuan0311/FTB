@@ -189,6 +189,32 @@ struct StatusBarConfig {
     StatusBarConfig() = default;
 };
 
+// ---- AI Key 配置（独立的 backend/endpoint/model/api_key 组合）----
+struct AIKeyConfig {
+    std::string name = "Default";
+    std::string backend = "ollama";
+    std::string endpoint = "http://localhost:11434";
+    std::string api_key;
+    std::string model = "llama3.2";
+};
+
+// ---- AI 配置 ----
+struct AIConfig {
+    std::vector<AIKeyConfig> keys = { AIKeyConfig{} };
+    int active_key = 0;
+    std::string system_prompt;
+    bool require_confirmation = true;
+
+    AIConfig() = default;
+};
+
+// ---- 快捷键配置 ----
+struct KeyBindingsConfig {
+    std::string prefix_key = "CtrlB";
+
+    KeyBindingsConfig() = default;
+};
+
 // ---- 预览配置 ----
 struct PreviewConfig {
     int max_text_file_size_kb = 0;      // 0 = no limit

@@ -17,9 +17,11 @@ option(FTB_ENABLE_ICONS "Enable Nerd Font icons (requires patched font)" ON)
 option(FTB_ENABLE_LIBCHAFA "Enable libchafa for advanced image preview" OFF)
 option(FTB_ENABLE_TREE_SITTER "Enable tree-sitter for advanced syntax highlighting" OFF)
 option(FTB_ENABLE_PLUGINS "Enable TypeScript/JavaScript plugin system" ON)
+option(FTB_ENABLE_AI "Enable AI assistant panel (requires httplib)" OFF)
 
 # 设置包含目录
 include_directories(include)
+include_directories(third_party)
 
 # ---- 核心依赖 (必须) ----
 find_package(ftxui CONFIG REQUIRED)
@@ -72,6 +74,19 @@ if(FTB_ENABLE_PLUGINS)
     message(STATUS "Plugin system: ENABLED (TypeScript/JavaScript)")
 else()
     message(STATUS "Plugin system: DISABLED")
+endif()
+
+if(FTB_ENABLE_AI)
+    add_compile_definitions(FTB_ENABLE_AI)
+    find_package(OpenSSL QUIET)
+    if(OpenSSL_FOUND)
+        add_compile_definitions(CPPHTTPLIB_OPENSSL_SUPPORT)
+        message(STATUS "AI assistant: ENABLED (Ollama + OpenAI + HTTPS/SSL)")
+    else()
+        message(STATUS "AI assistant: ENABLED (Ollama only, install libssl-dev for HTTPS)")
+    endif()
+else()
+    message(STATUS "AI assistant: DISABLED")
 endif()
 
 # ---- 构建核心库 ----
@@ -160,6 +175,28 @@ list(APPEND FTB_CORE_SOURCES
     src/dialog/UIStylePanel.cpp
 )
 
+# AI 模块源文件
+if(FTB_ENABLE_AI)
+    list(APPEND FTB_CORE_SOURCES
+        src/ai/AIClient.cpp
+        src/ai/ContextBuilder.cpp
+        src/ai/ToolRegistry.cpp
+        src/ai/ResponseRouter.cpp
+        src/ai/ActionExecutor.cpp
+        src/ai/ActionExecutor_FileIO.cpp
+        src/ai/ActionExecutor_Browse.cpp
+        src/ai/ActionExecutor_Search.cpp
+        src/ai/ActionExecutor_Clipboard.cpp
+        src/ai/ActionExecutor_Batch.cpp
+        src/ai/ActionExecutor_Advanced.cpp
+        src/ai/MemoryManager.cpp
+        src/ai/AIAgent.cpp
+        src/ai/SessionManager.cpp
+        src/dialog/AIDialog.cpp
+        src/dialog/AIConfigDialog.cpp
+    )
+endif()
+
 # 可选模块源文件
 if(FTB_ENABLE_SSH)
     list(APPEND FTB_CORE_SOURCES
@@ -187,6 +224,11 @@ target_link_libraries(FTB_core
 )
 
 # 可选链接库 (PUBLIC 以传播到最终可执行文件)
+# AI 模块链接 (SSL for OpenRouter / OpenAI HTTPS endpoints)
+if(FTB_ENABLE_AI AND OpenSSL_FOUND)
+    target_link_libraries(FTB_core PUBLIC OpenSSL::SSL OpenSSL::Crypto)
+endif()
+
 if(FTB_ENABLE_SSH)
     # --no-as-needed 确保 SSHConnection 尚未被实际引用时 libssh2 仍被链接
     target_link_libraries(FTB_core PUBLIC

@@ -10,6 +10,14 @@
 
 namespace FTB {
 
+struct PrefixKeyInfo {
+    std::string name;
+    std::string display_name;
+    bool is_current = false;
+    bool is_safe = true;
+    std::string conflict_note;
+};
+
 /**
  * @class KeyBindings
  * @brief 统一快捷键管理模块
@@ -66,6 +74,10 @@ public:
 #ifdef FTB_ENABLE_SSH
         SSH,
 #endif
+#ifdef FTB_ENABLE_AI
+        AI,
+        AIConfig,
+#endif
     };
 
     static KeyBindings& GetInstance();
@@ -108,6 +120,15 @@ public:
     // 设置屏幕引用
     void SetScreen(ftxui::ScreenInteractive* screen) { screen_ = screen; }
 
+    // 设置前缀键 (由配置文件传入)
+    void SetPrefixKey(const std::string& key_name);
+
+    // 获取当前前缀键名称
+    const std::string& GetPrefixKeyName() const { return prefix_key_name_; }
+
+    // 获取所有可选前缀键列表 (供帮助面板使用)
+    std::vector<PrefixKeyInfo> GetAvailablePrefixKeys() const;
+
 private:
     KeyBindings() = default;
 
@@ -118,9 +139,14 @@ private:
     std::map<PanelCommand, CommandCallback> callbacks_;
     ftxui::ScreenInteractive* screen_ = nullptr;
 
+    ftxui::Event prefix_event_ = ftxui::Event::CtrlB;
+    std::string prefix_key_name_ = "CtrlB";
+
     // 命令名称映射
     static const std::map<std::string, PanelCommand> command_map_;
     static std::map<std::string, PanelCommand> InitCommandMap();
+
+    static const std::map<std::string, ftxui::Event>& GetKeyEventMap();
 };
 
 } // namespace FTB

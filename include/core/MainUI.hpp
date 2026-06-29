@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <set>
+#include <memory>
 #include <atomic>
 #include <functional>
 #include <ftxui/dom/elements.hpp>
@@ -20,6 +21,10 @@
 #include "config/ObjectPool.hpp"
 #include "ops/OpenerManager.hpp"
 #include "renderer/detail_element.hpp"
+
+#ifdef FTB_ENABLE_AI
+#include "ai/AIAgent.hpp"
+#endif
 
 namespace FTB {
 
@@ -54,7 +59,60 @@ enum class ActivePanel {
 #ifdef FTB_ENABLE_SSH
     SSH,
 #endif
+#ifdef FTB_ENABLE_AI
+    AI,
+    AIConfig,
+#endif
 };
+
+// ---- AI 面板状态 ----
+#ifdef FTB_ENABLE_AI
+class AIClient;
+struct AILogEntry {
+    enum Type { User, Assistant, Step, Success, Error, System };
+    Type type;
+    std::string text;
+};
+
+struct AIPanelState {
+    std::string input_text;
+    int input_cursor = 0;
+    std::vector<AILogEntry> entries;
+    bool input_focused = true;
+    int log_scroll = 0;
+    bool auto_scroll = true;
+    int spinner_index = 0;
+    int stream_visible_len = 0;
+    std::string current_session_id;
+
+    // Text selection state (line + character)
+    bool sel_dragging = false;
+    int sel_anchor_line = -1;
+    int sel_current_line = -1;
+    int sel_anchor_col = -1;
+    int sel_current_col = -1;
+    int conv_area_y = 3;
+    int conv_area_x = 0;
+    int conv_content_width = 72;
+
+    // Input history
+    std::vector<std::string> input_history;
+    int history_pos = -1;
+    std::string saved_input;
+
+    // Line-based scrolling
+    std::vector<int> entry_line_heights;
+    int total_display_lines = 0;
+    int conv_height = 0;
+
+    ~AIPanelState();
+    AIPanelState();
+    AIPanelState(AIPanelState&&) noexcept;
+    AIPanelState& operator=(AIPanelState&&) noexcept;
+    AIPanelState(const AIPanelState&) = delete;
+    AIPanelState& operator=(const AIPanelState&) = delete;
+};
+#endif
 
 // ---- 主界面共享状态 ----
 struct MainState {
@@ -137,6 +195,7 @@ struct MainState {
 
     // 目录历史
     DirectoryHistory directoryHistory;
+    DirectoryHistory forward_history;
 
     // 多标签管理
     TabManager tabManager;
@@ -168,6 +227,17 @@ struct MainState {
     std::string ssh_remotePath; // current remote path
     std::vector<FTB::SSHRecord> ssh_records;
     int ssh_record_selected = 0;
+#endif
+#ifdef FTB_ENABLE_AI
+    AIPanelState ai;
+    std::unique_ptr<AIAgent> ai_agent;
+    // AI config dialog state
+    int ai_config_tab = 0;
+    int ai_config_selected = 0;
+    int ai_config_field = 0;
+    bool ai_config_editing = false;
+    int ai_config_active_key = 0;
+    std::vector<AIKeyConfig> ai_config_keys;
 #endif
 };
 

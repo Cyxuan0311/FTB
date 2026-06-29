@@ -93,6 +93,86 @@ std::map<std::string, KeyBindings::PanelCommand> KeyBindings::InitCommandMap() {
 #ifdef FTB_ENABLE_SSH
     m["ssh"]        = PanelCommand::SSH;
 #endif
+#ifdef FTB_ENABLE_AI
+    m["ai"]         = PanelCommand::AI;
+    m["ask"]        = PanelCommand::AI;
+    m["aicfg"]      = PanelCommand::AIConfig;
+    m["ai-config"]  = PanelCommand::AIConfig;
+#endif
+    return m;
+}
+
+const std::map<std::string, ftxui::Event>& KeyBindings::GetKeyEventMap() {
+    static const std::map<std::string, ftxui::Event> m = [] {
+        std::map<std::string, ftxui::Event> map;
+        map["CtrlA"] = ftxui::Event::CtrlA;
+        map["CtrlB"] = ftxui::Event::CtrlB;
+        map["CtrlC"] = ftxui::Event::CtrlC;
+        map["CtrlD"] = ftxui::Event::CtrlD;
+        map["CtrlE"] = ftxui::Event::CtrlE;
+        map["CtrlF"] = ftxui::Event::CtrlF;
+        map["CtrlG"] = ftxui::Event::CtrlG;
+        map["CtrlH"] = ftxui::Event::CtrlH;
+        map["CtrlI"] = ftxui::Event::CtrlI;
+        map["CtrlJ"] = ftxui::Event::CtrlJ;
+        map["CtrlK"] = ftxui::Event::CtrlK;
+        map["CtrlL"] = ftxui::Event::CtrlL;
+        map["CtrlM"] = ftxui::Event::CtrlM;
+        map["CtrlN"] = ftxui::Event::CtrlN;
+        map["CtrlO"] = ftxui::Event::CtrlO;
+        map["CtrlP"] = ftxui::Event::CtrlP;
+        map["CtrlQ"] = ftxui::Event::CtrlQ;
+        map["CtrlR"] = ftxui::Event::CtrlR;
+        map["CtrlS"] = ftxui::Event::CtrlS;
+        map["CtrlT"] = ftxui::Event::CtrlT;
+        map["CtrlU"] = ftxui::Event::CtrlU;
+        map["CtrlV"] = ftxui::Event::CtrlV;
+        map["CtrlW"] = ftxui::Event::CtrlW;
+        map["CtrlX"] = ftxui::Event::CtrlX;
+        map["CtrlY"] = ftxui::Event::CtrlY;
+        map["CtrlZ"] = ftxui::Event::CtrlZ;
+
+        map["AltA"] = ftxui::Event::AltA;
+        map["AltB"] = ftxui::Event::AltB;
+        map["AltC"] = ftxui::Event::AltC;
+        map["AltD"] = ftxui::Event::AltD;
+        map["AltE"] = ftxui::Event::AltE;
+        map["AltF"] = ftxui::Event::AltF;
+        map["AltG"] = ftxui::Event::AltG;
+        map["AltH"] = ftxui::Event::AltH;
+        map["AltI"] = ftxui::Event::AltI;
+        map["AltJ"] = ftxui::Event::AltJ;
+        map["AltK"] = ftxui::Event::AltK;
+        map["AltL"] = ftxui::Event::AltL;
+        map["AltM"] = ftxui::Event::AltM;
+        map["AltN"] = ftxui::Event::AltN;
+        map["AltO"] = ftxui::Event::AltO;
+        map["AltP"] = ftxui::Event::AltP;
+        map["AltQ"] = ftxui::Event::AltQ;
+        map["AltR"] = ftxui::Event::AltR;
+        map["AltS"] = ftxui::Event::AltS;
+        map["AltT"] = ftxui::Event::AltT;
+        map["AltU"] = ftxui::Event::AltU;
+        map["AltV"] = ftxui::Event::AltV;
+        map["AltW"] = ftxui::Event::AltW;
+        map["AltX"] = ftxui::Event::AltX;
+        map["AltY"] = ftxui::Event::AltY;
+        map["AltZ"] = ftxui::Event::AltZ;
+
+        map["F1"]  = ftxui::Event::F1;
+        map["F2"]  = ftxui::Event::F2;
+        map["F3"]  = ftxui::Event::F3;
+        map["F4"]  = ftxui::Event::F4;
+        map["F5"]  = ftxui::Event::F5;
+        map["F6"]  = ftxui::Event::F6;
+        map["F7"]  = ftxui::Event::F7;
+        map["F8"]  = ftxui::Event::F8;
+        map["F9"]  = ftxui::Event::F9;
+        map["F10"] = ftxui::Event::F10;
+        map["F11"] = ftxui::Event::F11;
+        map["F12"] = ftxui::Event::F12;
+        return map;
+    }();
     return m;
 }
 
@@ -102,8 +182,7 @@ KeyBindings& KeyBindings::GetInstance() {
 }
 
 bool KeyBindings::HandleEvent(const ftxui::Event& event) {
-    // Ctrl+B: 进入前缀模式
-    if (event == ftxui::Event::CtrlB) {
+    if (event == prefix_event_) {
         EnterPrefixMode();
         return true;
     }
@@ -226,6 +305,60 @@ bool KeyBindings::HandlePrefixInput(const ftxui::Event& event) {
     return true; // 在前缀模式下消费所有事件
 }
 
+void KeyBindings::SetPrefixKey(const std::string& key_name) {
+    const auto& event_map = GetKeyEventMap();
+    auto it = event_map.find(key_name);
+    if (it != event_map.end()) {
+        prefix_event_ = it->second;
+        prefix_key_name_ = key_name;
+    } else {
+        prefix_event_ = ftxui::Event::CtrlB;
+        prefix_key_name_ = "CtrlB";
+    }
+}
+
+static const std::map<std::string, std::string> InitConflictMap() {
+    std::map<std::string, std::string> m;
+    m["CtrlR"] = "Reload config";
+    m["CtrlC"] = "Quit FTB";
+    m["CtrlD"] = "Delete confirm";
+    m["CtrlM"] = "Same as Enter (terminal-level)";
+    m["CtrlI"] = "Same as Tab (terminal-level)";
+    m["CtrlH"] = "Same as Backspace (terminal-level)";
+
+    m["AltJ"]  = "Preview scroll down";
+    m["AltK"]  = "Preview scroll up";
+    m["AltH"]  = "Preview scroll left";
+    m["AltL"]  = "Preview scroll right";
+    return m;
+}
+
+std::vector<PrefixKeyInfo> KeyBindings::GetAvailablePrefixKeys() const {
+    static const auto conflict_map = InitConflictMap();
+    std::vector<PrefixKeyInfo> result;
+    for (const auto& [name, event] : GetKeyEventMap()) {
+        PrefixKeyInfo info;
+        info.name = name;
+        info.is_current = (name == prefix_key_name_);
+        auto cit = conflict_map.find(name);
+        if (cit != conflict_map.end()) {
+            info.is_safe = false;
+            info.conflict_note = cit->second;
+        } else {
+            info.is_safe = true;
+        }
+        if (name.size() >= 4 && name.substr(0, 3) == "Alt") {
+            info.display_name = "Alt+" + name.substr(3);
+        } else if (name.size() >= 4 && name.substr(0, 4) == "Ctrl") {
+            info.display_name = "Ctrl+" + name.substr(4);
+        } else {
+            info.display_name = name;
+        }
+        result.push_back(info);
+    }
+    return result;
+}
+
 void KeyBindings::EnterPrefixMode() {
     prefix_mode_ = true;
     command_input_.clear();
@@ -329,6 +462,10 @@ std::vector<std::pair<std::string, std::string>> KeyBindings::GetCommandList() c
     list.push_back({"opencfg / oc",        "Configure openers"});
 #ifdef FTB_ENABLE_SSH
     list.push_back({"ssh",               "SSH connection"});
+#endif
+#ifdef FTB_ENABLE_AI
+    list.push_back({"ai / ask",          "AI assistant panel"});
+    list.push_back({"aicfg / ai-config", "AI configuration"});
 #endif
     return list;
 }
