@@ -829,6 +829,191 @@ bool PluginManager::ValidatePlugin(const std::string& dir) const {
            fs::exists(fs::path(dir) / "package.json");
 }
 
+// ─── Previewer: Load Definition ───────────────────────────────────────
+// Runs the plugin's entry() once (via qjs) to extract the command template.
+// The definition is cached for subsequent previews.
+
+PreviewerDefinition PluginManager::LoadPreviewerDefinition(const std::string& name, const PluginContext& ctx) {
+    {
+        std::lock_guard<std::mutex> lock(plugins_mutex_);
+        auto it = previewer_definitions_.find(name);
+        if (it != previewer_definitions_.end() && it->second.loaded) {
+            return it->second;
+        }
+    }
+
+    PluginContext def_ctx = ctx;
+    def_ctx.panel_width = std::max(def_ctx.panel_width, 80);
+
+    auto result = ExecutePluginFunction(name, "entry", def_ctx);
+    PreviewerDefinition def;
+
+    if (result.success && result.data.is_object()) {
+        auto& d = result.data;
+        if (d.contains("command") && d["command"].is_string())
+            def.command = d["command"].get<std::string>();
+        if (d.contains("args") && d["args"].is_array()) {
+            for (const auto& a : d["args"])
+                def.args.push_back(a.get<std::string>());
+        }
+        if (d.contains("label") && d["label"].is_string())
+            def.label = d["label"].get<std::string>();
+        if (d.contains("ansi") && d["ansi"].is_boolean())
+            def.ansi_output = d["ansi"].get<bool>();
+        if (d.contains("timeout") && d["timeout"].is_number())
+            def.timeout_ms = d["timeout"].get<int>();
+    }
+
+    if (def.command.empty()) {
+        def.loaded = false;
+    } else {
+        def.loaded = true;
+        if (def.label.empty()) def.label = name;
+    }
+
+    if (def.loaded) {
+        std::lock_guard<std::mutex> lock(plugins_mutex_);
+        previewer_definitions_[name] = def;
+    }
+
+    return def;
+}
+
+// ─── Previewer: Cancel ────────────────────────────────────────────────
+
+void PluginManager::CancelPluginPreview() {
+    std::lock_guard<std::mutex> lock(preview_mutex_);
+    if (preview_entry_.child_pid > 0) {
+        ::kill(-preview_entry_.child_pid, SIGTERM);
+        ::waitpid(preview_entry_.child_pid, nullptr, WNOHANG);
+        preview_entry_.child_pid = 0;
+    }
+}
+
+// ─── Previewer: Execute ───────────────────────────────────────────────
+// Lazy-loads the command definition, expands placeholders, then forks a
+// subprocess to run the external command asynchronously.
+
+void PluginManager::ExecutePluginPreview(const std::string& name,
+                                           const PluginContext& ctx,
+                                           int panel_width) {
+    auto def = LoadPreviewerDefinition(name, ctx);
+    if (!def.loaded) {
+        std::lock_guard<std::mutex> lock(preview_mutex_);
+        preview_entry_ = {name, ctx.selected_file_path, "", name, true, true, true, 0};
+        return;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(preview_mutex_);
+        if (preview_entry_.file_path == ctx.selected_file_path
+            && preview_entry_.plugin_name == name
+            && preview_entry_.loaded) {
+            return;
+        }
+    }
+
+    CancelPluginPreview();
+
+    auto Expand = [&](std::string s) -> std::string {
+        auto r = [&](const std::string& from, const std::string& to) -> bool {
+            size_t p;
+            if ((p = s.find(from)) != std::string::npos) {
+                s.replace(p, from.size(), to);
+                return true;
+            }
+            return false;
+        };
+        r("{file}", ctx.selected_file_path);
+        r("{name}", ctx.selected_file);
+        r("{width}", std::to_string(panel_width));
+        return s;
+    };
+
+    std::string cmd = Expand(def.command);
+    for (const auto& a : def.args)
+        cmd += " " + Expand(a);
+
+    if (def.timeout_ms > 0) {
+        cmd = "timeout " + std::to_string(def.timeout_ms / 1000) + "s " + cmd;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(preview_mutex_);
+        preview_entry_.plugin_name = name;
+        preview_entry_.file_path = ctx.selected_file_path;
+        preview_entry_.output.clear();
+        preview_entry_.label = def.label;
+        preview_entry_.completed = false;
+        preview_entry_.failed = false;
+        preview_entry_.child_pid = 0;
+        preview_entry_.loaded = true;
+    }
+
+    std::thread([this, cmd, path = ctx.selected_file_path]() {
+        int pipefd[2];
+        if (::pipe(pipefd) == -1) return;
+
+        pid_t pid = ::fork();
+        if (pid == -1) {
+            ::close(pipefd[0]);
+            ::close(pipefd[1]);
+            return;
+        }
+
+        if (pid == 0) {
+            ::close(pipefd[0]);
+            ::dup2(pipefd[1], STDOUT_FILENO);
+            int fd = ::open("/dev/null", O_WRONLY);
+            ::dup2(fd, STDERR_FILENO);
+            for (int i = 3; i < 1024; i++) ::close(i);
+            ::setpgid(0, 0);
+            ::execlp("/bin/sh", "sh", "-c", cmd.c_str(), nullptr);
+            ::_exit(1);
+        }
+
+        ::close(pipefd[1]);
+        {
+            std::lock_guard<std::mutex> lock(preview_mutex_);
+            preview_entry_.child_pid = pid;
+        }
+
+        std::string result;
+        char buf[4096];
+        ssize_t n;
+        while ((n = ::read(pipefd[0], buf, sizeof(buf))) > 0)
+            result.append(buf, n);
+        ::close(pipefd[0]);
+
+        ::waitpid(pid, nullptr, 0);
+
+        {
+            std::lock_guard<std::mutex> lock(preview_mutex_);
+            if (preview_entry_.file_path != path) return;
+            preview_entry_.output = std::move(result);
+            preview_entry_.failed = preview_entry_.output.empty();
+            preview_entry_.completed = true;
+            preview_entry_.child_pid = 0;
+        }
+    }).detach();
+}
+
+// ─── Previewer: Poll Result ───────────────────────────────────────────
+
+bool PluginManager::PollPluginPreview(const std::string& name,
+                                       PluginPreviewResult& out) {
+    std::lock_guard<std::mutex> lock(preview_mutex_);
+    if (preview_entry_.plugin_name != name || !preview_entry_.loaded) {
+        return false;
+    }
+    out.label = preview_entry_.label;
+    out.loaded = true;
+    out.completed = preview_entry_.completed;
+    out.failed = preview_entry_.failed;
+    out.output = preview_entry_.output;
+    return true;
+}
+
 // ─── Status Bar Content (Async) ─────────────────────────────────────
 
 std::vector<StatusBarSegment> PluginManager::GetStatusBarContent(const PluginContext& ctx) {
