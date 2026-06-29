@@ -10,7 +10,6 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include "../../include/utils/PerfLogger.hpp"
 #include "browser/BinaryFileHandler.hpp"
 #include "config/ConfigManager.hpp"
 
@@ -82,7 +81,6 @@ void HexPreview::LoadAsync(const std::string& filePath, uintmax_t fileSize, int 
         : std::min(fileSize, static_cast<uintmax_t>(65536));
 
     std::thread([filePath, cols, max_bytes]() {
-        PERF_LOG("preview", "HexPreview thread start: " + filePath);
         try {
             std::string cmd = "xxd -c " + std::to_string(cols)
                             + " -g 1 -l " + std::to_string(max_bytes)
@@ -151,7 +149,6 @@ void HexPreview::LoadAsync(const std::string& filePath, uintmax_t fileSize, int 
             bool ok = WIFEXITED(status) && WEXITSTATUS(status) == 0;
 
             {
-                PERF_LOG("preview", "HexPreview thread done: " + filePath);
                 std::lock_guard<std::mutex> lock(s_cache_mutex);
                 if (s_cache.key != filePath) return;
                 if (ok && !result.empty()) {
