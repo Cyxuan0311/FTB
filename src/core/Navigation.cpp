@@ -7,7 +7,6 @@
 #include "preview/PreviewCache.hpp"
 #include "browser/FileManager.hpp"
 #include "utils/StatusMessage.hpp"
-#include "utils/PerfLogger.hpp"
 #include "config/ConfigManager.hpp"
 #include "ops/OpenerManager.hpp"
 
@@ -36,7 +35,6 @@ static bool IsRemoteDir(MainState& state, const std::string& name) {
 #endif
 
 void NavigateToParent(MainState& state) {
-    PERF_SCOPE("nav");
 #ifdef FTB_ENABLE_SSH
     if (state.ssh_connected) {
         std::string parent = ParentPath(state.currentPath);
@@ -79,7 +77,6 @@ void NavigateToParent(MainState& state) {
 }
 
 void NavigateIntoSelected(MainState& state) {
-    PERF_SCOPE("nav");
     if (state.selected >= 0 && state.selected < static_cast<int>(state.filteredContents.size())) {
         std::string name = state.filteredContents[state.selected];
 
@@ -139,7 +136,6 @@ bool HandleNavigationEvent(MainState& state, const Event& event) {
     }
 
     if (event == Event::ArrowDown || event == Event::Character('j')) {
-        PERF_LOG("nav", "ArrowDown");
         if (state.selected < static_cast<int>(state.filteredContents.size()) - 1) {
             state.selected++;
             state.preview_scroll_y = 0;
@@ -152,7 +148,6 @@ bool HandleNavigationEvent(MainState& state, const Event& event) {
     }
 
     if (event == Event::ArrowUp || event == Event::Character('k')) {
-        PERF_LOG("nav", "ArrowUp");
         if (state.selected > 0) {
             state.selected--;
             state.preview_scroll_y = 0;
@@ -165,7 +160,6 @@ bool HandleNavigationEvent(MainState& state, const Event& event) {
     }
 
     if (event == Event::Character('h')) {
-        PERF_LOG("nav", "NavigateToParent via h");
         if (state.selected != 0) { state.selected = 0; return true; }
         NavigateToParent(state);
         return true;
@@ -179,19 +173,16 @@ bool HandleNavigationEvent(MainState& state, const Event& event) {
     }
 
     if (event == Event::Character('l')) {
-        PERF_LOG("nav", "NavigateIntoSelected via l");
         NavigateIntoSelected(state);
         return true;
     }
 
     if (event == Event::ArrowRight || event == Event::Return) {
-        PERF_LOG("nav", "NavigateIntoSelected via Enter");
         NavigateIntoSelected(state);
         return true;
     }
 
     if (event == Event::Home) {
-        PERF_LOG("nav", "Home");
         state.selected = 0;
         state.current_page = 0;
         state.preview_scroll_y = 0;
@@ -200,7 +191,6 @@ bool HandleNavigationEvent(MainState& state, const Event& event) {
     }
 
     if (event == Event::End || event == Event::Character('G')) {
-        PERF_LOG("nav", "End/G");
         state.selected = static_cast<int>(state.filteredContents.size()) - 1;
         if (state.selected < 0) state.selected = 0;
         state.current_page = state.selected / state.items_per_page;
@@ -213,7 +203,6 @@ bool HandleNavigationEvent(MainState& state, const Event& event) {
         auto now = std::chrono::steady_clock::now();
         auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - g_last_press).count();
         if (g_pending && diff < 400) {
-            PERF_LOG("nav", "gg");
             state.selected = 0;
             state.current_page = 0;
             state.preview_scroll_y = 0;
@@ -237,7 +226,6 @@ bool HandleNavigationEvent(MainState& state, const Event& event) {
     }
 
     if (event == Event::Character('/')) {
-        PERF_LOG("nav", "Search mode");
         state.search_mode = true;
         state.searchQuery.clear();
         return true;
@@ -255,7 +243,6 @@ bool HandleNavigationEvent(MainState& state, const Event& event) {
     }
 
     if (event == Event::Character('.')) {
-        PERF_LOG("nav", "Toggle hidden files");
         auto& cfg = ConfigManager::GetInstance()->GetConfigMutable();
         cfg.style.show_hidden_files = !cfg.style.show_hidden_files;
         state.selected = 0;

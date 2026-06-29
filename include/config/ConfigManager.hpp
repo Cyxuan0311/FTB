@@ -248,7 +248,9 @@ struct FTBConfig {
     LoggingConfig logging;
     BookmarkConfig bookmarks;
     OpenerConfig opener;
+    KeyBindingsConfig keybindings;
     PreviewConfig preview;
+    AIConfig ai;
 
     // 自定义颜色映射
     std::map<std::string, ftxui::Color> custom_colors;

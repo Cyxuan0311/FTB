@@ -1,0 +1,13 @@
+{
+    "name": "sysinfo",
+    "version": "1.0.0",
+    "description": "Display CPU usage and battery level in the status bar",
+    "author": "FTB",
+    "entry": "main.ts",
+    "type": "statusbar",
+    "permissions": {
+        "fs_read": true,
+        "fs_write": true,
+        "max_exec_ms": 5000
+    }
+}
