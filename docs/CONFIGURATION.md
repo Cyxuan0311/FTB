@@ -60,7 +60,28 @@ All color values support hex format (`#RRGGBB`) and named terminal colors.
       "executable": "#a6e3a1",
       "link": "#f5c2e7",
       "hidden": "#6c7086",
-      "system": "#f38ba8"
+      "system": "#f38ba8",
+      "extensions": {
+        "cpp": "#a6e3a1",
+        "hpp": "#a6e3a1",
+        "py": "#89b4fa",
+        "js": "#f5c2e7",
+        "ts": "#f5c2e7",
+        "md": "#89b4fa",
+        "txt": "#6c7086",
+        "toml": "#6c7086",
+        "json": "#f9e2af",
+        "yaml": "#f9e2af",
+        "yml": "#f9e2af",
+        "png": "#f38ba8",
+        "jpg": "#f38ba8",
+        "jpeg": "#f38ba8",
+        "gif": "#f38ba8",
+        "svg": "#f38ba8",
+        "zip": "#f5c2e7",
+        "tar": "#f5c2e7",
+        "gz": "#f5c2e7"
+      }
     }
   }
 }
@@ -74,6 +95,7 @@ All color values support hex format (`#RRGGBB`) and named terminal colors.
 | `link` | Symbolic links |
 | `hidden` | Hidden files (starting with `.`) |
 | `system` | System files |
+| `extensions` | Extension-to-color map (overrides categories for matching files) |
 
 #### Syntax Highlighting Colors (`colors.syntax`)
 

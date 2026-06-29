@@ -58,7 +58,28 @@ cp config/.ftb.template ~/.config/ftb/ftb.json
       "executable": "#a6e3a1",
       "link": "#f5c2e7",
       "hidden": "#6c7086",
-      "system": "#f38ba8"
+      "system": "#f38ba8",
+      "extensions": {
+        "cpp": "#a6e3a1",
+        "hpp": "#a6e3a1",
+        "py": "#89b4fa",
+        "js": "#f5c2e7",
+        "ts": "#f5c2e7",
+        "md": "#89b4fa",
+        "txt": "#6c7086",
+        "toml": "#6c7086",
+        "json": "#f9e2af",
+        "yaml": "#f9e2af",
+        "yml": "#f9e2af",
+        "png": "#f38ba8",
+        "jpg": "#f38ba8",
+        "jpeg": "#f38ba8",
+        "gif": "#f38ba8",
+        "svg": "#f38ba8",
+        "zip": "#f5c2e7",
+        "tar": "#f5c2e7",
+        "gz": "#f5c2e7"
+      }
     }
   }
 }
@@ -72,6 +93,7 @@ cp config/.ftb.template ~/.config/ftb/ftb.json
 | `link` | 符号链接 |
 | `hidden` | 隐藏文件（以 `.` 开头） |
 | `system` | 系统文件 |
+| `extensions` | 扩展名→颜色映射（对匹配的文件覆盖类别颜色） |
 
 #### 语法高亮颜色 (`colors.syntax`)
 
