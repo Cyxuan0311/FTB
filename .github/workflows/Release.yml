@@ -13,21 +13,17 @@ env:
 jobs:
   # ---- Build & Test Matrix ----
   build:
-    name: Build (${{ matrix.os }}, ${{ matrix.compiler }})
+    name: Build (${{ matrix.os == 'ubuntu-latest' && 'linux' || 'macos' }}, ${{ matrix.compiler }}, ${{ matrix.icons && 'icons' || 'noicons' }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-latest
-            compiler: gcc
-            artifact_name: FTB-linux-x86_64
-          - os: ubuntu-latest
-            compiler: clang
-            artifact_name: FTB-linux-x86_64-clang
+        os: [ubuntu-latest, macos-latest]
+        compiler: [gcc, clang]
+        icons: [true, false]
+        exclude:
           - os: macos-latest
-            compiler: clang
-            artifact_name: FTB-macos-arm64
+            compiler: gcc
 
     steps:
       - name: Checkout Repository
@@ -67,21 +63,13 @@ jobs:
           sudo cmake --install FTXUI/build
           rm -rf FTXUI
 
-      - name: Configure CMake (GCC)
-        if: matrix.compiler == 'gcc'
+      - name: Configure CMake
         run: |
           cmake -B build \
             -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-            -DCMAKE_C_COMPILER=gcc \
-            -DCMAKE_CXX_COMPILER=g++
-
-      - name: Configure CMake (Clang)
-        if: matrix.compiler == 'clang'
-        run: |
-          cmake -B build \
-            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-            -DCMAKE_C_COMPILER=clang \
-            -DCMAKE_CXX_COMPILER=clang++
+            -DCMAKE_C_COMPILER=${{ matrix.compiler == 'gcc' && 'gcc' || 'clang' }} \
+            -DCMAKE_CXX_COMPILER=${{ matrix.compiler == 'gcc' && 'g++' || 'clang++' }} \
+            -DFTB_ENABLE_ICONS=${{ matrix.icons && 'ON' || 'OFF' }}
 
       - name: Build
         run: cmake --build build --config ${{ env.BUILD_TYPE }} -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
@@ -93,7 +81,7 @@ jobs:
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
+          name: FTB-${{ matrix.os == 'ubuntu-latest' && 'linux-x86_64' || 'macos-arm64' }}${{ matrix.compiler == 'clang' && '-clang' || '' }}-${{ matrix.icons && 'icons' || 'noicons' }}
           path: build/FTB
           retention-days: 7
 
