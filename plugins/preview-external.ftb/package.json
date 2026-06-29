@@ -1,0 +1,19 @@
+{
+    "name": "preview-external",
+    "version": "1.0.0",
+    "description": "Preview files using external CLI tools (glow, chafa, pdftotext, etc.)",
+    "author": "FTB",
+    "entry": "main.ts",
+    "type": "previewer",
+    "keywords": [".md", ".pdf", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".bmp"],
+    "permissions": {
+        "fs_read": false,
+        "fs_write": false,
+        "fs_list": false,
+        "net_fetch": false,
+        "env_read": false,
+        "clipboard": false,
+        "subprocess": true,
+        "max_exec_ms": 5000
+    }
+}
