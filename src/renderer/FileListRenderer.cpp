@@ -14,9 +14,19 @@ namespace FTB {
 using namespace ftxui;
 
 Color GetEntryColor(const FileManager::DirEntryInfo& info) {
+    if (!info.is_dir && !info.is_symlink) {
+        auto dot_pos = info.name.rfind('.');
+        if (dot_pos != std::string::npos && dot_pos + 1 < info.name.size()) {
+            std::string ext = info.name.substr(dot_pos + 1);
+            Color ext_color = ConfigManager::GetInstance()->GetExtensionColor(ext);
+            if (ext_color != ftxui::Color::Default)
+                return ext_color;
+        }
+    }
     if (info.is_dir) return TC("directory");
     if (info.is_symlink) return TC("link");
     if (info.is_executable) return TC("executable");
+    if (info.is_hidden) return TC("hidden");
     return TC("file");
 }
 

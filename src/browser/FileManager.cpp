@@ -4,7 +4,7 @@
 #include "../include/renderer/IconMapper.hpp"
 #include "../include/browser/SortMode.hpp"
 #include "../include/config/ConfigManager.hpp"
-#include "../include/utils/PerfLogger.hpp"
+#include "../include/utils/FilesystemUtil.hpp"
 #include <filesystem>                         // C++17 文件系统库，用于路径操作和遍历
 #include <fstream>                            // 文件读写
 #include <iostream>                           // 标准输出
@@ -90,7 +90,9 @@ bool isDirectory(const std::string & path) {
  * @return 返回包含目录中所有条目名称的字符串向量
  */
 std::vector<std::string> getDirectoryContents(const std::string & path) {
-    PERF_SCOPE("file");
+
+
+
 #ifdef FTB_ENABLE_SSH
     if (g_ssh_conn && g_ssh_conn->isConnected()) {
         auto entries = getDirectoryEntries(path);
@@ -112,7 +114,6 @@ std::vector<std::string> getDirectoryContents(const std::string & path) {
     }
     
     cache_misses.fetch_add(1);
-    PERF_LOG("file", "getDirectoryContents cache MISS: " + path);
     std::vector<std::string> contents;  // 存储结果的字符串向量
     contents.reserve(1000);  // 预分配空间，减少重新分配
     
@@ -158,7 +159,9 @@ std::vector<std::string> getDirectoryContents(const std::string & path) {
 }
 
 std::vector<DirEntryInfo> getDirectoryEntries(const std::string& path) {
-    PERF_SCOPE("file");
+
+
+
 #ifdef FTB_ENABLE_SSH
     if (g_ssh_conn && g_ssh_conn->isConnected()) {
         auto sftp_entries = g_ssh_conn->listDirectory(path);
@@ -192,7 +195,6 @@ std::vector<DirEntryInfo> getDirectoryEntries(const std::string& path) {
         return cached.value();
     }
 
-    PERF_LOG("file", "getDirectoryEntries cache MISS: " + path);
     std::vector<DirEntryInfo> entries;
     entries.reserve(256);
 
@@ -205,6 +207,7 @@ std::vector<DirEntryInfo> getDirectoryEntries(const std::string& path) {
 
             auto sft = entry.symlink_status();
             info.exists = true;
+            info.is_hidden = (!info.name.empty() && info.name[0] == '.');
             info.is_symlink = sft.type() == fs::file_type::symlink;
             info.is_dir = sft.type() == fs::file_type::directory;
             info.is_regular = sft.type() == fs::file_type::regular;
@@ -517,13 +520,7 @@ bool moveToTrash(const std::string & path) {
 
         std::string orig_path = fs::absolute(path).string();
 
-        std::error_code ec;
-        fs::rename(path, dest, ec);
-        if (ec) {
-            fs::copy(path, dest, fs::copy_options::recursive | fs::copy_options::overwrite_existing, ec);
-            if (ec) return false;
-            fs::remove_all(path, ec);
-        }
+        if (!FTB::renameWithFallback(path, dest)) return false;
 
 #ifndef __APPLE__
         auto now = std::chrono::system_clock::now();
@@ -670,7 +667,9 @@ void calculation_current_folder_files_number(
  * @return 返回由指定行拼接而成的字符串，若出错则返回错误信息字符串
  */
 std::string readFileContent(const std::string & filePath, size_t startLine, size_t endLine) {
-    PERF_SCOPE("file");
+
+
+
 #ifdef FTB_ENABLE_SSH
     if (g_ssh_conn && g_ssh_conn->isConnected()) {
         return g_ssh_conn->readFileContent(filePath, startLine, endLine);
@@ -688,7 +687,6 @@ std::string readFileContent(const std::string & filePath, size_t startLine, size
     }
     
     cache_misses.fetch_add(1);
-    PERF_LOG("file", "readFileContent cache MISS: " + cache_key);
     
     // 打开文件
     std::ifstream file(filePath);
@@ -812,8 +810,11 @@ bool renameFileOrDirectory(const std::string& oldPath, const std::string& newNam
             return false;
         }
         
-        // 执行实际重命名操作
-        fs::rename(oldPath, newFilePath);
+        // 执行实际重命名操作（支持跨设备回退）
+        if (!FTB::renameWithFallback(oldPath, newFilePath)) {
+            std::cerr << "Error: rename failed: " << oldPath << " -> " << newFilePath << std::endl;
+            return false;
+        }
         
         // 获取父目录路径用于缓存更新
         std::string parentPath = oldFilePath.parent_path().string();

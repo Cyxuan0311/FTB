@@ -15,10 +15,10 @@
 #include <functional>
 #include <ftxui/dom/elements.hpp>
 
+#include "core/MainUI.hpp"
 #include "core/AnsiParser.hpp"
 #include "preview/ArchivePreview.hpp"
 #include "preview/ImagePreview.hpp"
-#include "utils/PerfLogger.hpp"
 #include "preview/MarkdownPreview.hpp"
 #include "preview/SpreadsheetPreview.hpp"
 #include "preview/MediaPreview.hpp"
@@ -32,7 +32,6 @@
 #include "editor/SyntaxHighlighter.hpp"
 #include "renderer/TextSelection.hpp"
 #include "utils/UnicodeUtil.hpp"
-#include "utils/PerfLogger.hpp"
 
 namespace fs = std::filesystem;
 
@@ -113,7 +112,6 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
                             const std::string& currentPath,
                             int scroll_y,
                             int scroll_x) {
-    PERF_SCOPE("preview");
     auto& cache = PreviewCache::Instance();
 
     cache.Update(entries, selected, currentPath);
@@ -207,7 +205,6 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
     }
 
     if (data.is_dir && data.exists) {
-        PERF_LOG("preview", "Directory preview: " + data.selectedName);
         std::string dirPath = (fs::path(currentPath) / data.selectedName).string();
         cache.EnsureDirLoaded(dirPath);
         cache.SyncDirData(data);
@@ -225,17 +222,14 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
             show_count = std::min(show_count, panel_usable);
             for (int i = 0; i < show_count; ++i) {
                 const auto& entry = data.dir_contents[i];
-                bool is_hidden = (!entry.name.empty() && entry.name[0] == '.');
 
                 std::string branch = (i == show_count - 1) ? u8"\u2514\u2500\u2500 " : u8"\u251C\u2500\u2500 ";
 
                 Element name_el;
                 if (entry.is_dir) {
                     name_el = text(" " + entry.icon + entry.name) | bgcolor(TC("directory")) | color(TC("main_bg")) | bold;
-                } else if (is_hidden) {
-                    name_el = text(" " + entry.icon + entry.name) | color(TC("hidden"));
                 } else {
-                    name_el = text(" " + entry.icon + entry.name) | color(TC("main_fg"));
+                    name_el = text(" " + entry.icon + entry.name) | color(GetEntryColor(entry));
                 }
 
                 info_elements.push_back(
@@ -263,13 +257,11 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
 #else
     is_image = !data.is_dir && FTB::ImagePreview::IsImageFile(filePath);
 #endif
-    PERF_LOG("preview", "Image preview: " + data.selectedName);
     if (is_image && is_media && MediaPreview::IsEnabled()) {
         is_image = false;
     }
 
     if (is_image) {
-        PERF_LOG("preview", "Image preview: " + data.selectedName);
         int img_w = std::max(20, preview_panel_width - 4);
         int img_h = std::max(10, term_dim.dimy - 12);
 
@@ -305,7 +297,6 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
         && !is_spreadsheet && !is_media && !is_audio && !is_pdf && !is_doc;
 
     if (is_archive) {
-        PERF_LOG("preview", "Archive preview: " + data.selectedName);
         std::string archivePath = (fs::path(currentPath) / data.selectedName).string();
         cache.SyncArchiveData(data);
         if (!data.archive_loaded) {
@@ -384,7 +375,7 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
                     if (node.is_dir) {
                         name_el = text(" " + node.name + "/") | color(TC("directory")) | bold;
                     } else {
-                        name_el = text(" " + node.name) | color(TC("main_fg"));
+                        name_el = text(" " + node.name) | color(TC("file"));
                     }
 
                     Elements row = {
@@ -418,7 +409,6 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
     }
 
     if (is_spreadsheet) {
-        PERF_LOG("preview", "Spreadsheet preview: " + data.selectedName);
         std::string fp = (fs::path(currentPath) / data.selectedName).string();
         bool xleak_used = false;
 
@@ -445,7 +435,6 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
     }
 
     if (is_media && MediaPreview::IsEnabled()) {
-        PERF_LOG("preview", "Media preview: " + data.selectedName);
         std::string fp = (fs::path(currentPath) / data.selectedName).string();
         MediaPreview::LoadAsync(fp, preview_panel_width);
         MediaCache mc;
@@ -464,7 +453,6 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
     }
 
     if (is_audio && AudioPreview::IsEnabled()) {
-        PERF_LOG("preview", "Audio preview: " + data.selectedName);
         std::string fp = (fs::path(currentPath) / data.selectedName).string();
         AudioPreview::LoadAsync(fp, preview_panel_width);
         AudioCache ac;
@@ -483,7 +471,6 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
     }
 
     if (is_doc) {
-        PERF_LOG("preview", "Doc preview: " + data.selectedName);
         std::string fp = (fs::path(currentPath) / data.selectedName).string();
         bool pandoc_used = false;
 
@@ -510,7 +497,6 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
     }
 
     if (is_pdf) {
-        PERF_LOG("preview", "PDF preview: " + data.selectedName);
         std::string fp = (fs::path(currentPath) / data.selectedName).string();
         bool hygg_used = false;
 
@@ -537,7 +523,6 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
     }
 
     if (is_hex_binary) {
-        PERF_LOG("preview", "Hex preview: " + data.selectedName);
         std::string fp = (fs::path(currentPath) / data.selectedName).string();
         if (HexPreview::IsEnabled()) {
             HexPreview::LoadAsync(fp, data.file_size, preview_panel_width);
@@ -565,7 +550,6 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
         || data.file_size <= static_cast<uintmax_t>(cfg_preview.max_text_file_size_kb) * 1024;
 
     if (!data.is_dir && data.is_regular && text_preview_eligible && !is_image && !is_archive && !is_spreadsheet && !is_media && !is_audio && !is_pdf && !is_doc && !is_hex_binary) {
-        PERF_LOG("preview", "Text preview: " + data.selectedName);
         std::string fp = (fs::path(currentPath) / data.selectedName).string();
 
         bool is_markdown = MarkdownPreview::IsMarkdownFile(data.selectedName);

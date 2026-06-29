@@ -117,6 +117,7 @@ namespace FileManager
         bool         is_symlink = false;
         bool         is_regular = false;
         bool         is_executable = false;
+        bool         is_hidden = false;
         bool         exists = false;
         uintmax_t    file_size = 0;
         std::string  mod_time;       // 格式化后的修改时间
