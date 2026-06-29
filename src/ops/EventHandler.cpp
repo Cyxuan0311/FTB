@@ -129,6 +129,7 @@ bool HandleFileOperationEvent(MainState& state, const Event& event) {
     // Ctrl+R: 重载配置
     if (event == Event::CtrlR) {
         FTB::ConfigManager::GetInstance()->ReloadConfig();
+        FTB::StatusMessage::Show("Config reloaded");
         return true;
     }
 

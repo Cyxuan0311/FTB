@@ -25,7 +25,7 @@ void print_help(const char* prog_name) {
     std::cout << "  j/k or Arrows    Navigate up/down" << std::endl;
     std::cout << "  h/l or Left/Right  Parent/Enter directory" << std::endl;
     std::cout << "  /                Search" << std::endl;
-    std::cout << "  Ctrl+B           Command prefix mode" << std::endl;
+    std::cout << "  Ctrl+B           Command prefix mode (configurable via ftb.json)" << std::endl;
     std::cout << "  Escape           Clear search/close panel" << std::endl;
     std::cout << "  Ctrl+C           Quit" << std::endl;
 }

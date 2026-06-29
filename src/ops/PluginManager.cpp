@@ -1,10 +1,12 @@
 #include "../../include/ops/PluginManager.hpp"
+#include "../../include/utils/PerfLogger.hpp"
 
 #include <fstream>
 #include <sstream>
 #include <filesystem>
 #include <algorithm>
 #include <cstdlib>
+#include <regex>
 
 namespace fs = std::filesystem;
 
@@ -90,19 +92,26 @@ PluginInstance::~PluginInstance() {
 }
 
 bool PluginInstance::Load() {
-    if (state_ == PluginState::Loaded) return true;
+    PERF_LOG("plugin", "Load start name=" + metadata_.name + " dir=" + plugin_dir_);
+    if (state_ == PluginState::Loaded) {
+        PERF_LOG("plugin", "Load - already loaded");
+        return true;
+    }
 
     // Read entry file
     fs::path entry_path = fs::path(plugin_dir_) / metadata_.entry;
+    PERF_LOG("plugin", "Load entry_path=" + entry_path.string());
     if (!fs::exists(entry_path)) {
         // Try .js fallback
         entry_path = fs::path(plugin_dir_) /
                      fs::path(metadata_.entry).replace_extension(".js");
+        PERF_LOG("plugin", "Load fallback path=" + entry_path.string());
     }
 
     if (!fs::exists(entry_path)) {
         last_error_ = "Entry file not found: " + metadata_.entry;
         state_ = PluginState::Error;
+        PERF_LOG("plugin", "Load - entry not found: " + entry_path.string());
         return false;
     }
 
@@ -111,27 +120,35 @@ bool PluginInstance::Load() {
     if (!ifs.is_open()) {
         last_error_ = "Cannot open entry file";
         state_ = PluginState::Error;
+        PERF_LOG("plugin", "Load - cannot open: " + entry_path.string());
         return false;
     }
     std::ostringstream oss;
     oss << ifs.rdbuf();
     compiled_code_ = oss.str();
+    PERF_LOG("plugin", "Load code size=" + std::to_string(compiled_code_.size()) + " ext=" + entry_path.extension().string());
 
     // If it's TypeScript (.ts), we need to transpile
     if (entry_path.extension() == ".ts") {
+        PERF_LOG("plugin", "Load - compiling TypeScript");
         if (!CompileTypeScript()) {
+            PERF_LOG("plugin", "Load - TS compile failed");
             state_ = PluginState::Error;
             return false;
         }
+        PERF_LOG("plugin", "Load - TS compile ok, output size=" + std::to_string(compiled_code_.size()));
     }
 
     // Create sandbox
+    PERF_LOG("plugin", "Load - creating sandbox");
     if (!CreateSandbox()) {
+        PERF_LOG("plugin", "Load - sandbox creation failed");
         state_ = PluginState::Error;
         return false;
     }
 
     state_ = PluginState::Loaded;
+    PERF_LOG("plugin", "Load - success");
     return true;
 }
 
@@ -142,11 +159,14 @@ void PluginInstance::Unload() {
 }
 
 PluginResult PluginInstance::Execute(const PluginContext& ctx) {
+    PERF_LOG("plugin", "Execute name=" + metadata_.name + " state=" + std::to_string(static_cast<int>(state_)));
     return ExecuteFunction("entry", ctx);
 }
 
 PluginResult PluginInstance::ExecuteFunction(const std::string& fn, const PluginContext& ctx) {
+    PERF_LOG("plugin", "ExecuteFunction name=" + metadata_.name + " fn=" + fn + " state=" + std::to_string(static_cast<int>(state_)));
     if (state_ != PluginState::Loaded) {
+        PERF_LOG("plugin", "ExecuteFunction - not loaded, state=" + std::to_string(static_cast<int>(state_)));
         return {false, "Plugin not loaded", {}, ""};
     }
 
@@ -160,6 +180,7 @@ PluginResult PluginInstance::ExecuteFunction(const std::string& fn, const Plugin
     } else {
         state_ = PluginState::Error;
         last_error_ = result.error;
+        PERF_LOG("plugin", "ExecuteFunction - error: " + result.error);
     }
 
     return result;
@@ -171,44 +192,79 @@ bool PluginInstance::Reload() {
 }
 
 bool PluginInstance::CompileTypeScript() {
-    // TypeScript compilation strategy:
-    // 1. Try to use the system's `esbuild` or `tsc` if available
-    // 2. Fall back to a simple TS->JS strip (remove type annotations)
-    //
-    // For security and simplicity, we use a built-in transpiler that
-    // strips TypeScript type annotations using regex patterns.
-    // This handles the common cases without requiring external tools.
+    PERF_LOG("plugin", "CompileTypeScript start size=" + std::to_string(compiled_code_.size()));
 
-    // Strip single-line type annotations: `: Type` patterns
-    // This is a simplified transpiler for the subset of TS we support
+    // Phase 1: Remove `interface X { ... }` blocks with a brace-depth counter
+    // to handle nested braces (e.g. interface with fs: { ... } properties)
+    {
+        std::string result;
+        std::istringstream stream(compiled_code_);
+        std::string line;
+        int interface_depth = 0;
 
-    // Remove interface declarations
+        while (std::getline(stream, line)) {
+            std::string trimmed = line;
+            trimmed.erase(0, trimmed.find_first_not_of(" \t\r\n"));
+
+            // Check if this line starts an interface declaration
+            if (interface_depth == 0 && trimmed.find("interface ") == 0) {
+                interface_depth = 0;
+                for (char c : line) {
+                    if (c == '{') interface_depth++;
+                    if (c == '}') interface_depth--;
+                }
+                continue;
+            }
+
+            if (interface_depth > 0) {
+                for (char c : line) {
+                    if (c == '{') interface_depth++;
+                    if (c == '}') interface_depth--;
+                }
+                if (interface_depth > 0) continue;
+                continue;
+            }
+
+            result += line + "\n";
+        }
+        compiled_code_ = result;
+    }
+
+    PERF_LOG("plugin", "CompileTypeScript after interface removal size=" + std::to_string(compiled_code_.size()));
+
+    // Phase 2: Apply regex replacements for other TypeScript constructs
     static const std::vector<std::pair<std::string, std::string>> replacements = {
-        // Remove `interface X { ... }`
-        {"interface\\s+\\w+\\s*\\{[^}]*\\}", ""},
-        // Remove `type X = ...;`
+        // Remove `type X = ...;` declarations
         {"type\\s+\\w+\\s*(<[^>]*>)?\\s*=\\s*[^;]+;", ""},
         // Remove type imports: `import type { X } from ...`
         {"import\\s+type\\s+\\{[^}]*\\}\\s+from\\s+['\"][^'\"]*['\"];?", ""},
         // Remove `as Type` assertions
         {"\\s+as\\s+[A-Z]\\w*(<[^>]*>)?", ""},
-        // Remove generic type params: `<Type>`
-        {"<(?:[A-Z]\\w*(?:\\s*,\\s*[A-Z]\\w*)*)>", ""},
-        // Remove return type annotations: `): Type =>` or `): Type {`
-        {"\\):\\s*[A-Z]\\w*(?:\\[\\])?\\s*=>", ") =>"},
-        {"\\):\\s*[A-Z]\\w*(?:\\[\\])?\\s*\\{", ") {"},
-        // Remove param type annotations: `(param: Type`
-        {"(\\w+):\\s*[A-Z]\\w*(?:\\[\\])?(?:\\s*=\\s*[^,)]+)?", "$1"},
+        // Remove return type annotations before => or {
+        {"\\)\\s*:\\s*[A-Za-z_]\\w*(?:\\[\\])?\\s*=>", ") =>"},
+        {"\\)\\s*:\\s*[A-Za-z_]\\w*(?:\\[\\])?\\s*\\{", ") {"},
+        // Remove return type annotations before => or { (with array/union types)
+        {"\\)\\s*:\\s*(?:[A-Za-z_]\\w*(?:\\[\\])?(?:\\s*\\|\\s*[A-Za-z_]\\w*(?:\\[\\])?)*)\\s*=>", ") =>"},
+        {"\\)\\s*:\\s*(?:[A-Za-z_]\\w*(?:\\[\\])?(?:\\s*\\|\\s*[A-Za-z_]\\w*(?:\\[\\])?)*)\\s*\\{", ") {"},
+        // Remove param type annotations in arrow functions: `(x: Type) =>`
+        {"\\((\\w+):\\s*[A-Za-z_]\\w*(?:\\[\\])?\\s*\\)", "($1)"},
+        // Remove first param in multi-param functions: `(x: Type, y: Type)`
+        {"\\(\\s*(\\w+):\\s*[A-Za-z_]\\w*(?:\\[\\])?,\\s*", "($1, "},
+        // Remove middle params: `, x: Type` - only uppercase types to avoid matching object literal properties like `, bold: false`
+        {",\\s*(\\w+):\\s*[A-Z]\\w*(?:\\[\\])?(?:\\s*=\\s*[^,)]+)?", ",$1"},
         // Remove variable type annotations: `const x: Type =`
-        {"(const|let|var)\\s+(\\w+):\\s*[A-Z]\\w*(?:\\[\\])?\\s*=", "$1 $2 ="},
+        {"(const|let|var)\\s+(\\w+):\\s*[A-Za-z_]\\w*(?:\\[\\])?\\s*=", "$1 $2 ="},
     };
 
-    // Apply simple regex-free stripping for common patterns
-    // Note: For production use, a proper TS compiler (esbuild/swc) should be used
-    // This simplified version handles the plugin API subset
+    for (const auto& [pattern, replacement] : replacements) {
+        try {
+            compiled_code_ = std::regex_replace(compiled_code_, std::regex(pattern), replacement);
+        } catch (const std::regex_error& e) {
+            PERF_LOG("plugin", "CompileTypeScript regex error: " + std::string(e.what()) + " for pattern=" + pattern);
+        }
+    }
 
-    // Mark as compiled (even with simplified transpilation)
-    // The actual runtime will handle JS execution
+    PERF_LOG("plugin", "CompileTypeScript done, final size=" + std::to_string(compiled_code_.size()));
     return true;
 }
 
@@ -255,6 +311,7 @@ bool PluginInstance::InjectAPI(const PluginContext& /*ctx*/) {
 }
 
 PluginResult PluginInstance::RunInSandbox(const std::string& code, const std::string& fn_name, const PluginContext& ctx) {
+    PERF_LOG("plugin", "RunInSandbox start fn=" + fn_name + " code_size=" + std::to_string(code.size()));
     // Execution strategy:
     // For security, plugins run in an isolated subprocess using QuickJS
     // standalone interpreter. This provides:
@@ -267,12 +324,85 @@ PluginResult PluginInstance::RunInSandbox(const std::string& code, const std::st
 
     PluginResult result;
 
-    // Build the execution wrapper
+    // Build the execution wrapper with QuickJS built-in modules for subprocess mode
     std::string wrapped_code = R"(
 (function() {
     'use strict';
-    // ---- FTB Plugin Runtime ----
-    const ftb = {
+    // ---- FTB Plugin Runtime (subprocess mode with QuickJS-ng) ----
+    var __ftb_tmpdir = '/tmp/ftb_plugin_' + os.getpid();
+
+    function __ftb_result(data) {
+        std.out.puts(data);
+    }
+
+    function __ftb_call(method, args) {
+        switch (method) {
+            case 'exec': {
+                var cmd = args[0];
+                var cmdArgs = args[1] || [];
+                var fullCmd = cmd;
+                for (var i = 0; i < cmdArgs.length; i++) {
+                    var a = String(cmdArgs[i]);
+                    fullCmd += " '" + a.replace(/'/g, "'\\''") + "'";
+                }
+                var outfile = __ftb_tmpdir + '_exec.out';
+                os.exec(['/bin/sh', '-c', fullCmd + ' > ' + outfile + ' 2>&1']);
+                var output = '';
+                try {
+                    var loaded = std.loadFile(outfile);
+                    if (loaded !== null) output = loaded;
+                } catch(e) {}
+                try { os.remove(outfile); } catch(e) {}
+                return output;
+            }
+            case 'fs.readFile': {
+                return std.loadFile(args[0]);
+            }
+            case 'fs.writeFile': {
+                var wpath = args[0].replace(/'/g, "'\\''");
+                var wcontent = args[1].replace(/'/g, "'\\''");
+                os.exec(['/bin/sh', '-c', "printf '%s' '" + wcontent + "' > '" + wpath + "'"]);
+                return '';
+            }
+            case 'fs.listDir': {
+                var outfile = __ftb_tmpdir + '_ls.out';
+                os.exec(['/bin/sh', '-c', 'ls -1 "' + args[0].replace(/"/g, '\\"') + '" > ' + outfile + ' 2>/dev/null']);
+                var output = '';
+                try {
+                    var loaded = std.loadFile(outfile);
+                    if (loaded !== null) output = loaded;
+                } catch(e) {}
+                try { os.remove(outfile); } catch(e) {}
+                var entries = [];
+                var lines = output.split('\n');
+                for (var i = 0; i < lines.length; i++) {
+                    var trimmed = lines[i].trim();
+                    if (trimmed.length > 0) entries.push(trimmed);
+                }
+                return entries;
+            }
+            case 'env.get': {
+                return os.getenv(args[0]);
+            }
+            case 'log': {
+                std.err.puts('[ftb:plugin] ' + args[0] + '\n');
+                return '';
+            }
+            case 'clipboard.read':
+            case 'clipboard.write':
+            case 'ui.message':
+            case 'ui.confirm':
+            case 'statusBar.set': {
+                return '';
+            }
+            default: {
+                throw new Error('Unknown API method: ' + method);
+            }
+        }
+    }
+
+    // ---- FTB Plugin API ----
+    var ftb = {
         ctx: )" + nlohmann::json({
             {"current_path", ctx.current_path},
             {"selected_file", ctx.selected_file},
@@ -311,7 +441,7 @@ PluginResult PluginInstance::RunInSandbox(const std::string& code, const std::st
     // ---- Execute ----
     if (typeof )" + fn_name + R"( === 'function') {
         try {
-            const result = )" + fn_name + R"((ftb));
+            var result = )" + fn_name + R"((ftb);
             __ftb_result(JSON.stringify({success: true, data: result || null}));
         } catch(e) {
             __ftb_result(JSON.stringify({success: false, error: e.message || String(e)}));
@@ -324,8 +454,10 @@ PluginResult PluginInstance::RunInSandbox(const std::string& code, const std::st
 
     // Try to execute using QuickJS (qjs) if available
     std::string qjs_path = "/usr/local/bin/qjs";
+    PERF_LOG("plugin", "RunInSandbox check qjs at " + qjs_path + " exists=" + std::to_string(fs::exists(qjs_path)));
     if (!fs::exists(qjs_path)) {
         qjs_path = "/usr/bin/qjs";
+        PERF_LOG("plugin", "RunInSandbox fallback qjs at " + qjs_path + " exists=" + std::to_string(fs::exists(qjs_path)));
     }
 
     if (fs::exists(qjs_path)) {
@@ -335,17 +467,22 @@ PluginResult PluginInstance::RunInSandbox(const std::string& code, const std::st
             std::ofstream ofs(tmp_path);
             ofs << wrapped_code;
         }
+        PERF_LOG("plugin", "RunInSandbox wrote " + tmp_path + " size=" + std::to_string(wrapped_code.size()));
 
-        // Execute with timeout
+        // Execute with timeout (--std makes std/os/bjson globals in QuickJS-ng)
+        // stderr goes to separate file to keep stdout clean for JSON parsing
+        std::string err_path = tmp_path + ".err";
         std::string cmd = "timeout " + std::to_string(metadata_.permissions.max_exec_ms / 1000) +
-                         " " + qjs_path + " " + tmp_path + " 2>&1";
+                         " " + qjs_path + " --std " + tmp_path + " 2>" + err_path;
+        PERF_LOG("plugin", "RunInSandbox cmd=" + cmd);
 
         FILE* pipe = popen(cmd.c_str(), "r");
         if (!pipe) {
             result.success = false;
             result.error = "Failed to start JS runtime";
-            // Clean up
+            PERF_LOG("plugin", "RunInSandbox popen failed");
             fs::remove(tmp_path);
+            fs::remove(err_path);
             return result;
         }
 
@@ -355,34 +492,55 @@ PluginResult PluginInstance::RunInSandbox(const std::string& code, const std::st
             output += buffer;
         }
         int exit_code = pclose(pipe);
+        PERF_LOG("plugin", "RunInSandbox exit_code=" + std::to_string(exit_code) +
+                 " stdout_size=" + std::to_string(output.size()) +
+                 " stdout_preview=" + output.substr(0, 200));
 
-        // Clean up temp file
+        // Read stderr output if non-zero exit
+        std::string err_output;
+        if (exit_code != 0) {
+            std::ifstream err_ifs(err_path);
+            if (err_ifs) {
+                std::ostringstream err_oss;
+                err_oss << err_ifs.rdbuf();
+                err_output = err_oss.str();
+            }
+            PERF_LOG("plugin", "RunInSandbox stderr=" + err_output);
+        }
+
+        // Clean up temp files
         fs::remove(tmp_path);
+        fs::remove(err_path);
 
         if (exit_code != 0) {
             result.success = false;
-            result.error = "Plugin exited with code " + std::to_string(exit_code) + ": " + output;
+            result.error = "Plugin exited with code " + std::to_string(exit_code) + ": " + err_output;
+            PERF_LOG("plugin", "RunInSandbox error=" + result.error);
             return result;
         }
 
-        // Parse output
+        // Parse output (stdout should contain only JSON)
         try {
             auto j = nlohmann::json::parse(output);
             result.success = j.value("success", false);
             if (j.contains("data")) result.data = j["data"];
             if (j.contains("error")) result.error = j["error"].get<std::string>();
             if (j.contains("message")) result.message = j.value("message", "");
-        } catch (const nlohmann::json::parse_error&) {
-            // If output is not JSON, treat as message
+            PERF_LOG("plugin", "RunInSandbox JSON parsed success=" + std::to_string(result.success));
+        } catch (const nlohmann::json::parse_error& e) {
+            // If output is not JSON, treat as raw message
             result.success = true;
             result.message = output;
+            PERF_LOG("plugin", "RunInSandbox JSON parse failed: " + std::string(e.what()) + " raw=" + output);
         }
     } else {
         // No JS runtime available - return error
         result.success = false;
         result.error = "No JavaScript runtime found. Install QuickJS (qjs) to enable plugins.";
+        PERF_LOG("plugin", "RunInSandbox - qjs not found at any known path");
     }
 
+    PERF_LOG("plugin", "RunInSandbox end success=" + std::to_string(result.success));
     return result;
 }
 
@@ -394,25 +552,36 @@ PluginManager* PluginManager::GetInstance() {
 }
 
 void PluginManager::Initialize(const std::string& config_dir) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    PERF_LOG("plugin", "Initialize config_dir=" + config_dir);
+    std::lock_guard<std::mutex> lock(plugins_mutex_);
 
-    if (initialized_) return;
+    if (initialized_) {
+        PERF_LOG("plugin", "Initialize skipped - already initialized");
+        return;
+    }
 
+    config_dir_ = config_dir;
     plugins_dir_ = config_dir + "/plugins";
+    PERF_LOG("plugin", "plugins_dir=" + plugins_dir_);
 
     // Create plugins directory if it doesn't exist
     if (!fs::exists(plugins_dir_)) {
+        PERF_LOG("plugin", "Creating plugins directory");
         fs::create_directories(plugins_dir_);
     }
 
     // Scan for plugins
     ScanPlugins();
 
+    // Load persisted enabled state (overrides ScanPlugins defaults)
+    LoadEnabledState();
+
     initialized_ = true;
+    PERF_LOG("plugin", "Initialize done, plugins count=" + std::to_string(plugins_.size()));
 }
 
 void PluginManager::Shutdown() {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> lock(plugins_mutex_);
 
     for (auto& [name, plugin] : plugins_) {
         if (plugin->GetState() == PluginState::Loaded) {
@@ -424,18 +593,26 @@ void PluginManager::Shutdown() {
 }
 
 void PluginManager::ScanPlugins() {
-    if (!fs::exists(plugins_dir_)) return;
+    PERF_LOG("plugin", "ScanPlugins start dir=" + plugins_dir_);
+    if (!fs::exists(plugins_dir_)) {
+        PERF_LOG("plugin", "ScanPlugins - plugins_dir does not exist");
+        return;
+    }
 
+    int count = 0;
     for (const auto& entry : fs::directory_iterator(plugins_dir_)) {
         if (!entry.is_directory()) continue;
 
         std::string dir_name = entry.path().filename().string();
+        PERF_LOG("plugin", "ScanPlugins entry=" + dir_name);
 
         // Plugin directories end with .ftb
         if (dir_name.size() > 4 && dir_name.substr(dir_name.size() - 4) == ".ftb") {
             std::string plugin_name = dir_name.substr(0, dir_name.size() - 4);
+            PERF_LOG("plugin", "ScanPlugins candidate=" + plugin_name + " path=" + entry.path().string());
 
             if (ValidatePlugin(entry.path().string())) {
+                PERF_LOG("plugin", "ScanPlugins validated=" + plugin_name);
                 // Read package.json
                 fs::path pkg_path = entry.path() / "package.json";
                 if (fs::exists(pkg_path)) {
@@ -446,6 +623,7 @@ void PluginManager::ScanPlugins() {
 
                         PluginMetadata meta = PluginMetadata::FromJson(pkg);
                         meta.name = plugin_name;
+                        PERF_LOG("plugin", "ScanPlugins meta name=" + meta.name + " type=" + std::to_string(static_cast<int>(meta.type)));
 
                         auto instance = std::make_unique<PluginInstance>(
                             entry.path().string(), meta);
@@ -455,16 +633,23 @@ void PluginManager::ScanPlugins() {
                         if (enabled_map_.find(plugin_name) == enabled_map_.end()) {
                             enabled_map_[plugin_name] = true;
                         }
+                        count++;
                     } catch (const std::exception& e) {
+                        PERF_LOG("plugin", "ScanPlugins exception=" + std::string(e.what()));
                     }
+                } else {
+                    PERF_LOG("plugin", "ScanPlugins no package.json");
                 }
+            } else {
+                PERF_LOG("plugin", "ScanPlugins validation failed");
             }
         }
     }
+    PERF_LOG("plugin", "ScanPlugins end, total=" + std::to_string(count));
 }
 
 std::vector<std::string> PluginManager::GetAvailablePlugins() const {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> lock(plugins_mutex_);
 
     std::vector<std::string> names;
     for (const auto& [name, plugin] : plugins_) {
@@ -474,7 +659,7 @@ std::vector<std::string> PluginManager::GetAvailablePlugins() const {
 }
 
 const PluginMetadata* PluginManager::GetPluginMetadata(const std::string& name) const {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> lock(plugins_mutex_);
 
     auto it = plugins_.find(name);
     if (it != plugins_.end()) {
@@ -484,7 +669,7 @@ const PluginMetadata* PluginManager::GetPluginMetadata(const std::string& name) 
 }
 
 bool PluginManager::LoadPlugin(const std::string& name) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> lock(plugins_mutex_);
 
     auto it = plugins_.find(name);
     if (it == plugins_.end()) return false;
@@ -497,7 +682,7 @@ bool PluginManager::LoadPlugin(const std::string& name) {
 }
 
 void PluginManager::UnloadPlugin(const std::string& name) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> lock(plugins_mutex_);
 
     auto it = plugins_.find(name);
     if (it != plugins_.end()) {
@@ -506,7 +691,7 @@ void PluginManager::UnloadPlugin(const std::string& name) {
 }
 
 bool PluginManager::IsPluginLoaded(const std::string& name) const {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> lock(plugins_mutex_);
 
     auto it = plugins_.find(name);
     if (it != plugins_.end()) {
@@ -516,31 +701,40 @@ bool PluginManager::IsPluginLoaded(const std::string& name) const {
 }
 
 PluginResult PluginManager::ExecutePlugin(const std::string& name, const PluginContext& ctx) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    PERF_LOG("plugin", "ExecutePlugin name=" + name + " path=" + ctx.current_path);
+    std::lock_guard<std::mutex> lock(plugins_mutex_);
 
     auto it = plugins_.find(name);
     if (it == plugins_.end()) {
+        PERF_LOG("plugin", "ExecutePlugin - not found: " + name);
         return {false, "Plugin not found: " + name, {}, ""};
     }
 
     if (!enabled_map_[name]) {
+        PERF_LOG("plugin", "ExecutePlugin - disabled: " + name);
         return {false, "Plugin is disabled: " + name, {}, ""};
     }
 
     // Auto-load if needed
     if (it->second->GetState() != PluginState::Loaded) {
+        PERF_LOG("plugin", "ExecutePlugin - auto-loading: " + name);
         if (!it->second->Load()) {
+            PERF_LOG("plugin", "ExecutePlugin - load failed: " + it->second->GetLastError());
             return {false, "Failed to load plugin: " + it->second->GetLastError(), {}, ""};
         }
+        PERF_LOG("plugin", "ExecutePlugin - loaded ok: " + name);
     }
 
-    return it->second->Execute(ctx);
+    auto result = it->second->Execute(ctx);
+    PERF_LOG("plugin", "ExecutePlugin result success=" + std::to_string(result.success) +
+             " error=" + result.error + " message=" + result.message);
+    return result;
 }
 
 PluginResult PluginManager::ExecutePluginFunction(const std::string& name,
                                                     const std::string& fn,
                                                     const PluginContext& ctx) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> lock(plugins_mutex_);
 
     auto it = plugins_.find(name);
     if (it == plugins_.end()) {
@@ -562,7 +756,7 @@ PluginResult PluginManager::ExecutePluginFunction(const std::string& name,
 
 std::string PluginManager::FindPreviewer(const std::string& mime_type,
                                            const std::string& file_ext) const {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> lock(plugins_mutex_);
 
     for (const auto& [name, plugin] : plugins_) {
         if (plugin->GetMetadata().type != PluginType::Previewer) continue;
@@ -580,7 +774,7 @@ std::string PluginManager::FindPreviewer(const std::string& mime_type,
 }
 
 std::string PluginManager::FindFetcher(const std::string& mime_type) const {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> lock(plugins_mutex_);
 
     for (const auto& [name, plugin] : plugins_) {
         if (plugin->GetMetadata().type != PluginType::Fetcher) continue;
@@ -595,28 +789,34 @@ std::string PluginManager::FindFetcher(const std::string& mime_type) const {
 }
 
 void PluginManager::EnablePlugin(const std::string& name) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    enabled_map_[name] = true;
+    {
+        std::lock_guard<std::mutex> lock(plugins_mutex_);
+        enabled_map_[name] = true;
+    }
+    SaveEnabledState();
 }
 
 void PluginManager::DisablePlugin(const std::string& name) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    enabled_map_[name] = false;
+    {
+        std::lock_guard<std::mutex> lock(plugins_mutex_);
+        enabled_map_[name] = false;
 
-    auto it = plugins_.find(name);
-    if (it != plugins_.end()) {
-        it->second->Unload();
+        auto it = plugins_.find(name);
+        if (it != plugins_.end()) {
+            it->second->Unload();
+        }
     }
+    SaveEnabledState();
 }
 
 bool PluginManager::IsPluginEnabled(const std::string& name) const {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> lock(plugins_mutex_);
     auto it = enabled_map_.find(name);
     return it != enabled_map_.end() && it->second;
 }
 
 void PluginManager::ReloadPlugin(const std::string& name) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> lock(plugins_mutex_);
 
     auto it = plugins_.find(name);
     if (it != plugins_.end()) {
@@ -625,7 +825,7 @@ void PluginManager::ReloadPlugin(const std::string& name) {
 }
 
 void PluginManager::ReloadAll() {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> lock(plugins_mutex_);
 
     for (auto& [name, plugin] : plugins_) {
         plugin->Reload();
@@ -633,7 +833,7 @@ void PluginManager::ReloadAll() {
 }
 
 std::vector<std::string> PluginManager::GetPluginErrors() const {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> lock(plugins_mutex_);
 
     std::vector<std::string> errors;
     for (const auto& [name, plugin] : plugins_) {
@@ -645,7 +845,7 @@ std::vector<std::string> PluginManager::GetPluginErrors() const {
 }
 
 nlohmann::json PluginManager::GetPluginStatus(const std::string& name) const {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> lock(plugins_mutex_);
 
     auto it = plugins_.find(name);
     if (it == plugins_.end()) {
@@ -682,57 +882,159 @@ bool PluginManager::ValidatePlugin(const std::string& dir) const {
            fs::exists(fs::path(dir) / "package.json");
 }
 
-// ─── Status Bar Content ──────────────────────────────────────────────
+// ─── Status Bar Content (Async) ─────────────────────────────────────
 
 std::vector<StatusBarSegment> PluginManager::GetStatusBarContent(const PluginContext& ctx) {
-    std::lock_guard<std::mutex> lock(mutex_);
-
-    // Throttle: only refresh every STATUSBAR_REFRESH_INTERVAL_MS
-    auto now = std::chrono::steady_clock::now();
-    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-        now - statusbar_last_refresh_).count();
-    bool should_refresh = elapsed >= STATUSBAR_REFRESH_INTERVAL_MS;
-
-    if (should_refresh) {
-        statusbar_last_refresh_ = now;
-
-        for (auto& [name, plugin] : plugins_) {
-            if (plugin->GetMetadata().type != PluginType::StatusBar) continue;
-            if (!enabled_map_.count(name) || !enabled_map_.at(name)) continue;
-
-            // Auto-load if needed
-            if (plugin->GetState() != PluginState::Loaded) {
-                if (!plugin->Load()) continue;
-            }
-
-            // Execute the plugin's entry function
-            PluginResult result = plugin->Execute(ctx);
-
-            std::vector<StatusBarSegment> segments;
-
-            if (result.success && result.data.is_array()) {
-                for (const auto& seg : result.data) {
-                    StatusBarSegment s;
-                    s.text = seg.value("text", "");
-                    s.fg_color = seg.value("fg", "");
-                    s.bg_color = seg.value("bg", "");
-                    s.bold = seg.value("bold", false);
-                    segments.push_back(std::move(s));
-                }
-            }
-
-            statusbar_cache_[name] = std::move(segments);
-        }
+    // Store a snapshot of the context for the background thread
+    {
+        std::lock_guard<std::mutex> lock(ctx_mutex_);
+        statusbar_context_snapshot_ = ctx;
     }
 
-    // Collect all segments from cache
+    // Return cached segments immediately — never blocks on plugin execution
+    std::lock_guard<std::mutex> lock(statusbar_mutex_);
+    return statusbar_cached_segments_;
+}
+
+void PluginManager::UpdateContextSnapshot(const PluginContext& ctx) {
+    std::lock_guard<std::mutex> lock(ctx_mutex_);
+    statusbar_context_snapshot_ = ctx;
+}
+
+// ─── Background Refresh ──────────────────────────────────────────────
+
+void PluginManager::StartBackgroundRefresh(std::function<void()> on_updated) {
+    if (background_running_.exchange(true)) return;
+
+    on_statusbar_updated_ = std::move(on_updated);
+    background_thread_ = std::thread(&PluginManager::BackgroundRefreshWorker, this);
+}
+
+void PluginManager::StopBackgroundRefresh() {
+    background_running_ = false;
+    shutdown_cv_.notify_one();
+    if (background_thread_.joinable()) {
+        // Wait up to 500ms for the worker to finish its current cycle
+        auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(500);
+        while (background_thread_.joinable() && std::chrono::steady_clock::now() < deadline) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        if (background_thread_.joinable()) {
+            background_thread_.detach();
+        } else {
+            background_thread_.join();
+        }
+    }
+}
+
+void PluginManager::BackgroundRefreshWorker() {
+    while (background_running_) {
+        // Wait for interval or shutdown signal
+        {
+            std::unique_lock<std::mutex> lock(shutdown_mutex_);
+            shutdown_cv_.wait_for(lock,
+                std::chrono::milliseconds(STATUSBAR_REFRESH_INTERVAL_MS),
+                [this] { return !background_running_; });
+        }
+        if (!background_running_) break;
+
+        // Snapshot the current context
+        PluginContext ctx;
+        {
+            std::lock_guard<std::mutex> lock(ctx_mutex_);
+            ctx = statusbar_context_snapshot_;
+        }
+
+        if (ctx.current_path.empty()) continue;
+
+        auto segments = ExecuteStatusBarPlugins(ctx);
+
+        // Update the cache
+        {
+            std::lock_guard<std::mutex> lock(statusbar_mutex_);
+            statusbar_cached_segments_ = std::move(segments);
+        }
+
+        // Notify UI thread to re-render
+        if (on_statusbar_updated_) {
+            on_statusbar_updated_();
+        }
+    }
+}
+
+std::vector<StatusBarSegment> PluginManager::ExecuteStatusBarPlugins(const PluginContext& ctx) {
     std::vector<StatusBarSegment> all_segments;
-    for (const auto& [name, segs] : statusbar_cache_) {
-        for (const auto& seg : segs) {
-            all_segments.push_back(seg);
+
+    std::lock_guard<std::mutex> lock(plugins_mutex_);
+
+    for (auto& [name, plugin] : plugins_) {
+        if (plugin->GetMetadata().type != PluginType::StatusBar) continue;
+        if (!enabled_map_.count(name) || !enabled_map_.at(name)) continue;
+
+        // Auto-load if needed
+        if (plugin->GetState() != PluginState::Loaded) {
+            if (!plugin->Load()) continue;
+        }
+
+        // Execute the plugin's entry function
+        PluginResult result = plugin->Execute(ctx);
+
+        if (result.success && result.data.is_array()) {
+            for (const auto& seg : result.data) {
+                StatusBarSegment s;
+                s.text = seg.value("text", "");
+                s.fg_color = seg.value("fg", "");
+                s.bg_color = seg.value("bg", "");
+                s.bold = seg.value("bold", false);
+                s.align = seg.value("align", "left");
+                all_segments.push_back(std::move(s));
+            }
         }
     }
+
     return all_segments;
+}
+
+// ─── Enabled State Persistence ──────────────────────────────────────
+
+void PluginManager::SaveEnabledState() {
+    if (config_dir_.empty()) return;
+
+    std::lock_guard<std::mutex> lock(plugins_mutex_);
+
+    nlohmann::json j;
+    for (const auto& [name, enabled] : enabled_map_) {
+        j[name] = enabled;
+    }
+
+    std::string path = config_dir_ + "/plugins_enabled.json";
+    try {
+        std::ofstream ofs(path);
+        ofs << j.dump(2);
+    } catch (const std::exception& e) {
+        PERF_LOG("plugin", "SaveEnabledState error=" + std::string(e.what()));
+    }
+}
+
+void PluginManager::LoadEnabledState() {
+    if (config_dir_.empty()) return;
+
+    std::string path = config_dir_ + "/plugins_enabled.json";
+    if (!fs::exists(path)) return;
+
+    try {
+        std::ifstream ifs(path);
+        nlohmann::json j;
+        ifs >> j;
+
+        for (auto it = j.begin(); it != j.end(); ++it) {
+            if (it.value().is_boolean()) {
+                enabled_map_[it.key()] = it.value().get<bool>();
+            }
+        }
+    } catch (const std::exception& e) {
+        PERF_LOG("plugin", "LoadEnabledState error=" + std::string(e.what()));
+    }
 }
 
 }  // namespace FTB

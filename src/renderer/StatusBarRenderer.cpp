@@ -179,6 +179,8 @@ Element BuildNormalStatusBar(MainState& state) {
     }
 #endif
 
+    Elements right_segments;
+
 #ifdef FTB_ENABLE_PLUGINS
     {
         PluginContext pctx;
@@ -193,14 +195,18 @@ Element BuildNormalStatusBar(MainState& state) {
             if (!seg.bg_color.empty()) {
                 seg_bg = ConfigManager::GetInstance()->ParseColor(seg.bg_color);
             }
-            left_segments.push_back(FTB::PowerlineSegmentLeft(
-                " " + seg.text + " ", seg_bg, seg_fg, TC("main_bg"), seg.bold, right_sep
-            ));
+            if (seg.align == "right") {
+                right_segments.push_back(FTB::PowerlineSegmentRight(
+                    " " + seg.text + " ", seg_bg, seg_fg, TC("main_bg"), seg.bold, left_sep
+                ));
+            } else {
+                left_segments.push_back(FTB::PowerlineSegmentLeft(
+                    " " + seg.text + " ", seg_bg, seg_fg, TC("main_bg"), seg.bold, right_sep
+                ));
+            }
         }
     }
 #endif
-
-    Elements right_segments;
 
     if (sb_cfg.show_position || sb_cfg.show_clipboard) {
         std::string pos_info;

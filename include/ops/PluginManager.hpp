@@ -30,8 +30,10 @@
 #include <memory>
 #include <functional>
 #include <mutex>
+#include <condition_variable>
 #include <atomic>
 #include <chrono>
+#include <thread>
 #include <nlohmann/json.hpp>
 
 namespace FTB {
@@ -116,6 +118,7 @@ struct StatusBarSegment {
     std::string fg_color;       // Foreground color (hex or name)
     std::string bg_color;       // Background color (hex or name)
     bool bold = false;
+    std::string align = "left"; // "left" or "right"
 };
 
 // ─── Plugin Instance ─────────────────────────────────────────────────
@@ -204,24 +207,51 @@ public:
     std::vector<std::string> GetPluginErrors() const;
     nlohmann::json GetPluginStatus(const std::string& name) const;
 
-    // Status bar: collect segments from all enabled StatusBar-type plugins
+    // Status bar: async background refresh
+    //   - GetStatusBarContent returns cached segments immediately (never blocks)
+    //   - UpdateContextSnapshot stores current context for background thread
     std::vector<StatusBarSegment> GetStatusBarContent(const PluginContext& ctx);
+    void UpdateContextSnapshot(const PluginContext& ctx);
+
+    // Background refresh lifecycle
+    void StartBackgroundRefresh(std::function<void()> on_updated);
+    void StopBackgroundRefresh();
 
 private:
     PluginManager() = default;
     ~PluginManager() = default;
 
+    // Background worker: periodically executes StatusBar plugins
+    void BackgroundRefreshWorker();
+    std::vector<StatusBarSegment> ExecuteStatusBarPlugins(const PluginContext& ctx);
+
+    std::string config_dir_;
     std::string plugins_dir_;
     std::map<std::string, std::unique_ptr<PluginInstance>> plugins_;
     std::map<std::string, bool> enabled_map_;  // name -> enabled
-    mutable std::mutex mutex_;
+    mutable std::mutex plugins_mutex_;
     bool initialized_ = false;
 
-    // Status bar cache: plugin name -> last segments
-    std::map<std::string, std::vector<StatusBarSegment>> statusbar_cache_;
-    std::chrono::steady_clock::time_point statusbar_last_refresh_;
+    // Cached status bar segments (read by UI thread, written by background thread)
+    std::vector<StatusBarSegment> statusbar_cached_segments_;
+    mutable std::mutex statusbar_mutex_;
+
+    // Context snapshot for background thread
+    PluginContext statusbar_context_snapshot_;
+    std::mutex ctx_mutex_;
+
+    // Background thread
+    std::thread background_thread_;
+    std::atomic<bool> background_running_{false};
+    std::function<void()> on_statusbar_updated_;
+    std::condition_variable shutdown_cv_;
+    std::mutex shutdown_mutex_;
+
+    // Polling interval for background refresh
     static constexpr int STATUSBAR_REFRESH_INTERVAL_MS = 2000;
 
+    void SaveEnabledState();
+    void LoadEnabledState();
     std::string ResolvePluginPath(const std::string& name) const;
     bool ValidatePlugin(const std::string& dir) const;
 };
