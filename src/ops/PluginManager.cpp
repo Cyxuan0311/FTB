@@ -1,5 +1,4 @@
 #include "../../include/ops/PluginManager.hpp"
-#include "../../include/utils/PerfLogger.hpp"
 
 #include <fstream>
 #include <sstream>
@@ -92,26 +91,21 @@ PluginInstance::~PluginInstance() {
 }
 
 bool PluginInstance::Load() {
-    PERF_LOG("plugin", "Load start name=" + metadata_.name + " dir=" + plugin_dir_);
     if (state_ == PluginState::Loaded) {
-        PERF_LOG("plugin", "Load - already loaded");
         return true;
     }
 
     // Read entry file
     fs::path entry_path = fs::path(plugin_dir_) / metadata_.entry;
-    PERF_LOG("plugin", "Load entry_path=" + entry_path.string());
     if (!fs::exists(entry_path)) {
         // Try .js fallback
         entry_path = fs::path(plugin_dir_) /
                      fs::path(metadata_.entry).replace_extension(".js");
-        PERF_LOG("plugin", "Load fallback path=" + entry_path.string());
     }
 
     if (!fs::exists(entry_path)) {
         last_error_ = "Entry file not found: " + metadata_.entry;
         state_ = PluginState::Error;
-        PERF_LOG("plugin", "Load - entry not found: " + entry_path.string());
         return false;
     }
 
@@ -120,35 +114,27 @@ bool PluginInstance::Load() {
     if (!ifs.is_open()) {
         last_error_ = "Cannot open entry file";
         state_ = PluginState::Error;
-        PERF_LOG("plugin", "Load - cannot open: " + entry_path.string());
         return false;
     }
     std::ostringstream oss;
     oss << ifs.rdbuf();
     compiled_code_ = oss.str();
-    PERF_LOG("plugin", "Load code size=" + std::to_string(compiled_code_.size()) + " ext=" + entry_path.extension().string());
 
     // If it's TypeScript (.ts), we need to transpile
     if (entry_path.extension() == ".ts") {
-        PERF_LOG("plugin", "Load - compiling TypeScript");
         if (!CompileTypeScript()) {
-            PERF_LOG("plugin", "Load - TS compile failed");
             state_ = PluginState::Error;
             return false;
         }
-        PERF_LOG("plugin", "Load - TS compile ok, output size=" + std::to_string(compiled_code_.size()));
     }
 
     // Create sandbox
-    PERF_LOG("plugin", "Load - creating sandbox");
     if (!CreateSandbox()) {
-        PERF_LOG("plugin", "Load - sandbox creation failed");
         state_ = PluginState::Error;
         return false;
     }
 
     state_ = PluginState::Loaded;
-    PERF_LOG("plugin", "Load - success");
     return true;
 }
 
@@ -159,14 +145,11 @@ void PluginInstance::Unload() {
 }
 
 PluginResult PluginInstance::Execute(const PluginContext& ctx) {
-    PERF_LOG("plugin", "Execute name=" + metadata_.name + " state=" + std::to_string(static_cast<int>(state_)));
     return ExecuteFunction("entry", ctx);
 }
 
 PluginResult PluginInstance::ExecuteFunction(const std::string& fn, const PluginContext& ctx) {
-    PERF_LOG("plugin", "ExecuteFunction name=" + metadata_.name + " fn=" + fn + " state=" + std::to_string(static_cast<int>(state_)));
     if (state_ != PluginState::Loaded) {
-        PERF_LOG("plugin", "ExecuteFunction - not loaded, state=" + std::to_string(static_cast<int>(state_)));
         return {false, "Plugin not loaded", {}, ""};
     }
 
@@ -180,7 +163,6 @@ PluginResult PluginInstance::ExecuteFunction(const std::string& fn, const Plugin
     } else {
         state_ = PluginState::Error;
         last_error_ = result.error;
-        PERF_LOG("plugin", "ExecuteFunction - error: " + result.error);
     }
 
     return result;
@@ -192,7 +174,6 @@ bool PluginInstance::Reload() {
 }
 
 bool PluginInstance::CompileTypeScript() {
-    PERF_LOG("plugin", "CompileTypeScript start size=" + std::to_string(compiled_code_.size()));
 
     // Phase 1: Remove `interface X { ... }` blocks with a brace-depth counter
     // to handle nested braces (e.g. interface with fs: { ... } properties)
@@ -230,7 +211,6 @@ bool PluginInstance::CompileTypeScript() {
         compiled_code_ = result;
     }
 
-    PERF_LOG("plugin", "CompileTypeScript after interface removal size=" + std::to_string(compiled_code_.size()));
 
     // Phase 2: Apply regex replacements for other TypeScript constructs
     static const std::vector<std::pair<std::string, std::string>> replacements = {
@@ -260,11 +240,9 @@ bool PluginInstance::CompileTypeScript() {
         try {
             compiled_code_ = std::regex_replace(compiled_code_, std::regex(pattern), replacement);
         } catch (const std::regex_error& e) {
-            PERF_LOG("plugin", "CompileTypeScript regex error: " + std::string(e.what()) + " for pattern=" + pattern);
         }
     }
 
-    PERF_LOG("plugin", "CompileTypeScript done, final size=" + std::to_string(compiled_code_.size()));
     return true;
 }
 
@@ -311,7 +289,6 @@ bool PluginInstance::InjectAPI(const PluginContext& /*ctx*/) {
 }
 
 PluginResult PluginInstance::RunInSandbox(const std::string& code, const std::string& fn_name, const PluginContext& ctx) {
-    PERF_LOG("plugin", "RunInSandbox start fn=" + fn_name + " code_size=" + std::to_string(code.size()));
     // Execution strategy:
     // For security, plugins run in an isolated subprocess using QuickJS
     // standalone interpreter. This provides:
@@ -454,10 +431,8 @@ PluginResult PluginInstance::RunInSandbox(const std::string& code, const std::st
 
     // Try to execute using QuickJS (qjs) if available
     std::string qjs_path = "/usr/local/bin/qjs";
-    PERF_LOG("plugin", "RunInSandbox check qjs at " + qjs_path + " exists=" + std::to_string(fs::exists(qjs_path)));
     if (!fs::exists(qjs_path)) {
         qjs_path = "/usr/bin/qjs";
-        PERF_LOG("plugin", "RunInSandbox fallback qjs at " + qjs_path + " exists=" + std::to_string(fs::exists(qjs_path)));
     }
 
     if (fs::exists(qjs_path)) {
@@ -467,20 +442,17 @@ PluginResult PluginInstance::RunInSandbox(const std::string& code, const std::st
             std::ofstream ofs(tmp_path);
             ofs << wrapped_code;
         }
-        PERF_LOG("plugin", "RunInSandbox wrote " + tmp_path + " size=" + std::to_string(wrapped_code.size()));
 
         // Execute with timeout (--std makes std/os/bjson globals in QuickJS-ng)
         // stderr goes to separate file to keep stdout clean for JSON parsing
         std::string err_path = tmp_path + ".err";
         std::string cmd = "timeout " + std::to_string(metadata_.permissions.max_exec_ms / 1000) +
                          " " + qjs_path + " --std " + tmp_path + " 2>" + err_path;
-        PERF_LOG("plugin", "RunInSandbox cmd=" + cmd);
 
         FILE* pipe = popen(cmd.c_str(), "r");
         if (!pipe) {
             result.success = false;
             result.error = "Failed to start JS runtime";
-            PERF_LOG("plugin", "RunInSandbox popen failed");
             fs::remove(tmp_path);
             fs::remove(err_path);
             return result;
@@ -492,7 +464,6 @@ PluginResult PluginInstance::RunInSandbox(const std::string& code, const std::st
             output += buffer;
         }
         int exit_code = pclose(pipe);
-        PERF_LOG("plugin", "RunInSandbox exit_code=" + std::to_string(exit_code) +
                  " stdout_size=" + std::to_string(output.size()) +
                  " stdout_preview=" + output.substr(0, 200));
 
@@ -505,7 +476,6 @@ PluginResult PluginInstance::RunInSandbox(const std::string& code, const std::st
                 err_oss << err_ifs.rdbuf();
                 err_output = err_oss.str();
             }
-            PERF_LOG("plugin", "RunInSandbox stderr=" + err_output);
         }
 
         // Clean up temp files
@@ -515,7 +485,6 @@ PluginResult PluginInstance::RunInSandbox(const std::string& code, const std::st
         if (exit_code != 0) {
             result.success = false;
             result.error = "Plugin exited with code " + std::to_string(exit_code) + ": " + err_output;
-            PERF_LOG("plugin", "RunInSandbox error=" + result.error);
             return result;
         }
 
@@ -526,21 +495,17 @@ PluginResult PluginInstance::RunInSandbox(const std::string& code, const std::st
             if (j.contains("data")) result.data = j["data"];
             if (j.contains("error")) result.error = j["error"].get<std::string>();
             if (j.contains("message")) result.message = j.value("message", "");
-            PERF_LOG("plugin", "RunInSandbox JSON parsed success=" + std::to_string(result.success));
         } catch (const nlohmann::json::parse_error& e) {
             // If output is not JSON, treat as raw message
             result.success = true;
             result.message = output;
-            PERF_LOG("plugin", "RunInSandbox JSON parse failed: " + std::string(e.what()) + " raw=" + output);
         }
     } else {
         // No JS runtime available - return error
         result.success = false;
         result.error = "No JavaScript runtime found. Install QuickJS (qjs) to enable plugins.";
-        PERF_LOG("plugin", "RunInSandbox - qjs not found at any known path");
     }
 
-    PERF_LOG("plugin", "RunInSandbox end success=" + std::to_string(result.success));
     return result;
 }
 
@@ -552,21 +517,17 @@ PluginManager* PluginManager::GetInstance() {
 }
 
 void PluginManager::Initialize(const std::string& config_dir) {
-    PERF_LOG("plugin", "Initialize config_dir=" + config_dir);
     std::lock_guard<std::mutex> lock(plugins_mutex_);
 
     if (initialized_) {
-        PERF_LOG("plugin", "Initialize skipped - already initialized");
         return;
     }
 
     config_dir_ = config_dir;
     plugins_dir_ = config_dir + "/plugins";
-    PERF_LOG("plugin", "plugins_dir=" + plugins_dir_);
 
     // Create plugins directory if it doesn't exist
     if (!fs::exists(plugins_dir_)) {
-        PERF_LOG("plugin", "Creating plugins directory");
         fs::create_directories(plugins_dir_);
     }
 
@@ -577,7 +538,6 @@ void PluginManager::Initialize(const std::string& config_dir) {
     LoadEnabledState();
 
     initialized_ = true;
-    PERF_LOG("plugin", "Initialize done, plugins count=" + std::to_string(plugins_.size()));
 }
 
 void PluginManager::Shutdown() {
@@ -593,9 +553,7 @@ void PluginManager::Shutdown() {
 }
 
 void PluginManager::ScanPlugins() {
-    PERF_LOG("plugin", "ScanPlugins start dir=" + plugins_dir_);
     if (!fs::exists(plugins_dir_)) {
-        PERF_LOG("plugin", "ScanPlugins - plugins_dir does not exist");
         return;
     }
 
@@ -604,15 +562,12 @@ void PluginManager::ScanPlugins() {
         if (!entry.is_directory()) continue;
 
         std::string dir_name = entry.path().filename().string();
-        PERF_LOG("plugin", "ScanPlugins entry=" + dir_name);
 
         // Plugin directories end with .ftb
         if (dir_name.size() > 4 && dir_name.substr(dir_name.size() - 4) == ".ftb") {
             std::string plugin_name = dir_name.substr(0, dir_name.size() - 4);
-            PERF_LOG("plugin", "ScanPlugins candidate=" + plugin_name + " path=" + entry.path().string());
 
             if (ValidatePlugin(entry.path().string())) {
-                PERF_LOG("plugin", "ScanPlugins validated=" + plugin_name);
                 // Read package.json
                 fs::path pkg_path = entry.path() / "package.json";
                 if (fs::exists(pkg_path)) {
@@ -623,7 +578,6 @@ void PluginManager::ScanPlugins() {
 
                         PluginMetadata meta = PluginMetadata::FromJson(pkg);
                         meta.name = plugin_name;
-                        PERF_LOG("plugin", "ScanPlugins meta name=" + meta.name + " type=" + std::to_string(static_cast<int>(meta.type)));
 
                         auto instance = std::make_unique<PluginInstance>(
                             entry.path().string(), meta);
@@ -635,17 +589,13 @@ void PluginManager::ScanPlugins() {
                         }
                         count++;
                     } catch (const std::exception& e) {
-                        PERF_LOG("plugin", "ScanPlugins exception=" + std::string(e.what()));
                     }
                 } else {
-                    PERF_LOG("plugin", "ScanPlugins no package.json");
                 }
             } else {
-                PERF_LOG("plugin", "ScanPlugins validation failed");
             }
         }
     }
-    PERF_LOG("plugin", "ScanPlugins end, total=" + std::to_string(count));
 }
 
 std::vector<std::string> PluginManager::GetAvailablePlugins() const {
@@ -701,32 +651,25 @@ bool PluginManager::IsPluginLoaded(const std::string& name) const {
 }
 
 PluginResult PluginManager::ExecutePlugin(const std::string& name, const PluginContext& ctx) {
-    PERF_LOG("plugin", "ExecutePlugin name=" + name + " path=" + ctx.current_path);
     std::lock_guard<std::mutex> lock(plugins_mutex_);
 
     auto it = plugins_.find(name);
     if (it == plugins_.end()) {
-        PERF_LOG("plugin", "ExecutePlugin - not found: " + name);
         return {false, "Plugin not found: " + name, {}, ""};
     }
 
     if (!enabled_map_[name]) {
-        PERF_LOG("plugin", "ExecutePlugin - disabled: " + name);
         return {false, "Plugin is disabled: " + name, {}, ""};
     }
 
     // Auto-load if needed
     if (it->second->GetState() != PluginState::Loaded) {
-        PERF_LOG("plugin", "ExecutePlugin - auto-loading: " + name);
         if (!it->second->Load()) {
-            PERF_LOG("plugin", "ExecutePlugin - load failed: " + it->second->GetLastError());
             return {false, "Failed to load plugin: " + it->second->GetLastError(), {}, ""};
         }
-        PERF_LOG("plugin", "ExecutePlugin - loaded ok: " + name);
     }
 
     auto result = it->second->Execute(ctx);
-    PERF_LOG("plugin", "ExecutePlugin result success=" + std::to_string(result.success) +
              " error=" + result.error + " message=" + result.message);
     return result;
 }
@@ -1012,7 +955,6 @@ void PluginManager::SaveEnabledState() {
         std::ofstream ofs(path);
         ofs << j.dump(2);
     } catch (const std::exception& e) {
-        PERF_LOG("plugin", "SaveEnabledState error=" + std::string(e.what()));
     }
 }
 
@@ -1033,7 +975,6 @@ void PluginManager::LoadEnabledState() {
             }
         }
     } catch (const std::exception& e) {
-        PERF_LOG("plugin", "LoadEnabledState error=" + std::string(e.what()));
     }
 }
 
