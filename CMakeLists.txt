@@ -117,6 +117,7 @@ set(FTB_CORE_SOURCES
     # config
     src/config/CLIArgs.cpp
     src/config/ConfigManager.cpp
+    src/config/DefaultExtensionColors.cpp
     src/config/KeyBindings.cpp
     src/config/ObjectPool.cpp
     src/config/ThemeManager.cpp

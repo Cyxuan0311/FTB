@@ -2,9 +2,10 @@
 #define CONFIG_MANAGER_HPP
 
 #include <string>
-#include <map>
 #include <vector>
+#include <map>
 #include <memory>
+#include <unordered_map>
 #include <unordered_set>
 #include <ftxui/dom/elements.hpp>
 #include "ops/OpenerManager.hpp"
@@ -31,6 +32,7 @@ struct FileTypeColors {
     std::string link;
     std::string hidden;
     std::string system;
+    std::unordered_map<std::string, std::string> extensions;
 
     FileTypeColors() : directory("#89b4fa"), file("#cdd6f4"), executable("#a6e3a1"),
                       link("#f5c2e7"), hidden("#6c7086"), system("#f38ba8") {}
@@ -238,6 +240,7 @@ public:
 
     ftxui::Color GetColor(const std::string& color_name) const;
     ftxui::Color GetFileTypeColor(const std::string& file_type) const;
+    ftxui::Color GetExtensionColor(const std::string& ext) const;
     ftxui::Color ParseColor(const std::string& color_str) const;
     void ApplyTheme(const std::string& theme_name);
     bool ReloadConfig();

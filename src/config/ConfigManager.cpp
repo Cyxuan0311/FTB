@@ -1,4 +1,5 @@
 #include "config/ConfigManager.hpp"
+#include "config/DefaultExtensionColors.hpp"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -44,10 +45,14 @@ static void JsonToColorConfig(const json& j, ColorConfig& c) {
 }
 
 static json FileTypeColorsToJson(const FileTypeColors& c) {
-    return json{
+    json j = {
         {"directory", c.directory}, {"file", c.file}, {"executable", c.executable},
         {"link", c.link}, {"hidden", c.hidden}, {"system", c.system}
     };
+    if (!c.extensions.empty()) {
+        j["extensions"] = json(c.extensions);
+    }
+    return j;
 }
 
 static void JsonToFileTypeColors(const json& j, FileTypeColors& c) {
@@ -57,6 +62,13 @@ static void JsonToFileTypeColors(const json& j, FileTypeColors& c) {
     if (j.contains("link"))        j["link"].get_to(c.link);
     if (j.contains("hidden"))      j["hidden"].get_to(c.hidden);
     if (j.contains("system"))      j["system"].get_to(c.system);
+    if (j.contains("extensions") && j["extensions"].is_object()) {
+        for (auto& [key, val] : j["extensions"].items()) {
+            if (val.is_string()) {
+                c.extensions[key] = val.get<std::string>();
+            }
+        }
+    }
 }
 
 static json StyleConfigToJson(const StyleConfig& s) {
@@ -425,6 +437,17 @@ ftxui::Color ConfigManager::GetFileTypeColor(const std::string& file_type) const
     if (file_type == "hidden")     return ParseColor(config_.colors_files.hidden);
     if (file_type == "system")     return ParseColor(config_.colors_files.system);
     return ParseColor(config_.colors_files.file);
+}
+
+ftxui::Color ConfigManager::GetExtensionColor(const std::string& ext) const {
+    auto it = config_.colors_files.extensions.find(ext);
+    if (it != config_.colors_files.extensions.end())
+        return ParseColor(it->second);
+    auto& defaults = GetDefaultExtensionColors();
+    auto dit = defaults.find(ext);
+    if (dit != defaults.end())
+        return ParseColor(dit->second);
+    return ftxui::Color::Default;
 }
 
 void ConfigManager::ApplyTheme(const std::string& theme_name) {
