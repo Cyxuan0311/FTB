@@ -468,8 +468,6 @@ PluginResult PluginInstance::RunInSandbox(const std::string& code, const std::st
             output += buffer;
         }
         int exit_code = pclose(pipe);
-                 " stdout_size=" + std::to_string(output.size()) +
-                 " stdout_preview=" + output.substr(0, 200));
 
         // Read stderr output if non-zero exit
         std::string err_output;
@@ -674,7 +672,6 @@ PluginResult PluginManager::ExecutePlugin(const std::string& name, const PluginC
     }
 
     auto result = it->second->Execute(ctx);
-             " error=" + result.error + " message=" + result.message);
     return result;
 }
 
