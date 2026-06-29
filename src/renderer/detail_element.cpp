@@ -17,6 +17,7 @@
 
 #include "core/MainUI.hpp"
 #include "core/AnsiParser.hpp"
+#include "ops/PluginManager.hpp"
 #include "preview/ArchivePreview.hpp"
 #include "preview/ImagePreview.hpp"
 #include "preview/MarkdownPreview.hpp"
@@ -203,6 +204,60 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
         info_elements.push_back(separator() | color(TC("main_border")));
         return vbox(info_elements) | bgcolor(TC("main_bg")) | flex | yframe;
     }
+
+#ifdef FTB_ENABLE_PLUGINS
+    // === Plugin Previewer ===
+    bool plugin_preview_handled = false;
+    if (!data.is_dir && data.exists) {
+        auto* pm = FTB::PluginManager::GetInstance();
+        if (pm) {
+            std::string mime;
+            if (!ext.empty() && ext[0] == '.')
+                mime = "text/" + ext.substr(1);
+            std::string plugin_name = pm->FindPreviewer(mime, ext);
+            if (!plugin_name.empty()) {
+                std::string fp = (fs::path(currentPath) / data.selectedName).string();
+                FTB::PluginContext pctx;
+                pctx.current_path = currentPath;
+                pctx.selected_file = data.selectedName;
+                pctx.selected_file_path = fp;
+                pctx.selected_is_dir = data.is_dir;
+                pctx.selected_size = data.file_size;
+                pctx.panel_width = preview_panel_width;
+
+                pm->ExecutePluginPreview(plugin_name, pctx, preview_panel_width);
+
+                FTB::PluginPreviewResult ppr;
+                if (pm->PollPluginPreview(plugin_name, ppr)) {
+                    if (ppr.completed) {
+                        if (!ppr.failed && !ppr.output.empty()) {
+                            info_elements.push_back(separator() | color(TC("main_border")));
+                            std::vector<ftxui::Element> lines;
+                            std::istringstream stream(ppr.output);
+                            std::string line;
+                            while (std::getline(stream, line)) {
+                                lines.push_back(FTB::AnsiStringToElement(line));
+                            }
+                            info_elements.push_back(vbox(std::move(lines)) | ftxui::flex);
+                            plugin_preview_handled = true;
+                        }
+                    } else {
+                        info_elements.push_back(separator() | color(TC("main_border")));
+                        std::string loading_label = ppr.label.empty() ? plugin_name : ppr.label;
+                        info_elements.push_back(
+                            text("  " + loading_label + " preview (loading...)") | color(TC("dim")) | dim
+                        );
+                        plugin_preview_handled = true;
+                    }
+                }
+            }
+        }
+    }
+
+    if (plugin_preview_handled) {
+        return vbox(info_elements) | bgcolor(TC("main_bg")) | flex | yframe;
+    }
+#endif
 
     if (data.is_dir && data.exists) {
         std::string dirPath = (fs::path(currentPath) / data.selectedName).string();
