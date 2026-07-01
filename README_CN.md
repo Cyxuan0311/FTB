@@ -50,8 +50,11 @@
 - 主题感知颜色，随当前主题自动适配
 
 ### 图片预览
-- 使用 Unicode 半块字符在终端中渲染 JPG、PNG、BMP、GIF 图片
-- 可选 libchafa 后端获得更高质量（使用 `-DFTB_ENABLE_LIBCHAFA=ON` 编译）
+- 在终端中渲染 JPG、PNG、BMP、GIF 图片
+- Unicode 半块字符渲染（内置，无额外依赖）
+- 可选 libchafa 后端获得更高质量（`-DFTB_ENABLE_LIBCHAFA=ON`）
+- 可选 libsixel 后端实现原生终端图像输出（`-DFTB_ENABLE_LIBSIXEL=ON`）
+- 可扩展的协议层：当前支持 sixel 协议，架构已预留 Kitty、iTerm2 等终端图像协议接口
 
 ### 主题系统
 18 个内置主题，均包含完整的语法高亮颜色支持：
@@ -121,13 +124,17 @@
 | nlohmann-json | JSON 配置解析 | 是 |
 | libssh2 | SSH 连接 | 否 (`-DFTB_ENABLE_SSH=ON`) |
 | tree-sitter | 高级语法高亮 | 否 (`-DFTB_ENABLE_TREE_SITTER=ON`) |
-| libchafa | 图片预览 | 否 (`-DFTB_ENABLE_LIBCHAFA=ON`) |
+| libchafa | 高级图片预览 | 否 (`-DFTB_ENABLE_LIBCHAFA=ON`) |
+| libsixel | 原生终端图像输出 | 否 (`-DFTB_ENABLE_LIBSIXEL=ON`) |
 
 ### 安装依赖（Ubuntu/Debian）
 
 ```bash
 sudo apt-get update && sudo apt-get install -y \
     libftxui-dev nlohmann-json3-dev cmake g++
+
+# 可选：原生 sixel 图像支持
+sudo apt-get install -y libsixel-dev
 ```
 
 ### 编译
@@ -152,6 +159,9 @@ cmake .. -DFTB_ENABLE_TREE_SITTER=ON
 
 # 启用 libchafa 图片预览
 cmake .. -DFTB_ENABLE_LIBCHAFA=ON
+
+# 启用 libsixel 原生图像输出
+cmake .. -DFTB_ENABLE_LIBSIXEL=ON
 
 # 使用交互式脚本编译
 chmod +x ./build.sh

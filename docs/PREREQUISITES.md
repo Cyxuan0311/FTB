@@ -33,6 +33,7 @@ FTB uses these tools in a tiered fallback order to list archive contents:
 
 | Tool | Feature | Install |
 |------|---------|---------|
+| [libsixel](https://github.com/libsixel/libsixel) | Native terminal image output (sixel) | `apt install libsixel-dev` |
 | [qjs (QuickJS)](https://bellard.org/quickjs/) | Plugin system JavaScript runtime | `apt install quickjs` or build from source |
 | [fdfind](https://github.com/sharkdp/fd) / `fd` | Faster file search in FuzzyFinder | `apt install fd-find` |
 
@@ -43,13 +44,33 @@ FTB uses these tools in a tiered fallback order to list archive contents:
 sudo apt-get install -y timg ffmpeg glow eyed3 pandoc catdoc xxd unzip p7zip-full genisoimage
 
 # Other
-sudo apt-get install -y quickjs fd-find
+sudo apt-get install -y libsixel-dev quickjs fd-find
 ```
 
 For `xleak` and `hygg` (Rust tools):
 ```bash
 cargo install xleak hygg
 ```
+
+## Shell integration (optional)
+
+FTB can change your shell's working directory on exit. Add a wrapper function to your shell config:
+
+**Bash** (`~/.bashrc`):
+```bash
+function ftb() { command FTB "$@"; [ -f ~/.cache/ftb/cwd ] && cd "$(<~/.cache/ftb/cwd)" && rm ~/.cache/ftb/cwd; }
+alias FTB='ftb'
+```
+
+**Zsh** (`~/.zshrc`):
+```zsh
+function ftb() { command FTB "$@"; [ -f ~/.cache/ftb/cwd ] && cd "$(<~/.cache/ftb/cwd)" && rm ~/.cache/ftb/cwd; }
+alias FTB='ftb'
+```
+
+Then inside FTB, press `Ctrl+B` and type `z` (or `exit` / `quit`). The program will exit and your shell will `cd` to the directory you were browsing.
+
+Multiple terminal sessions are isolated — each shell session reads and clears its own `~/.cache/ftb/cwd` file.
 
 ---
 

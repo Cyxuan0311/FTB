@@ -102,6 +102,7 @@ Press `Ctrl+B` to enter command prefix mode, then type a command:
 | `gh` | | Go to home directory |
 | `gd` | | Go to downloads directory |
 | `gc` | | Go to config directory |
+| `z` | `exit`, `quit` | Quit and cd to current directory in shell (requires shell wrapper) |
 | `ssh` | | SSH connection (if enabled) |
 
 - `Tab` — Auto-complete command name

@@ -52,8 +52,11 @@ A terminal-based file browser, built with C++17 and [FTXUI](https://github.com/A
 - Theme-aware colors that adapt to the active theme
 
 ### Image Preview
-- Renders JPG, PNG, BMP, GIF images in the terminal using Unicode half-block characters
-- Optional libchafa backend for better quality (build with `-DFTB_ENABLE_LIBCHAFA=ON`)
+- Renders JPG, PNG, BMP, GIF images in the terminal
+- Unicode half-block character rendering (built-in, no dependencies)
+- Optional libchafa backend for better quality (`-DFTB_ENABLE_LIBCHAFA=ON`)
+- Optional libsixel backend for native terminal image output (`-DFTB_ENABLE_LIBSIXEL=ON`)
+- Extensible protocol layer: supports sixel currently, with architecture ready for Kitty, iTerm2, and other terminal image protocols
 
 ### Theme System
 18 built-in themes with full syntax color support:
@@ -123,7 +126,8 @@ Press `Ctrl+B` to enter prefix mode, then type commands:
 | nlohmann-json | JSON config parsing | Yes |
 | libssh2 | SSH connections | No (`-DFTB_ENABLE_SSH=ON`) |
 | tree-sitter | Advanced syntax highlighting | No (`-DFTB_ENABLE_TREE_SITTER=ON`) |
-| libchafa | Image preview | No (`-DFTB_ENABLE_LIBCHAFA=ON`) |
+| libchafa | Advanced image preview | No (`-DFTB_ENABLE_LIBCHAFA=ON`) |
+| libsixel | Native terminal image output | No (`-DFTB_ENABLE_LIBSIXEL=ON`) |
 | QuickJS | Plugin system runtime | No (plugins require `qjs`) |
 
 ### Install dependencies (Ubuntu/Debian)
@@ -131,6 +135,9 @@ Press `Ctrl+B` to enter prefix mode, then type commands:
 ```bash
 sudo apt-get update && sudo apt-get install -y \
     libftxui-dev nlohmann-json3-dev cmake g++
+
+# Optional: native sixel image support
+sudo apt-get install -y libsixel-dev
 ```
 
 ### Build
@@ -155,6 +162,9 @@ cmake .. -DFTB_ENABLE_TREE_SITTER=ON
 
 # Enable libchafa image preview
 cmake .. -DFTB_ENABLE_LIBCHAFA=ON
+
+# Enable libsixel native image output 
+cmake .. -DFTB_ENABLE_LIBSIXEL=ON
 
 # Disable plugin system
 cmake .. -DFTB_ENABLE_PLUGINS=OFF

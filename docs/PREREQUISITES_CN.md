@@ -31,6 +31,7 @@ FTB 按层级降级顺序使用以下工具列出归档内容：
 
 | 工具 | 功能 | 安装方式 |
 |------|---------|---------|
+| [libsixel](https://github.com/libsixel/libsixel) | 原生终端图像输出（sixel 协议） | `apt install libsixel-dev` |
 | [qjs (QuickJS)](https://bellard.org/quickjs/) | 插件系统 JavaScript 运行时 | `apt install quickjs` 或从源码编译 |
 | [fdfind](https://github.com/sharkdp/fd) / `fd` | FuzzyFinder 中更快的文件搜索 | `apt install fd-find` |
 
@@ -41,10 +42,30 @@ FTB 按层级降级顺序使用以下工具列出归档内容：
 sudo apt-get install -y timg ffmpeg glow eyed3 pandoc catdoc xxd unzip p7zip-full genisoimage
 
 # 其他
-sudo apt-get install -y quickjs fd-find
+sudo apt-get install -y libsixel-dev quickjs fd-find
 ```
 
 对于 `xleak` 和 `hygg`（Rust 工具）：
 ```bash
 cargo install xleak hygg
 ```
+
+## Shell 集成（可选）
+
+FTB 可以在退出时自动改变终端 shell 的当前目录。在 shell 配置文件中添加一个包装函数：
+
+**Bash**（`~/.bashrc`）：
+```bash
+function ftb() { command FTB "$@"; [ -f ~/.cache/ftb/cwd ] && cd "$(<~/.cache/ftb/cwd)" && rm ~/.cache/ftb/cwd; }
+alias FTB='ftb'
+```
+
+**Zsh**（`~/.zshrc`）：
+```zsh
+function ftb() { command FTB "$@"; [ -f ~/.cache/ftb/cwd ] && cd "$(<~/.cache/ftb/cwd)" && rm ~/.cache/ftb/cwd; }
+alias FTB='ftb'
+```
+
+然后在 FTB 中按 `Ctrl+B`，输入 `z`（或 `exit` / `quit`）。程序退出后，shell 会自动切换到刚刚浏览的目录。
+
+多个终端会话相互隔离——每个 shell 会话读取并清理自己的 `~/.cache/ftb/cwd` 文件。
