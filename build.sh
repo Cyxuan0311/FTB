@@ -71,6 +71,7 @@ OPT_ICONS=ON
 OPT_SSH=OFF
 OPT_TREE_SITTER=OFF
 OPT_LIBCHAFA=OFF
+OPT_LIBSIXEL=OFF
 OPT_PLUGINS=ON
 OPT_AI=OFF
 OPT_BUILD_TYPE=Debug
@@ -90,6 +91,7 @@ print_usage() {
     echo "  --ssh                 Enable SSH support (requires libssh2)"
     echo "  --tree-sitter         Enable tree-sitter (requires grammars)"
     echo "  --libchafa            Enable libchafa image preview"
+    echo "  --libsixel            Enable libsixel (native image protocol)"
     echo "  --no-icons            Disable Nerd Font icons"
     echo "  --no-plugins          Disable plugin system"
     echo "  --release             Build in Release mode"
@@ -115,6 +117,7 @@ for arg in "$@"; do
         --ssh)          OPT_SSH=ON ;;
         --tree-sitter)  OPT_TREE_SITTER=ON ;;
         --libchafa)     OPT_LIBCHAFA=ON ;;
+        --libsixel)     OPT_LIBSIXEL=ON ;;
         --no-icons)     OPT_ICONS=OFF ;;
         --no-plugins)   OPT_PLUGINS=OFF ;;
         --release)      OPT_BUILD_TYPE=Release ;;
@@ -125,7 +128,8 @@ for arg in "$@"; do
         --run)          OPT_RUN=true ;;
         --all)
             OPT_AI=ON; OPT_SSH=ON; OPT_TREE_SITTER=ON
-            OPT_LIBCHAFA=ON; OPT_PLUGINS=ON; OPT_ICONS=ON
+            OPT_LIBCHAFA=ON; OPT_LIBSIXEL=ON
+            OPT_PLUGINS=ON; OPT_ICONS=ON
             ;;
         --help|-h)      print_usage; exit 0 ;;
         *)              echo -e "${RED}Unknown option: $arg${NC}"; print_usage; exit 1 ;;
@@ -146,6 +150,7 @@ if $INTERACTIVE; then
     ask_yes_no "Enable SSH support (requires libssh2)?" "n" && OPT_SSH=ON || OPT_SSH=OFF
     ask_yes_no "Enable tree-sitter (requires grammars)?" "n" && OPT_TREE_SITTER=ON || OPT_TREE_SITTER=OFF
     ask_yes_no "Enable libchafa image preview?" "n"   && OPT_LIBCHAFA=ON || OPT_LIBCHAFA=OFF
+    ask_yes_no "Enable libsixel (native image protocol)?" "n" && OPT_LIBSIXEL=ON || OPT_LIBSIXEL=OFF
     ask_yes_no "Enable plugin system?" "y"            && OPT_PLUGINS=ON || OPT_PLUGINS=OFF
 
     ask_option "Select build type:" "Debug" "Release" "RelWithDebInfo" "MinSizeRel"
@@ -181,6 +186,7 @@ printf "  ${BOLD}│${NC} %-${LABEL_W}s %-${VALUE_W}s ${BOLD}│${NC}\n" "Icons:
 printf "  ${BOLD}│${NC} %-${LABEL_W}s %-${VALUE_W}s ${BOLD}│${NC}\n" "SSH:" "$OPT_SSH"
 printf "  ${BOLD}│${NC} %-${LABEL_W}s %-${VALUE_W}s ${BOLD}│${NC}\n" "Tree-sitter:" "$OPT_TREE_SITTER"
 printf "  ${BOLD}│${NC} %-${LABEL_W}s %-${VALUE_W}s ${BOLD}│${NC}\n" "libchafa:" "$OPT_LIBCHAFA"
+printf "  ${BOLD}│${NC} %-${LABEL_W}s %-${VALUE_W}s ${BOLD}│${NC}\n" "libsixel:" "$OPT_LIBSIXEL"
 printf "  ${BOLD}│${NC} %-${LABEL_W}s %-${VALUE_W}s ${BOLD}│${NC}\n" "Plugins:" "$OPT_PLUGINS"
 printf "  ${BOLD}│${NC} %-${LABEL_W}s %-${VALUE_W}s ${BOLD}│${NC}\n" "Build type:" "$OPT_BUILD_TYPE"
 printf "  ${BOLD}│${NC} %-${LABEL_W}s %-${VALUE_W}s ${BOLD}│${NC}\n" "Clean:" "$OPT_CLEAN"
@@ -205,6 +211,7 @@ CMAKE_OPTS=(
     "-DFTB_ENABLE_SSH=$OPT_SSH"
     "-DFTB_ENABLE_TREE_SITTER=$OPT_TREE_SITTER"
     "-DFTB_ENABLE_LIBCHAFA=$OPT_LIBCHAFA"
+    "-DFTB_ENABLE_LIBSIXEL=$OPT_LIBSIXEL"
     "-DFTB_ENABLE_PLUGINS=$OPT_PLUGINS"
     "-DCMAKE_BUILD_TYPE=$OPT_BUILD_TYPE"
 )

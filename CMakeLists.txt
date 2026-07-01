@@ -15,6 +15,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0 -Wall -Wextra -Wpedan
 option(FTB_ENABLE_SSH "Enable SSH connection support" OFF)
 option(FTB_ENABLE_ICONS "Enable Nerd Font icons (requires patched font)" ON)
 option(FTB_ENABLE_LIBCHAFA "Enable libchafa for advanced image preview" OFF)
+option(FTB_ENABLE_LIBSIXEL "Enable libsixel for native sixel image preview" OFF)
 option(FTB_ENABLE_TREE_SITTER "Enable tree-sitter for advanced syntax highlighting" OFF)
 option(FTB_ENABLE_PLUGINS "Enable TypeScript/JavaScript plugin system" ON)
 option(FTB_ENABLE_AI "Enable AI assistant panel (requires httplib)" OFF)
@@ -54,6 +55,15 @@ if(FTB_ENABLE_LIBCHAFA)
     message(STATUS "libchafa support: ENABLED (advanced image preview)")
 else()
     message(STATUS "libchafa support: DISABLED (using stb_image + Unicode blocks)")
+endif()
+
+if(FTB_ENABLE_LIBSIXEL)
+    add_compile_definitions(FTB_ENABLE_LIBSIXEL)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(SIXEL REQUIRED libsixel)
+    message(STATUS "libsixel support: ENABLED (native sixel image preview)")
+else()
+    message(STATUS "libsixel support: DISABLED")
 endif()
 
 # tree-sitter
@@ -121,6 +131,13 @@ set(FTB_CORE_SOURCES
     src/preview/PdfPreview.cpp
     src/preview/PreviewCache.cpp
     src/preview/SpreadsheetPreview.cpp
+    # protocols
+    src/protocols/SixelProtocol.cpp
+    src/protocols/KittyProtocol.cpp
+    src/protocols/ITerm2Protocol.cpp
+    src/protocols/ImageOutputManager.cpp
+    src/protocols/stb_image_write_impl.cpp
+    src/protocols/stb_image_resize_impl.cpp
     # renderer
     src/renderer/FileListRenderer.cpp
     src/renderer/Powerline.cpp
@@ -242,6 +259,11 @@ endif()
 if(FTB_ENABLE_LIBCHAFA)
     target_link_libraries(FTB_core PUBLIC ${CHAFA_LIBRARIES})
     target_include_directories(FTB_core PUBLIC ${CHAFA_INCLUDE_DIRS})
+endif()
+
+if(FTB_ENABLE_LIBSIXEL)
+    target_link_libraries(FTB_core PUBLIC ${SIXEL_LIBRARIES})
+    target_include_directories(FTB_core PUBLIC ${SIXEL_INCLUDE_DIRS})
 endif()
 
 if(FTB_ENABLE_TREE_SITTER)
