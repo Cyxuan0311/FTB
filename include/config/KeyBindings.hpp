@@ -71,6 +71,7 @@ public:
         OpenConfig,
         Tasks,
         BatchRename,
+        QuitWithCwd,
 #ifdef FTB_ENABLE_SSH
         SSH,
 #endif

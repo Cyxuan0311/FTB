@@ -559,6 +559,11 @@ void HandlePanelCommand(MainState& state, FTB::KeyBindings::PanelCommand cmd) {
         break;
     }
 #endif
+    case FTB::KeyBindings::PanelCommand::QuitWithCwd:
+        state.quit_with_cwd = true;
+        state.exit_path = state.currentPath;
+        if (state.screen) state.screen->Exit();
+        break;
     default:
         break;
     }
@@ -603,6 +608,7 @@ void RegisterPanelCommands(FTB::KeyBindings& keybindings, MainState& state) {
     keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::OpenPicker, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::OpenPicker); });
     keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::OpenManual, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::OpenManual); });
     keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::OpenConfig, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::OpenConfig); });
+    keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::QuitWithCwd, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::QuitWithCwd); });
 #ifdef FTB_ENABLE_PLUGINS
     keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::Plugin, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::Plugin); });
 #endif

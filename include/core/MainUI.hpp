@@ -193,6 +193,10 @@ struct MainState {
     int opener_config_field = 0;  // 0=name, 1=run, 2=desc, 3=rule_name, 4=rule_use
     bool opener_config_is_orphan = false;
 
+    // Exit with cwd
+    bool quit_with_cwd = false;
+    std::string exit_path;
+
     // 目录历史
     DirectoryHistory directoryHistory;
     DirectoryHistory forward_history;

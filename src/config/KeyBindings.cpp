@@ -90,6 +90,9 @@ std::map<std::string, KeyBindings::PanelCommand> KeyBindings::InitCommandMap() {
     m["ts"]         = PanelCommand::Tasks;
     m["batchrename"] = PanelCommand::BatchRename;
     m["br"]         = PanelCommand::BatchRename;
+    m["z"]          = PanelCommand::QuitWithCwd;
+    m["exit"]       = PanelCommand::QuitWithCwd;
+    m["quit"]       = PanelCommand::QuitWithCwd;
 #ifdef FTB_ENABLE_SSH
     m["ssh"]        = PanelCommand::SSH;
 #endif
@@ -460,6 +463,7 @@ std::vector<std::pair<std::string, std::string>> KeyBindings::GetCommandList() c
     list.push_back({"open / op",           "Open with picker"});
     list.push_back({"openwith / ow",       "Manual open with"});
     list.push_back({"opencfg / oc",        "Configure openers"});
+    list.push_back({"z / exit / quit",     "Quit and change shell directory"});
 #ifdef FTB_ENABLE_SSH
     list.push_back({"ssh",               "SSH connection"});
 #endif

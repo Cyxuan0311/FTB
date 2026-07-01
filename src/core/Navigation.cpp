@@ -6,6 +6,7 @@
 
 #include "preview/PreviewCache.hpp"
 #include "browser/FileManager.hpp"
+
 #include "utils/StatusMessage.hpp"
 #include "config/ConfigManager.hpp"
 #include "ops/OpenerManager.hpp"
@@ -64,10 +65,6 @@ void NavigateToParent(MainState& state) {
         state.cached_canonical_path.clear();
         state.cached_current_path_for_entries.clear();
         InvalidatePreviewCache();
-        {
-            std::lock_guard<std::mutex> lock(FileManager::cache_mutex);
-            FileManager::lru_dir_cache->erase(state.currentPath);
-        }
         state.allContents = FileManager::getDirectoryContents(state.currentPath);
         state.filteredContents = state.allContents;
         state.searchQuery.clear();
@@ -103,19 +100,7 @@ void NavigateIntoSelected(MainState& state) {
 #endif
 
         fs::path selectedPath = fs::path(state.currentPath) / name;
-        if (FileManager::isDirectory(selectedPath.string())) {
-            state.directoryHistory.push(state.currentPath);
-            state.currentPath = fs::canonical(selectedPath).string();
-            state.cached_canonical_path.clear();
-            state.cached_current_path_for_entries.clear();
-            InvalidatePreviewCache();
-            state.allContents = FileManager::getDirectoryContents(state.currentPath);
-            state.filteredContents = state.allContents;
-            state.selected = 0;
-            state.searchQuery.clear();
-            state.current_page = 0;
-            state.batch_selected.clear();
-        } else {
+        if (!FileManager::isDirectory(selectedPath.string())) {
             auto& opener = OpenerManager::Instance();
             auto defaultOpener = opener.GetDefaultOpener(name);
             if (defaultOpener) {
@@ -123,7 +108,19 @@ void NavigateIntoSelected(MainState& state) {
             } else {
                 StatusMessage::Show("No opener configured for this file type");
             }
+            return;
         }
+        state.directoryHistory.push(state.currentPath);
+        state.currentPath = fs::canonical(selectedPath).string();
+        state.cached_canonical_path.clear();
+        state.cached_current_path_for_entries.clear();
+        InvalidatePreviewCache();
+        state.allContents = FileManager::getDirectoryContents(state.currentPath);
+        state.filteredContents = state.allContents;
+        state.selected = 0;
+        state.searchQuery.clear();
+        state.current_page = 0;
+        state.batch_selected.clear();
     }
 }
 
