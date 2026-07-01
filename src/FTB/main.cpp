@@ -1,11 +1,14 @@
 #include <algorithm>
 #include <csignal>
+#include <memory>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
 #include <ftxui/component/component.hpp>
 #include <ftxui/component/screen_interactive.hpp>
 #include <ftxui/dom/elements.hpp>
 #include <iostream>
+#include <sstream>
 #include <thread>
 
 #include "../include/config/CLIArgs.hpp"
@@ -22,6 +25,7 @@
 #include "../include/renderer/detail_element.hpp"
 #include "../include/utils/StatusMessage.hpp"
 #include "../include/utils/PerfLogger.hpp"
+#include "../include/protocols/ImageOutputManager.hpp"
 #include "../include/utils/SystemClipboard.hpp"
 #include "../include/renderer/TextSelection.hpp"
 #ifdef FTB_ENABLE_AI
@@ -42,6 +46,43 @@
 using namespace ftxui;
 namespace fs = std::filesystem;
 using namespace FTB;
+
+// Node wrapper that post-processes the Screen after child rendering:
+// replaces characters in the image area with cursor-forward escapes,
+// preventing Screen::Print from writing spaces (which clear some protocols).
+class ImageSkipNode : public ftxui::Node {
+    ftxui::Element child_;
+public:
+    ImageSkipNode(ftxui::Element child) : child_(std::move(child)) {}
+
+    void ComputeRequirement() override {
+        child_->ComputeRequirement();
+        requirement_ = child_->requirement();
+    }
+
+    void SetBox(ftxui::Box box) override {
+        ftxui::Node::SetBox(box);
+        child_->SetBox(box);
+    }
+
+    void Render(ftxui::Screen& screen) override {
+        child_->Render(screen);
+        auto* proto = FTB::ImageOutputManager::ActiveProtocol();
+        if (!proto || !proto->NeedsSkipArea()) return;
+        int r = FTB::ImageOutputManager::CurrentRow();
+        int c = FTB::ImageOutputManager::CurrentCol();
+        int h = FTB::ImageOutputManager::CurrentImageRows();
+        if (r <= 0 || h <= 0 || c < 0) return;
+        int max_rows = FTB::ImageOutputManager::CurrentMaxRows();
+        if (max_rows > 0) h = std::min(h, max_rows);
+        int max_y = std::min(r + h, screen.dimy());
+        for (int y = r; y < max_y; y++) {
+            for (int x = c; x < screen.dimx(); x++) {
+                screen.PixelAt(x, y).character = "\033[C";
+            }
+        }
+    }
+};
 
 static void setupSignalHandlers() {
     struct sigaction sa;
@@ -138,6 +179,10 @@ int main(int argc, char* argv[])
         TaskSystem::getInstance(); // Ensure singleton is constructed
     }
 
+    {
+        FTB::ImageOutputManager::DetectProtocol();
+    }
+
     // ---- 主状态 ----
 
     MainState state;
@@ -185,7 +230,18 @@ int main(int argc, char* argv[])
     std::atomic<bool> refresh_ui{true};
     state.refresh_ui = &refresh_ui;
 
+    // ---- UI refresh timer (150ms) ----
+    // Only posts Event::Custom. The image flush is handled
+    // synchronously in the CatchEvent handler on the main
+    // thread, right after Screen::Print() completes.
     std::thread timer([&] {
+        std::string tid_str;
+        {
+            std::ostringstream oss;
+            oss << std::this_thread::get_id();
+            tid_str = oss.str();
+        }
+        PERF_LOG("timer", "UI refresh timer started tid=" + tid_str);
         while (refresh_ui) {
             std::this_thread::sleep_for(std::chrono::milliseconds(150));
             screen.Post(Event::Custom);
@@ -268,6 +324,10 @@ int main(int argc, char* argv[])
             result = main_content;
         }
 
+        auto* proto = FTB::ImageOutputManager::ActiveProtocol();
+        if (proto && proto->NeedsSkipArea()) {
+            return ftxui::Element(std::make_shared<ImageSkipNode>(std::move(result)));
+        }
         return result;
     });
 
@@ -282,6 +342,43 @@ int main(int argc, char* argv[])
     auto final_component = CatchEvent(renderer, [&](Event event) {
         if (event == Event::Custom) {
             screen.SetCursor(Screen::Cursor{0, 0, Screen::Cursor::Hidden});
+            std::ostringstream oss;
+            oss << std::this_thread::get_id();
+            static auto last_custom = std::chrono::steady_clock::now();
+            static bool deferred_flush_pending = false;
+            auto now = std::chrono::steady_clock::now();
+            auto since_last = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_custom).count();
+            last_custom = now;
+
+            // Gate: skip fast-repeat RENDER events (PluginManager bursts)
+            // to reduce redundant Print→FLUSH cycles. FLUSH follow-ups
+            // are never gated.
+            if (!deferred_flush_pending) {
+                static bool first_custom = true;
+                if (!first_custom && since_last < 50) {
+                    return false;
+                }
+                first_custom = false;
+            }
+
+            if (deferred_flush_pending) {
+                // Follow-up event: flush image AFTER Screen::Print
+                // has completed, then skip re-render so Print
+                // does not overwrite the image again.
+                deferred_flush_pending = false;
+                PERF_LOG("timer", "FLUSH image tid=" + oss.str() +
+                         " since_last=" + std::to_string(since_last) + "ms");
+                FTB::ImageOutputManager::FlushPendingIfDirty();
+                return false;
+            } else {
+                // First event: post a follow-up event, then let
+                // FTXUI run Render + Screen::Print().
+                deferred_flush_pending = true;
+                screen.Post(Event::Custom);
+                PERF_LOG("timer", "RENDER frame tid=" + oss.str() +
+                         " since_last=" + std::to_string(since_last) + "ms");
+                return true;
+            }
         }
 
         // ---- 鼠标事件处理 (三列拖拽选择 + 标签栏点击) ----
@@ -507,6 +604,23 @@ int main(int argc, char* argv[])
 
     config_manager->SaveConfig();
     std::cout << "\033[?25h" << std::flush;
+
+    if (state.quit_with_cwd && !state.exit_path.empty()) {
+        const char* cwd_file_env = std::getenv("FTB_CWD_FILE");
+        std::string home = std::getenv("HOME") ? std::getenv("HOME") : "";
+        std::string cwd_file = cwd_file_env
+            ? cwd_file_env
+            : (home + "/.cache/ftb/cwd");
+        try {
+            std::error_code ec;
+            fs::create_directories(fs::path(cwd_file).parent_path(), ec);
+            if (!ec) {
+                std::ofstream ofs(cwd_file);
+                if (ofs) ofs << state.exit_path;
+            }
+        } catch (...) {
+        }
+    }
 
     return 0;
 }
