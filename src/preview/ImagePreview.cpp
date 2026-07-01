@@ -1,10 +1,15 @@
 #include "../../include/preview/ImagePreview.hpp"
 
+#include "../../include/utils/PerfLogger.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <filesystem>
+#include <sstream>
 #include <thread>
+#include <vector>
 
 
 #define STB_IMAGE_IMPLEMENTATION

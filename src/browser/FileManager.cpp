@@ -108,7 +108,7 @@ std::vector<std::string> getDirectoryContents(const std::string & path) {
     trackPathAccess(path);
     
     auto cached_result = lru_dir_cache->get(path);
-    if (cached_result.has_value()) {
+    if (cached_result.has_value() && cached_result->is_still_valid(path)) {
         cache_hits.fetch_add(1);
         return cached_result->contents;
     }
