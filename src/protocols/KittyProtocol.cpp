@@ -147,11 +147,32 @@ void KittyProtocol::WriteToTerminal(const std::string& data,
              " render=" + std::to_string(render_w) + "x" + std::to_string(render_h) +
              " data_size=" + std::to_string(data.size()));
 
-    std::cout << "\033[" << term_row + 1 << ";" << term_col + 1 << "H"
-              << "\033_Ga=T,f=100,s=" << render_w
-              << ",v=" << render_h
-              << ",m=0;" << data << "\033\\"
-              << std::flush;
+    constexpr size_t CHUNK = 4096;
+    size_t total = data.size();
+    size_t offset = 0;
+    bool first = true;
+
+    while (offset < total) {
+        size_t this_chunk = std::min(CHUNK, total - offset);
+        bool more = (offset + this_chunk) < total;
+
+        if (first) {
+            std::cout << "\033[" << term_row + 1 << ";" << term_col + 1 << "H"
+                      << "\033_Ga=T,f=100,s=" << render_w
+                      << ",v=" << render_h
+                      << ",m=" << (more ? '1' : '0') << ";";
+            first = false;
+        } else {
+            std::cout << "\033_Gm=" << (more ? '1' : '0') << ";";
+        }
+
+        std::cout.write(data.data() + offset, static_cast<std::streamsize>(this_chunk));
+        std::cout << "\033\\";
+
+        offset += this_chunk;
+    }
+
+    std::cout << std::flush;
 }
 
 void KittyProtocol::WriteToTTY(const std::string& data,
@@ -170,24 +191,58 @@ void KittyProtocol::WriteToTTY(const std::string& data,
         return;
     }
 
-    char pos_buf[32];
-    int pos_len = std::snprintf(pos_buf, sizeof(pos_buf),
-                                "\033[%d;%dH", term_row + 1, term_col + 1);
-    ssize_t r;
-    r = ::write(fd, pos_buf, static_cast<size_t>(pos_len));
-    if (r < 0) { PERF_LOG("kitty_write", "FAILED cursor pos write"); ::close(fd); return; }
+    constexpr size_t CHUNK = 4096;
+    size_t total = data.size();
+    size_t offset = 0;
+    bool first = true;
 
-    std::string header = "\033_Ga=T,f=100,s=" + std::to_string(render_w) +
-                         ",v=" + std::to_string(render_h) + ",m=0;";
-    r = ::write(fd, header.data(), header.size());
-    if (r < 0) { PERF_LOG("kitty_write", "FAILED header write"); ::close(fd); return; }
+    while (offset < total) {
+        size_t this_chunk = std::min(CHUNK, total - offset);
+        bool more = (offset + this_chunk) < total;
+        ssize_t r;
 
-    r = ::write(fd, data.data(), data.size());
-    if (r < 0) { PERF_LOG("kitty_write", "FAILED data write"); ::close(fd); return; }
-    PERF_LOG("kitty_write", "TTY wrote " + std::to_string(r) + " bytes");
+        if (first) {
+            char pos_header[128];
+            int pos_header_len = std::snprintf(pos_header, sizeof(pos_header),
+                "\033[%d;%dH\033_Ga=T,f=100,s=%d,v=%d,m=%c;",
+                term_row + 1, term_col + 1,
+                render_w, render_h,
+                more ? '1' : '0');
+            r = ::write(fd, pos_header, static_cast<size_t>(pos_header_len));
+            if (r < 0) {
+                PERF_LOG("kitty_write", "FAILED first chunk header write");
+                ::close(fd);
+                return;
+            }
+            first = false;
+        } else {
+            char mid_header[16];
+            int mid_header_len = std::snprintf(mid_header, sizeof(mid_header),
+                "\033_Gm=%c;", more ? '1' : '0');
+            r = ::write(fd, mid_header, static_cast<size_t>(mid_header_len));
+            if (r < 0) {
+                PERF_LOG("kitty_write", "FAILED mid chunk header write");
+                ::close(fd);
+                return;
+            }
+        }
 
-    r = ::write(fd, "\033\\", 2);
-    if (r < 0) { PERF_LOG("kitty_write", "FAILED ST write"); ::close(fd); return; }
+        r = ::write(fd, data.data() + offset, this_chunk);
+        if (r < 0) {
+            PERF_LOG("kitty_write", "FAILED data write");
+            ::close(fd);
+            return;
+        }
+
+        r = ::write(fd, "\033\\", 2);
+        if (r < 0) {
+            PERF_LOG("kitty_write", "FAILED ST write");
+            ::close(fd);
+            return;
+        }
+
+        offset += this_chunk;
+    }
 
     ::close(fd);
 }
@@ -198,6 +253,12 @@ void KittyProtocol::ClearArea(int start_row, int num_rows,
     PERF_LOG("kitty_clear", "KittyProtocol::ClearArea start=" +
              std::to_string(start_row) + " rows=" + std::to_string(num_rows) +
              " col=" + std::to_string(start_col) + " width=" + std::to_string(width));
+
+    // Delete any overlaid images from kitty's graphics layer
+    // Writing spaces only clears the text layer, not the image overlay
+    static const char delete_imgs[] = "\033_Ga=d\033\\";
+    ssize_t unused_unused = ::write(STDOUT_FILENO, delete_imgs, sizeof(delete_imgs) - 1);
+    (void)unused_unused;
 
     if (width > 0) {
         int fd = ::open("/dev/tty", O_WRONLY);
