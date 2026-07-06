@@ -31,6 +31,7 @@
 #include "config/ObjectPool.hpp"
 #include "config/KeyBindings.hpp"
 #include "config/ThemeManager.hpp"
+#include "protocols/ImageOutputManager.hpp"
 #ifdef FTB_ENABLE_PLUGINS
 #include "ops/PluginManager.hpp"
 #endif
@@ -559,6 +560,18 @@ void HandlePanelCommand(MainState& state, FTB::KeyBindings::PanelCommand cmd) {
         break;
     }
 #endif
+    case FTB::KeyBindings::PanelCommand::ToggleProtocol: {
+        bool now = !FTB::ImageOutputManager::IsProtocolEnabled();
+        FTB::ImageOutputManager::SetProtocolEnabled(now);
+        FTB::ImageOutputManager::ReDetectProtocol();
+        {
+            auto& cfg = FTB::ConfigManager::GetInstance()->GetConfigMutable();
+            cfg.preview.protocol_enabled = now;
+            FTB::ConfigManager::GetInstance()->SaveConfig();
+        }
+        StatusMessage::Show(now ? "Image protocol: enabled" : "Image protocol: disabled (using ImagePreview)");
+        break;
+    }
     case FTB::KeyBindings::PanelCommand::QuitWithCwd:
         state.quit_with_cwd = true;
         state.exit_path = state.currentPath;
@@ -609,6 +622,7 @@ void RegisterPanelCommands(FTB::KeyBindings& keybindings, MainState& state) {
     keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::OpenManual, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::OpenManual); });
     keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::OpenConfig, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::OpenConfig); });
     keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::QuitWithCwd, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::QuitWithCwd); });
+    keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::ToggleProtocol, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::ToggleProtocol); });
 #ifdef FTB_ENABLE_PLUGINS
     keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::Plugin, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::Plugin); });
 #endif

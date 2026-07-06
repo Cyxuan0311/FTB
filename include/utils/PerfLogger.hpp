@@ -84,7 +84,7 @@ private:
 
 } // namespace FTB
 
-// 快捷宏
-#define PERF_LOG(tag, msg) FTB::PerfLogger::GetInstance().Log(tag, msg)
-#define PERF_TIMER(tag, name) FTB::PerfLogger::Timer _perf_timer_##__LINE__(tag, name)
-#define PERF_SCOPE(tag) FTB::PerfLogger::Timer _perf_scope_(tag, __FUNCTION__)
+// 快捷宏 (no-op)
+#define PERF_LOG(tag, msg) ((void)0)
+#define PERF_TIMER(tag, name) ((void)0)
+#define PERF_SCOPE(tag) ((void)0)

@@ -146,6 +146,8 @@ set(FTB_CORE_SOURCES
     src/renderer/detail_element.cpp
     # utils
     src/utils/UnicodeUtil.cpp
+    src/utils/TerminalProbe.cpp
+    src/utils/TmuxContext.cpp
     # config
     src/config/CLIArgs.cpp
     src/config/ConfigManager.cpp

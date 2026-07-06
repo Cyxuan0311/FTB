@@ -180,6 +180,7 @@ int main(int argc, char* argv[])
     }
 
     {
+        FTB::ImageOutputManager::SetProtocolEnabled(config_manager->GetConfig().preview.protocol_enabled);
         FTB::ImageOutputManager::DetectProtocol();
     }
 
@@ -235,13 +236,6 @@ int main(int argc, char* argv[])
     // synchronously in the CatchEvent handler on the main
     // thread, right after Screen::Print() completes.
     std::thread timer([&] {
-        std::string tid_str;
-        {
-            std::ostringstream oss;
-            oss << std::this_thread::get_id();
-            tid_str = oss.str();
-        }
-        PERF_LOG("timer", "UI refresh timer started tid=" + tid_str);
         while (refresh_ui) {
             std::this_thread::sleep_for(std::chrono::milliseconds(150));
             screen.Post(Event::Custom);
@@ -366,8 +360,6 @@ int main(int argc, char* argv[])
                 // has completed, then skip re-render so Print
                 // does not overwrite the image again.
                 deferred_flush_pending = false;
-                PERF_LOG("timer", "FLUSH image tid=" + oss.str() +
-                         " since_last=" + std::to_string(since_last) + "ms");
                 FTB::ImageOutputManager::FlushPendingIfDirty();
                 return false;
             } else {
@@ -375,8 +367,6 @@ int main(int argc, char* argv[])
                 // FTXUI run Render + Screen::Print().
                 deferred_flush_pending = true;
                 screen.Post(Event::Custom);
-                PERF_LOG("timer", "RENDER frame tid=" + oss.str() +
-                         " since_last=" + std::to_string(since_last) + "ms");
                 return true;
             }
         }
