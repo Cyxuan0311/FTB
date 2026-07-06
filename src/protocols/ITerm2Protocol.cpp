@@ -1,7 +1,8 @@
 #include "../../include/protocols/ITerm2Protocol.hpp"
 
 #include "../../include/protocols/base64_util.hpp"
-#include "../../include/utils/PerfLogger.hpp"
+#include "../../include/utils/TerminalProbe.hpp"
+#include "../../include/utils/TmuxContext.hpp"
 
 #include <algorithm>
 #include <cerrno>
@@ -23,18 +24,8 @@
 namespace FTB {
 
 bool ITerm2Protocol::IsSupported() const {
-    const char* term_program = std::getenv("TERM_PROGRAM");
-    if (term_program && std::string(term_program) == "iTerm.app") {
-        PERF_LOG("iterm2_detect", "TERM_PROGRAM=iTerm.app");
-        return true;
-    }
-    const char* ftb_iterm2 = std::getenv("FTB_ITERM2");
-    if (ftb_iterm2 && ftb_iterm2[0] == '1') {
-        PERF_LOG("iterm2_detect", "FORCED via FTB_ITERM2=1");
-        return true;
-    }
-    PERF_LOG("iterm2_detect", "NOT supported");
-    return false;
+    auto& info = TerminalProbe::Detect();
+    return info.iterm2;
 }
 
 struct PngWriteContext {
@@ -58,25 +49,12 @@ std::string ITerm2Protocol::Encode(
     out_term_rows = 0;
     out_render_w = 0;
     out_render_h = 0;
-    {
-        std::ostringstream oss;
-        oss << std::this_thread::get_id();
-        PERF_LOG("iterm2_encode", "ITerm2Protocol::Encode path=" + path +
-                 " max_w=" + std::to_string(max_width) +
-                 " max_h=" + std::to_string(max_height) +
-                 " tid=" + oss.str());
-    }
 
     int img_w, img_h, channels;
-    PERF_TIMER("iterm2_encode", "stbi_load");
     unsigned char* data = stbi_load(path.c_str(), &img_w, &img_h, &channels, 3);
     if (!data) {
-        PERF_LOG("iterm2_encode", "FAILED stbi_load for " + path);
         return {};
     }
-    PERF_LOG("iterm2_encode", "stbi_load ok: " + std::to_string(img_w) + "x" +
-             std::to_string(img_h) + " ch=" + std::to_string(channels) +
-             " file=" + path);
 
     double target_ratio = static_cast<double>(img_w) / img_h;
     int render_w, render_h;
@@ -93,7 +71,6 @@ std::string ITerm2Protocol::Encode(
         scaled = static_cast<unsigned char*>(std::malloc(
             static_cast<size_t>(render_w) * render_h * 3));
         if (!scaled) {
-            PERF_LOG("iterm2_encode", "FAILED malloc for scaled buffer");
             stbi_image_free(data);
             return {};
         }
@@ -107,8 +84,6 @@ std::string ITerm2Protocol::Encode(
     out_render_w = render_w;
     out_render_h = render_h;
     out_term_rows = (render_h + 17) / 18;
-    PERF_LOG("iterm2_encode", "render: " + std::to_string(render_w) + "x" +
-             std::to_string(render_h) + " term_rows=" + std::to_string(out_term_rows));
 
     std::vector<unsigned char> png_data;
     PngWriteContext ctx = {&png_data};
@@ -119,66 +94,59 @@ std::string ITerm2Protocol::Encode(
     stbi_image_free(data);
 
     if (!png_ok) {
-        PERF_LOG("iterm2_encode", "FAILED stbi_write_png_to_func");
         return {};
     }
 
-    PERF_LOG("iterm2_encode", "PNG size=" + std::to_string(png_data.size()) +
-             " bytes");
-
     std::string b64 = detail::Base64Encode(png_data.data(), png_data.size());
-    PERF_LOG("iterm2_encode", "base64 size=" + std::to_string(b64.size()) +
-             " bytes");
-
-    PERF_LOG("iterm2_encode", "ITerm2Protocol::Encode SUCCESS");
     return b64;
 }
 
 void ITerm2Protocol::WriteToTerminal(const std::string& data,
                                       int render_w, int render_h,
                                       int term_row, int term_col) {
-    PERF_LOG("iterm2_write", "ITerm2Protocol::WriteToTerminal row=" +
-             std::to_string(term_row) + " col=" + std::to_string(term_col) +
-             " render=" + std::to_string(render_w) + "x" + std::to_string(render_h) +
-             " data_size=" + std::to_string(data.size()));
 
-    std::cout << "\033[" << term_row + 1 << ";" << term_col + 1 << "H"
-              << "\033]1337;File=:size=" << data.size()
-              << ";inline=1;width=" << render_w << "px;height=" << render_h << "px:"
-              << data << "\a"
-              << std::flush;
+    std::string seq = "\033[" + std::to_string(term_row + 1) + ";" +
+                      std::to_string(term_col + 1) + "H" +
+                      "\033]1337;File=:size=" + std::to_string(data.size()) +
+                      ";inline=1;width=" + std::to_string(render_w) + "px;" +
+                      "height=" + std::to_string(render_h) + "px:" +
+                      data + "\a";
+
+    auto& tmux = TmuxContext::Instance();
+    if (tmux.InTmux() && tmux.PassthroughEnabled()) {
+        std::cout << tmux.WrapPassthrough(seq) << std::flush;
+    } else {
+        std::cout << seq << std::flush;
+    }
 }
 
 void ITerm2Protocol::WriteToTTY(const std::string& data,
                                  int render_w, int render_h,
                                  int term_row, int term_col) {
-    PERF_LOG("iterm2_write", "ITerm2Protocol::WriteToTTY row=" +
-             std::to_string(term_row) + " col=" + std::to_string(term_col) +
-             " render=" + std::to_string(render_w) + "x" + std::to_string(render_h) +
-             " data_size=" + std::to_string(data.size()));
 
     int fd = ::open("/dev/tty", O_WRONLY);
     if (fd == -1) fd = ::open("/dev/tty", O_RDWR);
     if (fd == -1) {
-        PERF_LOG("iterm2_write", "FAILED to open /dev/tty errno=" +
-                 std::to_string(errno));
         return;
     }
 
-    char pos_buf[32];
-    int pos_len = std::snprintf(pos_buf, sizeof(pos_buf),
-                                "\033[%d;%dH", term_row + 1, term_col + 1);
-    ssize_t r;
-    r = ::write(fd, pos_buf, static_cast<size_t>(pos_len));
-    if (r < 0) { PERF_LOG("iterm2_write", "FAILED cursor pos write"); ::close(fd); return; }
-
-    std::string seq = "\033]1337;File=:size=" + std::to_string(data.size()) +
+    // Build the full sequence: cursor pos + OSC 1337 image
+    std::string seq = "\033[" + std::to_string(term_row + 1) + ";" +
+                      std::to_string(term_col + 1) + "H" +
+                      "\033]1337;File=:size=" + std::to_string(data.size()) +
                       ";inline=1;width=" + std::to_string(render_w) + "px;" +
                       "height=" + std::to_string(render_h) + "px:" +
                       data + "\a";
-    r = ::write(fd, seq.data(), seq.size());
-    if (r < 0) { PERF_LOG("iterm2_write", "FAILED seq write"); ::close(fd); return; }
-    PERF_LOG("iterm2_write", "TTY wrote " + std::to_string(r) + " bytes");
+
+    auto& tmux = TmuxContext::Instance();
+    if (tmux.InTmux() && tmux.PassthroughEnabled()) {
+        std::string wrapped = tmux.WrapPassthrough(seq);
+        ssize_t r = ::write(fd, wrapped.data(), wrapped.size());
+        if (r < 0) { ::close(fd); return; }
+    } else {
+        ssize_t r = ::write(fd, seq.data(), seq.size());
+        if (r < 0) { ::close(fd); return; }
+    }
 
     ::close(fd);
 }
@@ -186,9 +154,6 @@ void ITerm2Protocol::WriteToTTY(const std::string& data,
 void ITerm2Protocol::ClearArea(int start_row, int num_rows,
                                 int start_col, int width) {
     if (num_rows <= 0) return;
-    PERF_LOG("iterm2_clear", "ITerm2Protocol::ClearArea start=" +
-             std::to_string(start_row) + " rows=" + std::to_string(num_rows) +
-             " col=" + std::to_string(start_col) + " width=" + std::to_string(width));
 
     if (width > 0) {
         int fd = ::open("/dev/tty", O_WRONLY);

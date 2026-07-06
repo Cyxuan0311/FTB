@@ -41,8 +41,15 @@ public:
     static bool HasPending();
     static void FlushPendingIfDirty();
 
+    // --- Protocol enable/disable ---
+    static void ReDetectProtocol();
+    static bool IsProtocolEnabled();
+    static void SetProtocolEnabled(bool on);
+
     // --- Async encode ---
     static void EncodeAsync(const std::string& path, int pixel_w, int pixel_h);
+    static bool HasFailed(const std::string& path);
+    static bool IsEncoding(const std::string& path);
 
 private:
     static std::unique_ptr<TerminalImageProtocol> s_protocol;
@@ -66,11 +73,18 @@ private:
     static int s_pending_panel_width;
     static int s_pending_render_w;
     static int s_pending_render_h;
-    static std::chrono::steady_clock::time_point s_pending_time;
 
     // Render dimensions
     static int s_render_w;
     static int s_render_h;
+
+    // Last flushed state (to avoid redundant flushes)
+    static std::string s_last_flushed_path;
+    static int s_last_flushed_render_w;
+    static int s_last_flushed_render_h;
+
+    // Protocol enable flag
+    static bool s_protocol_enabled_;
 
     // Async encode state
     static std::string s_encoding_path;
