@@ -2,7 +2,6 @@
 #include "ai/SessionManager.hpp"
 #include "core/MainUI.hpp"
 #include "config/ConfigManager.hpp"
-#include "utils/PerfLogger.hpp"
 #include "renderer/detail_element.hpp"
 
 namespace FTB {
@@ -18,7 +17,6 @@ AIAgent::~AIAgent() {
 }
 
 void AIAgent::sendRequest(const std::string& user_input, bool add_user_message) {
-    PERF_LOG("ai_flow", "sendRequest input=\"" + user_input + "\"");
     if (add_user_message) {
         needs_auto_continue_ = false;
         auto_continue_count_ = 0;
@@ -74,8 +72,6 @@ void AIAgent::sendRequest(const std::string& user_input, bool add_user_message) 
     auto messages = ContextBuilder::buildMessages(
         system_prompt, memory_.getHistory(), user_input);
 
-    PERF_LOG("ai_flow", "backend=" + active_key.backend + " model=" + active_key.model);
-
     client_.sendMessage(
         messages,
         [this](const std::string& delta) { handleStreamChunk(delta); },
@@ -109,8 +105,6 @@ void AIAgent::continueProcessing() {
     needs_auto_continue_ = false;
     auto_continue_count_++;
 
-    PERF_LOG("ai_flow", "auto-continue count=" + std::to_string(auto_continue_count_));
-
     std::string msg = "Continue the previous task. The steps above have been executed. "
         "Review the results carefully. If any step FAILED (e.g. error, empty result), "
         "you MUST retry with a corrected approach. The task is only complete when "
@@ -132,15 +126,12 @@ std::string AIAgent::getPendingResponse() const {
 void AIAgent::handleStreamChunk(const std::string& delta) {
     if (delta.empty()) return;
     stream_buffer_ += delta;
-    PERF_LOG("ai_http", "stream chunk len=" + std::to_string(delta.size())
-        + " total=" + std::to_string(stream_buffer_.size()));
     if (state_.screen) {
         state_.screen->Post(ftxui::Event::Custom);
     }
 }
 
 void AIAgent::handleResponseDone(const std::string& full_response) {
-    PERF_LOG("ai_flow", "handleResponseDone len=" + std::to_string(full_response.size()));
     pending_response_ = full_response;
     streaming_ = false;
     if (state_.screen) {
@@ -149,7 +140,6 @@ void AIAgent::handleResponseDone(const std::string& full_response) {
 }
 
 void AIAgent::handleError(const std::string& error) {
-    PERF_LOG("ai_flow", "request error: " + error);
     state_.ai.entries.push_back({AILogEntry::Error, "AI request failed: " + error});
     processing_ = false;
     streaming_ = false;
@@ -159,7 +149,6 @@ void AIAgent::handleError(const std::string& error) {
 }
 
 void AIAgent::processPendingResponse() {
-    PERF_LOG("ai_flow", "processPendingResponse len=" + std::to_string(pending_response_.size()));
     std::string response = pending_response_;
     pending_response_.clear();
 
@@ -199,8 +188,6 @@ void AIAgent::processPendingResponse() {
     }
 
     processing_ = false;
-    PERF_LOG("ai_flow", "processPendingResponse completed"
-        + std::string(needs_auto_continue_ ? " auto-continue" : ""));
     if (state_.screen) {
         state_.screen->Post(ftxui::Event::Custom);
     }

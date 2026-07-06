@@ -2,7 +2,6 @@
 #include "core/MainUI.hpp"
 #include "browser/FileManager.hpp"
 #include "browser/ClipboardManager.hpp"
-#include "utils/PerfLogger.hpp"
 #include "utils/FilesystemUtil.hpp"
 
 #include <filesystem>
@@ -137,7 +136,6 @@ std::unordered_map<std::string, ActionExecutor::HandlerFn> ActionExecutor::build
 
 ExecutionResult ActionExecutor::execute(const ToolCall& call) {
     ExecutionResult result;
-    PERF_LOG("ai_exec", "executeAction action=" + call.name);
 
     try {
         static const auto handler_map = buildHandlerMap();
@@ -162,7 +160,6 @@ ExecutionResult ActionExecutor::execute(const ToolCall& call) {
         result.success = false;
         result.message = e.what();
         result.log_type = "error";
-        PERF_LOG("ai_exec", "action failed: " + std::string(e.what()));
     }
 
     return result;

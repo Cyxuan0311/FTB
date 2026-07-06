@@ -1,6 +1,5 @@
 #include "ai/ActionExecutor.hpp"
 #include "core/MainUI.hpp"
-#include "utils/PerfLogger.hpp"
 #include "utils/FilesystemUtil.hpp"
 
 #include <filesystem>

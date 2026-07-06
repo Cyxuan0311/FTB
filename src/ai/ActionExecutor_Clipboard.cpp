@@ -2,7 +2,6 @@
 #include "core/MainUI.hpp"
 #include "browser/FileManager.hpp"
 #include "browser/ClipboardManager.hpp"
-#include "utils/PerfLogger.hpp"
 
 #include <filesystem>
 #include <sstream>

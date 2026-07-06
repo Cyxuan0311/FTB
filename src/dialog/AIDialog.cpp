@@ -2,7 +2,6 @@
 #include "ai/AIAgent.hpp"
 #include "ai/SessionManager.hpp"
 #include "config/ConfigManager.hpp"
-#include "utils/PerfLogger.hpp"
 #include "renderer/detail_element.hpp"
 
 #include <sstream>
@@ -89,7 +88,6 @@ static Element makeTextLine(const std::string& str, ftxui::Color col,
 }
 
 Element RenderAIPanel(MainState& state, int tw, int th) {
-    PERF_LOG("ai_ui", "RenderAIPanel");
 
     if (!state.ai_agent) {
         state.ai_agent = std::make_unique<AIAgent>(state);
@@ -512,7 +510,6 @@ bool HandleAIEvent(MainState& state, const Event& event) {
 
     if (event == Event::Escape) {
         if (agent.isProcessing()) {
-            PERF_LOG("ai_ui", "user cancelled processing");
             agent.cancel();
             state.ai.entries.push_back({AILogEntry::Error, "Cancelled by user"});
         } else {

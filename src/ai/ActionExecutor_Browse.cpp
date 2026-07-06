@@ -1,7 +1,6 @@
 #include "ai/ActionExecutor.hpp"
 #include "core/MainUI.hpp"
 #include "browser/FileManager.hpp"
-#include "utils/PerfLogger.hpp"
 
 #include <filesystem>
 #include <fstream>

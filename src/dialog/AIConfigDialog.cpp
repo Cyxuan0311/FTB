@@ -1,7 +1,6 @@
 #include "dialog/AIConfigDialog.hpp"
 #include "config/ConfigManager.hpp"
 #include "utils/StatusMessage.hpp"
-#include "utils/PerfLogger.hpp"
 
 #include <algorithm>
 

@@ -1,5 +1,4 @@
 #include "ai/AIClient.hpp"
-#include "utils/PerfLogger.hpp"
 #include "httplib.h"
 #include <nlohmann/json.hpp>
 
@@ -91,9 +90,6 @@ void AIClient::sendMessage(const std::vector<Message>& messages,
     cancelled_ = false;
     processing_ = true;
 
-    PERF_LOG("ai_http", "sendMessage msgs=" + std::to_string(messages.size())
-        + " backend=" + (config_.backend == Backend::Ollama ? "ollama" : "openai"));
-
     std::string body = (config_.backend == Backend::Ollama)
         ? buildOllamaBody(messages)
         : buildOpenAIBody(messages);
@@ -114,7 +110,6 @@ void AIClient::sendOllama(const std::string& body,
     std::string full_content;
 
     try {
-        PERF_LOG("ai_http", "sendOllama endpoint=" + config_.endpoint);
         httplib::Client cli(config_.endpoint);
         cli.set_read_timeout(120);
         cli.set_connection_timeout(10);
@@ -287,12 +282,10 @@ void AIClient::sendOpenAI(const std::string& body,
                     {"steps", steps}
                 };
                 std::string resp_str = resp_json.dump();
-                PERF_LOG("ai_http", "tool_calls result=" + resp_str);
                 if (on_done) on_done(resp_str);
             } else if (!full_content.empty()) {
                 if (on_done) on_done(full_content);
             } else {
-                PERF_LOG("ai_http", "SSE parsing yielded no content, body=" + result->body);
                 try {
                     auto json_resp = json::parse(result->body);
                     if (json_resp.contains("choices") && !json_resp["choices"].empty()) {
@@ -306,7 +299,6 @@ void AIClient::sendOpenAI(const std::string& body,
                         full_content = json_resp["message"]["content"].get<std::string>();
                     }
                 } catch (const json::parse_error&) {
-                    PERF_LOG("ai_http", "body is not valid JSON either");
                 }
                 if (!full_content.empty()) {
                     if (on_stream) on_stream(full_content);
@@ -319,7 +311,6 @@ void AIClient::sendOpenAI(const std::string& body,
 
 #ifdef FTB_HAVE_SSL
         if (is_https) {
-            PERF_LOG("ai_http", "sendOpenAI using HTTPS host=" + host);
             httplib::SSLClient cli(host);
             handle_result(do_request(cli));
         } else
