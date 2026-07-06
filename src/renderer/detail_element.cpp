@@ -1,7 +1,5 @@
 #include "renderer/detail_element.hpp"
 
-#include "utils/PerfLogger.hpp"
-
 #include <chrono>
 #include <ctime>
 #include <filesystem>
@@ -326,16 +324,6 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
         {
             std::ostringstream oss;
             oss << std::this_thread::get_id();
-            PERF_LOG("detail_img", "is_image=true protocol=" +
-                     (FTB::ImageOutputManager::ActiveProtocol()
-                      ? FTB::ImageOutputManager::ProtocolName()
-                      : "none") +
-                     " img_w=" + std::to_string(img_w) +
-                     " img_h=" + std::to_string(img_h) +
-                     " term_dim=" + std::to_string(term_dim.dimx) + "x" + std::to_string(term_dim.dimy) +
-                     " preview_panel_width=" + std::to_string(preview_panel_width) +
-                     " usable_line_width=" + std::to_string(usable_line_width) +
-                     " tid=" + oss.str());
         }
 
         auto* proto = FTB::ImageOutputManager::ActiveProtocol();
@@ -345,65 +333,57 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
             std::string dummy;
             int dummy_rows;
             if (!FTB::ImageOutputManager::GetCached(filePath, dummy, dummy_rows)) {
-                PERF_LOG("detail_img", "file changed, clearing previous image");
                 FTB::ImageOutputManager::ClearCurrent();
             }
         }
 
+        bool use_protocol = false;
+        std::string img_data;
+        int img_rows = 0, render_w = 0, render_h = 0;
+
         if (proto) {
-            info_elements.push_back(separator() | color(TC("main_border")));
-            int panel_start_row = static_cast<int>(info_elements.size());
-            PERF_LOG("detail_img", "entered protocol path protocol=" +
-                     FTB::ImageOutputManager::ProtocolName() +
-                     " info_elements_size=" + std::to_string(panel_start_row));
-
-            std::string img_data;
-            int img_rows = 0;
-            int render_w = 0, render_h = 0;
             bool have_cached = FTB::ImageOutputManager::GetCached(filePath, img_data, img_rows, &render_w, &render_h);
-            PERF_LOG("detail_img", "cache check: have_cached=" +
-                     std::to_string(have_cached) +
-                     " cached_rows=" + std::to_string(img_rows) +
-                     " cached_size=" + std::to_string(img_data.size()));
+            bool has_failed = FTB::ImageOutputManager::HasFailed(filePath);
 
-            int max_chars_h = std::max(5, term_dim.dimy - panel_start_row - 5);
-
-            if (!have_cached) {
+            if (!have_cached && !has_failed) {
                 int pixel_w = img_w * 9;
-                int pixel_h = max_chars_h * 18;
-                PERF_LOG("detail_img", "submitting async encode pixel_dim=" +
-                         std::to_string(pixel_w) + "x" + std::to_string(pixel_h) +
-                         " max_chars_h=" + std::to_string(max_chars_h));
-                FTB::ImageOutputManager::EncodeAsync(filePath, pixel_w, pixel_h);
+                int pixel_h = std::max(5, term_dim.dimy - 5) * 18;
+                if (!FTB::ImageOutputManager::IsEncoding(filePath)) {
+                    FTB::ImageOutputManager::EncodeAsync(filePath, pixel_w, pixel_h);
+                }
             }
 
             if (have_cached && img_rows > 0) {
+                use_protocol = true;
+            } else if (!has_failed) {
+                use_protocol = true; // encoding still in progress
+            }
+            // else has_failed: fall through to ImagePreview
+        }
+
+        if (use_protocol) {
+            info_elements.push_back(separator() | color(TC("main_border")));
+            int panel_start_row = static_cast<int>(info_elements.size());
+            int max_chars_h = std::max(5, term_dim.dimy - panel_start_row - 5);
+
+            if (!img_data.empty() && img_rows > 0) {
                 int preview_start_col = std::max(0, term_dim.dimx - preview_panel_width);
-
-                PERF_LOG("detail_img", "deferring image at row=" +
-                         std::to_string(panel_start_row) +
-                         " col=" + std::to_string(preview_start_col) +
-                         " data_size=" + std::to_string(img_data.size()) +
-                         " img_rows=" + std::to_string(img_rows));
-
                 FTB::ImageOutputManager::SetPending(
                     filePath, img_data, panel_start_row, preview_start_col,
                     img_rows, max_chars_h, preview_panel_width, render_w, render_h);
-                PERF_LOG("detail_img", "SetPending called");
 
                 std::string proto_note = "  [" +
                     FTB::ImageOutputManager::ProtocolName() + "] " +
                     std::to_string(img_rows) + " rows";
                 info_elements.push_back(
                     text(proto_note) | color(TC("dim")) | dim);
-                PERF_LOG("detail_img", "protocol path complete");
             } else {
-                PERF_LOG("detail_img", "encoding failed or still pending");
                 info_elements.push_back(
                     text("  Encoding image...") | color(TC("dim")) | dim);
             }
-        } else {
-            PERF_LOG("detail_img", "falling back to Unicode block rendering");
+        }
+
+        if (!use_protocol) {
             FTB::ImagePreview::LoadAsync(filePath, img_w, img_h);
 
             FTB::ImageCache img_cache;
@@ -412,11 +392,30 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
                 info_elements.push_back(separator() | color(TC("main_border")));
                 for (const auto& line : img_cache.image_lines) {
                     Elements char_els;
-                    for (const auto& p : line.pixels) {
-                        char_els.push_back(
-                            text(L"\u2588") |
-                            color(Color::RGB(p.r, p.g, p.b))
-                        );
+                    if (!line.half_block_bottom.empty()) {
+                        for (size_t x = 0; x < line.pixels.size(); ++x) {
+                            auto& top = line.pixels[x];
+                            auto& bot = line.half_block_bottom[x];
+                            if (top.r == bot.r && top.g == bot.g && top.b == bot.b) {
+                                char_els.push_back(
+                                    text(L"\u2588") |
+                                    color(Color::RGB(top.r, top.g, top.b))
+                                );
+                            } else {
+                                char_els.push_back(
+                                    text(L"\u2584") |
+                                    color(Color::RGB(bot.r, bot.g, bot.b)) |
+                                    bgcolor(Color::RGB(top.r, top.g, top.b))
+                                );
+                            }
+                        }
+                    } else {
+                        for (const auto& p : line.pixels) {
+                            char_els.push_back(
+                                text(L"\u2588") |
+                                color(Color::RGB(p.r, p.g, p.b))
+                            );
+                        }
                     }
                     info_elements.push_back(hbox(char_els));
                 }
@@ -431,7 +430,6 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
     } else {
         // Not an image - clear any active image
         if (FTB::ImageOutputManager::IsActive()) {
-            PERF_LOG("detail_img", "not an image, clearing image");
             FTB::ImageOutputManager::ClearCurrent();
         }
     }
