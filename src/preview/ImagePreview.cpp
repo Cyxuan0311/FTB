@@ -1,7 +1,5 @@
 #include "../../include/preview/ImagePreview.hpp"
 
-#include "../../include/utils/PerfLogger.hpp"
-
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -14,6 +12,8 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "../../third_party/stb_image.h"
+
+#include "../../third_party/stb_image_resize2.h"
 
 #ifdef FTB_ENABLE_LIBCHAFA
 #include <chafa.h>
@@ -64,8 +64,15 @@ std::vector<ImageLine> ImagePreview::RenderWithStbImage(
         render_h = std::max(1, static_cast<int>(max_width / target_ratio));
     }
 
-    double scale_x = static_cast<double>(render_w) / img_w;
-    double scale_y = static_cast<double>(render_h) / img_h;
+    int pixel_h = render_h * 2;
+    std::vector<unsigned char> scaled(render_w * pixel_h * 3);
+
+    stbir_resize_uint8_srgb(
+        data, img_w, img_h, 0,
+        scaled.data(), render_w, pixel_h, 0,
+        STBIR_RGB);
+
+    stbi_image_free(data);
 
     std::vector<ImageLine> lines;
     lines.reserve(render_h);
@@ -73,18 +80,30 @@ std::vector<ImageLine> ImagePreview::RenderWithStbImage(
     for (int y = 0; y < render_h; ++y) {
         ImageLine line;
         line.pixels.reserve(render_w);
+        line.half_block_bottom.reserve(render_w);
+
+        int top_row = y * 2;
+        int bot_row = y * 2 + 1;
 
         for (int x = 0; x < render_w; ++x) {
-            int src_x = std::min(static_cast<int>(x / scale_x), img_w - 1);
-            int src_y = std::min(static_cast<int>(y / scale_y), img_h - 1);
-            int idx = (src_y * img_w + src_x) * 3;
-            line.pixels.push_back({data[idx], data[idx + 1], data[idx + 2]});
+            int top_idx = (top_row * render_w + x) * 3;
+            int bot_idx = (bot_row * render_w + x) * 3;
+
+            line.pixels.push_back({
+                scaled[top_idx + 0],
+                scaled[top_idx + 1],
+                scaled[top_idx + 2],
+            });
+            line.half_block_bottom.push_back({
+                scaled[bot_idx + 0],
+                scaled[bot_idx + 1],
+                scaled[bot_idx + 2],
+            });
         }
 
         lines.push_back(std::move(line));
     }
 
-    stbi_image_free(data);
     return lines;
 }
 

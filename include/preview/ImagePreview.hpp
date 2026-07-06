@@ -17,6 +17,7 @@ struct Pixel {
 
 struct ImageLine {
     std::vector<Pixel> pixels;
+    std::vector<Pixel> half_block_bottom;
 };
 
 struct ImageCacheEntry {
