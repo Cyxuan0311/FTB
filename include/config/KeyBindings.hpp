@@ -72,6 +72,7 @@ public:
         Tasks,
         BatchRename,
         QuitWithCwd,
+        ToggleProtocol,
 #ifdef FTB_ENABLE_SSH
         SSH,
 #endif

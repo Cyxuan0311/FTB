@@ -205,7 +205,8 @@ static json PreviewConfigToJson(const PreviewConfig& p) {
         {"max_spreadsheet_rows", p.max_spreadsheet_rows},
         {"truncate_long_lines", p.truncate_long_lines},
         {"chunk_size_lines", p.chunk_size_lines},
-        {"virtual_scroll_margin", p.virtual_scroll_margin}
+        {"virtual_scroll_margin", p.virtual_scroll_margin},
+        {"protocol_enabled", p.protocol_enabled}
     };
 }
 
@@ -219,6 +220,7 @@ static void JsonToPreviewConfig(const json& j, PreviewConfig& p) {
     if (j.contains("truncate_long_lines"))    j["truncate_long_lines"].get_to(p.truncate_long_lines);
     if (j.contains("chunk_size_lines"))       j["chunk_size_lines"].get_to(p.chunk_size_lines);
     if (j.contains("virtual_scroll_margin"))  j["virtual_scroll_margin"].get_to(p.virtual_scroll_margin);
+    if (j.contains("protocol_enabled"))       j["protocol_enabled"].get_to(p.protocol_enabled);
 }
 
 static json BookmarkConfigToJson(const BookmarkConfig& b) {
