@@ -17,6 +17,7 @@ void print_help(const char* prog_name) {
     std::cout << "Options:" << std::endl;
     std::cout << "  -h, --help       Show this help message" << std::endl;
     std::cout << "  -v, --version    Show version information" << std::endl;
+    std::cout << "  -l, --log        Enable debug logging to ftb_perf.log" << std::endl;
     std::cout << "  --config <PATH>  Specify config file path" << std::endl;
     std::cout << std::endl;
     std::cout << "Keybindings (inside FTB):" << std::endl;
@@ -36,6 +37,8 @@ CLIArgs parse_args(int argc, char* argv[]) {
             args.show_help = true;
         } else if (arg == "-v" || arg == "--version") {
             args.show_version = true;
+        } else if (arg == "-l" || arg == "--log") {
+            args.log_enabled = true;
         } else if (arg == "--config" && i + 1 < argc) {
             args.config_path = argv[++i];
         } else if (arg[0] == '-') {

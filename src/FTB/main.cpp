@@ -24,6 +24,7 @@
 #include "../include/config/KeyBindings.hpp"
 #include "../include/renderer/detail_element.hpp"
 #include "../include/utils/StatusMessage.hpp"
+#include "../include/utils/PerfLogger.hpp"
 #include "../include/protocols/ImageOutputManager.hpp"
 #include "../include/utils/SystemClipboard.hpp"
 #include "../include/renderer/TextSelection.hpp"
@@ -161,8 +162,14 @@ int main(int argc, char* argv[])
 
 #ifdef FTB_ENABLE_PLUGINS
     {
+        if (cli_args.log_enabled) {
+            FTB::PerfLogger::GetInstance().Enable();
+        }
+
         std::string config_dir = std::string(getenv("HOME") ? getenv("HOME") : "/tmp") + "/.config/ftb";
         FTB::PluginManager::GetInstance()->Initialize(config_dir);
+
+        PERF_LOG("Init", "Plugin initialization complete");
     }
 #endif
 
