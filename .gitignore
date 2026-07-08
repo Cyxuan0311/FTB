@@ -29,5 +29,9 @@ some_propmt.md
 Video_and_Photo.md
 VideoPlayer_one.cpp
 
+# Python cache
+**/__pycache__/
+*.pyc
+
 # perf/log files
 ftb_perf.log
