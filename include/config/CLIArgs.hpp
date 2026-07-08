@@ -9,7 +9,6 @@ extern const char* FTB_VERSION;
 struct CLIArgs {
     bool show_help = false;
     bool show_version = false;
-    bool enable_logging = false;
     std::string startup_dir;
     std::string config_path;
 };

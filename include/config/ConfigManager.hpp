@@ -227,6 +227,7 @@ struct PreviewConfig {
     int chunk_size_lines = 200;         // lines per chunk for lazy text loading
     int virtual_scroll_margin = 50;     // extra lines to preload above/below viewport
     bool protocol_enabled = true;       // whether to use terminal image protocol (Kitty/iTerm2/Sixel)
+    int tab_width = 4;                  // tab display width in the preview panel
 
     PreviewConfig() = default;
 };

@@ -17,9 +17,7 @@ void print_help(const char* prog_name) {
     std::cout << "Options:" << std::endl;
     std::cout << "  -h, --help       Show this help message" << std::endl;
     std::cout << "  -v, --version    Show version information" << std::endl;
-    std::cout << "  --no-icons       Disable Nerd Font icons" << std::endl;
     std::cout << "  --config <PATH>  Specify config file path" << std::endl;
-    std::cout << "  -l               Enable performance debug logging" << std::endl;
     std::cout << std::endl;
     std::cout << "Keybindings (inside FTB):" << std::endl;
     std::cout << "  j/k or Arrows    Navigate up/down" << std::endl;
@@ -40,10 +38,6 @@ CLIArgs parse_args(int argc, char* argv[]) {
             args.show_version = true;
         } else if (arg == "--config" && i + 1 < argc) {
             args.config_path = argv[++i];
-        } else if (arg == "--no-icons") {
-            std::cerr << "Note: --no-icons is a build-time option. Rebuild with -DFTB_ENABLE_ICONS=OFF" << std::endl;
-        } else if (arg == "-l") {
-            args.enable_logging = true;
         } else if (arg[0] == '-') {
             std::cerr << "Unknown option: " << arg << std::endl;
             std::cerr << "Try '" << argv[0] << " --help' for more information." << std::endl;

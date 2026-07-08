@@ -93,6 +93,9 @@ std::map<std::string, KeyBindings::PanelCommand> KeyBindings::InitCommandMap() {
     m["z"]          = PanelCommand::QuitWithCwd;
     m["exit"]       = PanelCommand::QuitWithCwd;
     m["quit"]       = PanelCommand::QuitWithCwd;
+    m["pcmd"]       = PanelCommand::PluginCommand;
+    m["plugincmd"]  = PanelCommand::PluginCommand;
+    m["pc"]         = PanelCommand::PluginCommand;
     m["toggleprotocol"] = PanelCommand::ToggleProtocol;
     m["protocol"]       = PanelCommand::ToggleProtocol;
     m["imgproto"]       = PanelCommand::ToggleProtocol;
@@ -193,7 +196,6 @@ bool KeyBindings::HandleEvent(const ftxui::Event& event) {
         return true;
     }
 
-    // 如果已在前缀模式，处理命令输入
     if (prefix_mode_) {
         bool result = HandlePrefixInput(event);
         return result;
@@ -220,7 +222,6 @@ bool KeyBindings::HandlePrefixInput(const ftxui::Event& event) {
         return true;
     }
 
-    // 左/右箭头：移动光标
     if (event == ftxui::Event::ArrowLeft) {
         if (command_cursor_ > 0) {
             command_cursor_--;
@@ -235,7 +236,6 @@ bool KeyBindings::HandlePrefixInput(const ftxui::Event& event) {
         return true;
     }
 
-    // Home / End：移动到开头/末尾
     if (event == ftxui::Event::Home) {
         command_cursor_ = 0;
         return true;
@@ -246,13 +246,11 @@ bool KeyBindings::HandlePrefixInput(const ftxui::Event& event) {
         return true;
     }
 
-    // Tab: 补全命令
     if (event == ftxui::Event::Tab) {
         if (!command_input_.empty()) {
             std::string lower_input = command_input_;
             std::transform(lower_input.begin(), lower_input.end(), lower_input.begin(), ::tolower);
 
-            // 查找所有匹配的命令
             std::vector<std::string> matches;
             for (const auto& [name, cmd] : command_map_) {
                 if (name.size() >= lower_input.size() &&
@@ -261,12 +259,39 @@ bool KeyBindings::HandlePrefixInput(const ftxui::Event& event) {
                 }
             }
 
-            // 如果有匹配，补全到最长公共前缀
+            if (matches.empty()) {
+                auto sp = lower_input.find(' ');
+                if (sp != std::string::npos) {
+                    std::string prefix = lower_input.substr(0, sp);
+                    auto map_it = command_map_.find(prefix);
+                    if (map_it != command_map_.end() && map_it->second == PanelCommand::PluginCommand) {
+                        std::string payload = command_input_.substr(sp + 1);
+                        if (plugin_completer_) {
+                            auto plugin_matches = plugin_completer_(payload);
+                            if (!plugin_matches.empty()) {
+                                if (plugin_matches.size() == 1) {
+                                    command_input_ = prefix + " " + plugin_matches[0];
+                                } else {
+                                    std::string lcp = plugin_matches[0];
+                                    for (size_t i = 1; i < plugin_matches.size(); ++i) {
+                                        size_t j = 0;
+                                        while (j < lcp.size() && j < plugin_matches[i].size() && lcp[j] == plugin_matches[i][j]) j++;
+                                        lcp = lcp.substr(0, j);
+                                    }
+                                    command_input_ = prefix + " " + lcp;
+                                }
+                                command_cursor_ = command_input_.size();
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+
             if (!matches.empty()) {
                 if (matches.size() == 1) {
                     command_input_ = matches[0];
                 } else {
-                    // 找最长公共前缀
                     std::string lcp = matches[0];
                     for (size_t i = 1; i < matches.size(); ++i) {
                         size_t j = 0;
@@ -298,7 +323,6 @@ bool KeyBindings::HandlePrefixInput(const ftxui::Event& event) {
         return true;
     }
 
-    // 普通字符输入 (忽略冒号，因为前缀已经隐含了冒号)
     if (event.is_character()) {
         char c = event.character()[0];
         if (c != ':') {
@@ -308,7 +332,7 @@ bool KeyBindings::HandlePrefixInput(const ftxui::Event& event) {
         return true;
     }
 
-    return true; // 在前缀模式下消费所有事件
+    return true;
 }
 
 void KeyBindings::SetPrefixKey(const std::string& key_name) {
@@ -370,6 +394,7 @@ void KeyBindings::EnterPrefixMode() {
     command_input_.clear();
     command_cursor_ = 0;
     current_command_ = PanelCommand::None;
+    command_payload_.clear();
 }
 
 void KeyBindings::ExitPrefixMode() {
@@ -377,27 +402,39 @@ void KeyBindings::ExitPrefixMode() {
     command_input_.clear();
     command_cursor_ = 0;
     current_command_ = PanelCommand::None;
+    command_payload_.clear();
 }
 
 KeyBindings::PanelCommand KeyBindings::ExecuteCommand() {
-    // 转为小写
     std::string lower_input = command_input_;
     std::transform(lower_input.begin(), lower_input.end(), lower_input.begin(), ::tolower);
 
     auto it = command_map_.find(lower_input);
     if (it != command_map_.end()) {
         current_command_ = it->second;
+        command_payload_.clear();
         return current_command_;
     }
 
+    auto space_pos = lower_input.find(' ');
+    if (space_pos != std::string::npos) {
+        std::string prefix = lower_input.substr(0, space_pos);
+        it = command_map_.find(prefix);
+        if (it != command_map_.end()) {
+            current_command_ = it->second;
+            command_payload_ = command_input_.substr(space_pos + 1);
+            return current_command_;
+        }
+    }
+
     current_command_ = PanelCommand::None;
+    command_payload_.clear();
     return PanelCommand::None;
 }
 
 std::string KeyBindings::GetCommandHint() const {
     if (!prefix_mode_) return "";
 
-    // 根据当前输入尝试补全
     if (!command_input_.empty()) {
         std::string lower_input = command_input_;
         std::transform(lower_input.begin(), lower_input.end(), lower_input.begin(), ::tolower);
@@ -407,6 +444,30 @@ std::string KeyBindings::GetCommandHint() const {
             if (name.size() >= lower_input.size() &&
                 name.substr(0, lower_input.size()) == lower_input) {
                 matches.push_back(name);
+            }
+        }
+
+        if (matches.empty()) {
+            auto sp = lower_input.find(' ');
+            if (sp != std::string::npos) {
+                std::string prefix = lower_input.substr(0, sp);
+                auto map_it = command_map_.find(prefix);
+                if (map_it != command_map_.end() && map_it->second == PanelCommand::PluginCommand) {
+                    std::string payload = command_input_.substr(sp + 1);
+                    if (plugin_completer_) {
+                        auto plugin_matches = plugin_completer_(payload);
+                        if (plugin_matches.size() == 1) {
+                            return plugin_matches[0].substr(payload.size());
+                        } else if (plugin_matches.size() > 1) {
+                            std::string hint;
+                            for (size_t i = 0; i < plugin_matches.size(); ++i) {
+                                if (i > 0) hint += " ";
+                                hint += plugin_matches[i];
+                            }
+                            return " [" + hint + "]";
+                        }
+                    }
+                }
             }
         }
 
@@ -467,6 +528,7 @@ std::vector<std::pair<std::string, std::string>> KeyBindings::GetCommandList() c
     list.push_back({"openwith / ow",       "Manual open with"});
     list.push_back({"opencfg / oc",        "Configure openers"});
     list.push_back({"z / exit / quit",     "Quit and change shell directory"});
+    list.push_back({"pcmd / pc / plugincmd", "Execute plugin command"});
     list.push_back({"toggleprotocol / protocol / imgproto", "Toggle terminal image protocol (Kitty/iTerm2/Sixel)"});
 #ifdef FTB_ENABLE_SSH
     list.push_back({"ssh",               "SSH connection"});
