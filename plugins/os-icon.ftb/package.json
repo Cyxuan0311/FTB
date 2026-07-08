@@ -1,0 +1,11 @@
+{
+    "name": "os-icon",
+    "version": "1.0.0",
+    "description": "Display OS platform with Nerd Font icon in status bar",
+    "author": "FTB",
+    "entry": "main.ts",
+    "type": "statusbar",
+    "permissions": {
+        "max_exec_ms": 1000
+    }
+}

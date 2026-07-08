@@ -1,19 +1,21 @@
 {
     "name": "preview-external",
     "version": "1.0.0",
-    "description": "Preview files using external CLI tools (glow, chafa, pdftotext, etc.)",
+    "description": "Preview files using external CLI tools (glow, python, etc.)",
     "author": "FTB",
     "entry": "main.ts",
     "type": "previewer",
-    "keywords": [".md", ".pdf", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".bmp"],
+    "commands": ["disablepreview", "togglecolor", "setcolor"],
+    "keywords": [".apk", ".mp3", ".flac", ".ogg", ".wav", ".m4a", ".rar", ".pt", ".pth", ".onnx", ".safetensors", ".h5", ".hdf5", ".keras", ".tflite", ".csv", ".tsv", ".json", ".ipynb", ".unitypackage", ".deb", ".rpm", ".AppImage", ".snap", ".pkg.tar.zst", ".pkg.tar.xz", ".ttf", ".otf", ".woff", ".woff2", ".ttc"],
     "permissions": {
-        "fs_read": false,
+        "fs_read": true,
         "fs_write": false,
         "fs_list": false,
         "net_fetch": false,
         "env_read": false,
         "clipboard": false,
         "subprocess": true,
-        "max_exec_ms": 5000
+        "python_exec": true,
+        "max_exec_ms": 10000
     }
 }
