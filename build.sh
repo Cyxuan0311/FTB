@@ -169,9 +169,21 @@ fi
 # ====================================================================
 print_banner
 
+row() {
+    local label="$1" value="$2"
+    local cs="" ce=""
+    case "$value" in
+        ON|true)   cs="${GREEN}${BOLD}"; ce="${NC}" ;;
+        OFF|false) cs="${RED}";          ce="${NC}" ;;
+    esac
+    local pad=$((VALUE_W - ${#value}))
+    printf "  ${BOLD}│${NC} %-${LABEL_W}s ${cs}%s${ce}%*s ${BOLD}│${NC}\n" \
+        "$label" "$value" $pad ""
+}
+
 LABEL_W=16
 VALUE_W=16
-INNER_W=$((LABEL_W + VALUE_W + 1))
+INNER_W=$((LABEL_W + VALUE_W + 3))
 HR=$(printf '─%.0s' $(seq 1 $INNER_W))
 TITLE="Build Summary"
 PAD_L=$(((INNER_W - ${#TITLE}) / 2))
@@ -181,15 +193,15 @@ echo ""
 echo -e "${BOLD}  ┌${HR}┐${NC}"
 printf "  ${BOLD}│${NC}%*s%s%*s${BOLD}│${NC}\n" $PAD_L "" "$TITLE" $PAD_R ""
 echo -e "${BOLD}  ├${HR}┤${NC}"
-printf "  ${BOLD}│${NC} %-${LABEL_W}s %-${VALUE_W}s ${BOLD}│${NC}\n" "AI:" "$OPT_AI"
-printf "  ${BOLD}│${NC} %-${LABEL_W}s %-${VALUE_W}s ${BOLD}│${NC}\n" "Icons:" "$OPT_ICONS"
-printf "  ${BOLD}│${NC} %-${LABEL_W}s %-${VALUE_W}s ${BOLD}│${NC}\n" "SSH:" "$OPT_SSH"
-printf "  ${BOLD}│${NC} %-${LABEL_W}s %-${VALUE_W}s ${BOLD}│${NC}\n" "Tree-sitter:" "$OPT_TREE_SITTER"
-printf "  ${BOLD}│${NC} %-${LABEL_W}s %-${VALUE_W}s ${BOLD}│${NC}\n" "libchafa:" "$OPT_LIBCHAFA"
-printf "  ${BOLD}│${NC} %-${LABEL_W}s %-${VALUE_W}s ${BOLD}│${NC}\n" "libsixel:" "$OPT_LIBSIXEL"
-printf "  ${BOLD}│${NC} %-${LABEL_W}s %-${VALUE_W}s ${BOLD}│${NC}\n" "Plugins:" "$OPT_PLUGINS"
-printf "  ${BOLD}│${NC} %-${LABEL_W}s %-${VALUE_W}s ${BOLD}│${NC}\n" "Build type:" "$OPT_BUILD_TYPE"
-printf "  ${BOLD}│${NC} %-${LABEL_W}s %-${VALUE_W}s ${BOLD}│${NC}\n" "Clean:" "$OPT_CLEAN"
+row "AI:"          "$OPT_AI"
+row "Icons:"       "$OPT_ICONS"
+row "SSH:"         "$OPT_SSH"
+row "Tree-sitter:" "$OPT_TREE_SITTER"
+row "libchafa:"    "$OPT_LIBCHAFA"
+row "libsixel:"    "$OPT_LIBSIXEL"
+row "Plugins:"     "$OPT_PLUGINS"
+row "Build type:"  "$OPT_BUILD_TYPE"
+row "Clean:"       "$OPT_CLEAN"
 echo -e "${BOLD}  └${HR}┘${NC}"
 
 if $INTERACTIVE; then
