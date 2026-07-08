@@ -24,7 +24,6 @@
 #include "../include/config/KeyBindings.hpp"
 #include "../include/renderer/detail_element.hpp"
 #include "../include/utils/StatusMessage.hpp"
-#include "../include/utils/PerfLogger.hpp"
 #include "../include/protocols/ImageOutputManager.hpp"
 #include "../include/utils/SystemClipboard.hpp"
 #include "../include/renderer/TextSelection.hpp"
@@ -113,10 +112,6 @@ int main(int argc, char* argv[])
 
     setupSignalHandlers();
     auto cli_args = parse_args(argc, argv);
-
-    if (cli_args.enable_logging) {
-        FTB::PerfLogger::Enable();
-    }
 
     if (cli_args.show_help) {
         print_help(argv[0]);
@@ -330,6 +325,12 @@ int main(int argc, char* argv[])
     auto& keybindings = FTB::KeyBindings::GetInstance();
     keybindings.SetScreen(&screen);
     RegisterPanelCommands(keybindings, state);
+
+#ifdef FTB_ENABLE_PLUGINS
+    keybindings.SetPluginCompleter([](const std::string& input) {
+        return FTB::PluginManager::GetInstance()->CompletePluginCommand(input);
+    });
+#endif
 
     // ---- 事件处理 ----
 

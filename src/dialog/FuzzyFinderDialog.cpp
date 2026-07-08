@@ -5,8 +5,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
-#include <cstdio>
-#include <ctime>
+
 #include <filesystem>
 #include <mutex>
 #include <thread>
@@ -82,36 +81,10 @@ static std::string ParentPart(const std::string& path) {
     return (slash != std::string::npos && slash > 0) ? path.substr(0, slash) : "";
 }
 
-static std::string FmtFileSize(uintmax_t bytes) {
-    char buf[32];
-    if (bytes < 1024)
-        std::snprintf(buf, sizeof(buf), "%zu B", bytes);
-    else if (bytes < 1024 * 1024)
-        std::snprintf(buf, sizeof(buf), "%.1f KB", static_cast<double>(bytes) / 1024.0);
-    else
-        std::snprintf(buf, sizeof(buf), "%.1f MB", static_cast<double>(bytes) / (1024.0 * 1024.0));
-    return buf;
-}
-
-static std::string FormatFileTime(const fs::path& path) {
-    std::error_code ec;
-    auto ftime = fs::last_write_time(path, ec);
-    if (ec) return "unknown";
-    auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
-        ftime - fs::file_time_type::clock::now() + std::chrono::system_clock::now());
-    std::time_t t = std::chrono::system_clock::to_time_t(sctp);
-    std::tm tm;
-    localtime_r(&t, &tm);
-    char buf[64];
-    std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M", &tm);
-    return buf;
-}
-
 namespace FTB::UI {
 
 Element RenderFuzzyFinderPanel(MainState& state, int tw, int th) {
-    int pw = std::min(80, tw - 6);
-    int ph = std::min(30, th - 4);
+    int pw = std::min(100, tw - 4);
 
     std::vector<FdResult> results;
     bool loading;
@@ -121,29 +94,27 @@ Element RenderFuzzyFinderPanel(MainState& state, int tw, int th) {
         loading = s_loading;
     }
 
-    int visible_rows = std::max(3, ph - 8);
+    int visible_rows = std::max(3, std::min(th - 5, 22));
     if (state.panel_selected < s_scroll) s_scroll = state.panel_selected;
     if (state.panel_selected >= s_scroll + visible_rows)
         s_scroll = state.panel_selected - visible_rows + 1;
 
-    // === 输入行 (标准模式: 标签 + 文字 + 光标) ===
-    std::string input_str = state.panel_input.empty() ? "" : state.panel_input;
+    // === 输入行 (yazi 风格: ? 前缀) ===
+    std::string input_str = state.panel_input;
     auto input_dom = hbox({
-        text(" Search: ") | color(TC("main_fg")),
+        text("? ") | color(TC("indicator")),
         text(input_str + "\u258f") | color(TC("find_keyword")),
-    });
+        filler(),
+    }) | bgcolor(TC("input_bg"));
 
-    // === 左侧: 文件列表 ===
+    // === 文件列表 (单列, 无预览) ===
     Elements list_items;
     if (loading && results.empty()) {
-        list_items.push_back(text(" (searching...)") | color(TC("dim")) | dim);
-        for (int i = 1; i < visible_rows; ++i) list_items.push_back(text(""));
+        list_items.push_back(text("  searching...") | color(TC("dim")) | dim);
     } else if (results.empty() && !state.panel_input.empty()) {
-        list_items.push_back(text(" (no results)") | color(TC("dim")) | dim);
-        for (int i = 1; i < visible_rows; ++i) list_items.push_back(text(""));
+        list_items.push_back(text("  no results") | color(TC("dim")) | dim);
     } else if (results.empty()) {
-        list_items.push_back(text(" (type to search)") | color(TC("dim")) | dim);
-        for (int i = 1; i < visible_rows; ++i) list_items.push_back(text(""));
+        list_items.push_back(text("  type to search") | color(TC("dim")) | dim);
     } else {
         int end_idx = std::min(s_scroll + visible_rows, static_cast<int>(results.size()));
         for (int i = s_scroll; i < end_idx; ++i) {
@@ -151,111 +122,45 @@ Element RenderFuzzyFinderPanel(MainState& state, int tw, int th) {
             bool selected = (i == state.panel_selected);
 
             auto row = hbox({
-                text(selected ? " > " : "   ") | color(TC("indicator")),
+                text("  "),
                 text(DisplayName(r.path)) | color(selected ? TC("selection_fg") : TC("main_fg")) | (selected ? bold : nothing),
                 filler(),
                 text(ParentPart(r.path)) | color(TC("dim")) | dim,
+                text("  "),
             }) | (selected ? bgcolor(TC("selection_bg")) : nothing);
 
             list_items.push_back(row);
         }
-        int rendered = end_idx - s_scroll;
-        for (int i = rendered; i < visible_rows; ++i)
-            list_items.push_back(text(""));
     }
 
-    // 标题 + 计数器 (inline, 显示在左上角)
-    std::string count_str = results.empty() ? "" : (std::to_string(state.panel_selected + 1) + "/" + std::to_string(results.size()));
+    // === 计数 / 引擎 ===
+    std::string count_str;
+    if (!results.empty()) {
+        count_str = std::to_string(state.panel_selected + 1) + "/" + std::to_string(results.size());
+    }
 
-    auto left_panel = vbox({
-        hbox({
-            text(" Fd Search") | color(TC("title")) | bold,
-            filler(),
-            text(count_str) | color(TC("dim")),
-            text("  "),
-        }),
-        separator() | color(TC("main_border")),
-        input_dom | bgcolor(TC("input_bg")),
+    auto bottom_bar = hbox({
+        text(" ") | color(TC("dim")),
+        text(count_str) | color(TC("dim")),
+        filler(),
+        text(SearchEngine::HasExternal() ? " fdfind" : " builtin") | color(TC("dim")) | dim,
+        text(" "),
+    });
+
+    // === 组装: 顶部固定 + 底部填充 ===
+    auto content = vbox({
+        input_dom,
         separator() | color(TC("main_border")),
         vbox(std::move(list_items)) | flex,
-    }) | flex;
-
-    // === 右侧: 预览面板 ===
-    Elements preview_els;
-    auto add_preview = [&](const FdResult& sel) {
-        fs::path fullPath = fs::path(state.currentPath) / sel.path;
-
-        preview_els.push_back(text(" " + DisplayName(sel.path)) | color(TC("selection_fg")) | bold);
-        std::string parent = ParentPart(sel.path);
-        if (!parent.empty())
-            preview_els.push_back(text(" " + parent) | color(TC("dim")) | dim);
-
-        preview_els.push_back(separator() | color(TC("main_border")));
-
-        // File type
-        std::error_code ec;
-        auto st = fs::status(fullPath, ec);
-        if (!ec) {
-            const char* type_str = "unknown";
-            if (st.type() == fs::file_type::regular) type_str = "regular file";
-            else if (st.type() == fs::file_type::symlink) type_str = "symlink";
-            else if (st.type() == fs::file_type::character) type_str = "char device";
-            else if (st.type() == fs::file_type::block) type_str = "block device";
-            else if (st.type() == fs::file_type::fifo) type_str = "fifo";
-            else if (st.type() == fs::file_type::socket) type_str = "socket";
-            preview_els.push_back(hbox({
-                text(" ") | color(TC("title")),
-                text(type_str) | color(TC("main_fg")),
-            }));
-        }
-
-        // File size
-        auto fsize = fs::file_size(fullPath, ec);
-        if (!ec) {
-            preview_els.push_back(hbox({
-                text(" "),
-                text(FmtFileSize(fsize)) | color(TC("main_fg")),
-            }));
-        }
-
-        // Modification time
-        std::string ftime_str = FormatFileTime(fullPath);
-        preview_els.push_back(hbox({
-            text(" "),
-            text(ftime_str) | color(TC("main_fg")),
-        }));
-    };
-
-    if (!results.empty() && state.panel_selected >= 0 &&
-        state.panel_selected < static_cast<int>(results.size())) {
-        add_preview(results[state.panel_selected]);
-    } else {
-        preview_els.push_back(text("") | color(TC("dim")));
-    }
-
-    preview_els.push_back(filler());
-
-    auto right_panel = vbox({
         separator() | color(TC("main_border")),
-        vbox(std::move(preview_els)) | flex,
-    }) | flex;
+        bottom_bar,
+    }) | bgcolor(TC("main_bg")) | size(WIDTH, EQUAL, pw);
 
-    // === 整体组装 ===
     return vbox({
-        hbox({
-            left_panel,
-            separator() | color(TC("main_border")),
-            right_panel,
-        }) | flex,
-        separator() | color(TC("main_border")),
-        hbox({
-            text(" Esc=Cancel     Arrow=Navigate     Enter=Open") | color(TC("dim")) | dim,
-            filler(),
-            text(SearchEngine::HasExternal() ? " fdfind" : " builtin") | color(TC("dim")) | dim,
-            text(" "),
-        }),
-    }) | bgcolor(TC("main_bg")) | GetPanelBorder() |
-       size(WIDTH, EQUAL, pw) | size(HEIGHT, EQUAL, ph) | center;
+        text(""),
+        content,
+        filler(),
+    });
 }
 
 bool HandleFuzzyFinderEvent(MainState& state, const Event& event) {

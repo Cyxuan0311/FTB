@@ -141,14 +141,14 @@ std::string TmuxContext::WrapPassthrough(const std::string& seq) const {
 
 void TmuxContext::WriteWithPassthrough(int fd, const char* data, size_t len) const {
     if (!in_tmux_ || !passthrough_) {
-        ::write(fd, data, len);
+        [[maybe_unused]] auto _ = ::write(fd, data, len);
         return;
     }
     static const char ptm_prefix[] = "\033Ptmux;";
     static const char ptm_suffix[] = "\033\\";
-    ::write(fd, ptm_prefix, sizeof(ptm_prefix) - 1);
-    ::write(fd, data, static_cast<ssize_t>(len));
-    ::write(fd, ptm_suffix, sizeof(ptm_suffix) - 1);
+    [[maybe_unused]] auto _a = ::write(fd, ptm_prefix, sizeof(ptm_prefix) - 1);
+    [[maybe_unused]] auto _b = ::write(fd, data, static_cast<ssize_t>(len));
+    [[maybe_unused]] auto _c = ::write(fd, ptm_suffix, sizeof(ptm_suffix) - 1);
 }
 
 std::string TmuxContext::RunTmuxCommand(const std::string& cmd) {

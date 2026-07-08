@@ -3,11 +3,16 @@
 #include <vector>
 #include <string>
 #include <cstdint>
+#include <sstream>
+#include <iomanip>
 
 namespace FTB {
 
 ftxui::Element AnsiStringToElement(const std::string& ansi_text) {
-    if (ansi_text.empty()) return ftxui::text("");
+    if (ansi_text.empty()) {
+
+        return ftxui::text("");
+    }
 
     struct AnsiStyle {
         bool bold = false;

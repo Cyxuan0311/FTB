@@ -577,6 +577,41 @@ void HandlePanelCommand(MainState& state, FTB::KeyBindings::PanelCommand cmd) {
         state.exit_path = state.currentPath;
         if (state.screen) state.screen->Exit();
         break;
+    case FTB::KeyBindings::PanelCommand::PluginCommand: {
+#ifdef FTB_ENABLE_PLUGINS
+        std::string payload = FTB::KeyBindings::GetInstance().GetCommandPayload();
+        if (payload.empty()) {
+            StatusMessage::Show("Usage: pcmd <plugin> [command]");
+            break;
+        }
+        auto sp = payload.find(' ');
+        std::string plugin_name = (sp == std::string::npos) ? payload : payload.substr(0, sp);
+
+        auto* pm = FTB::PluginManager::GetInstance();
+        PluginContext ctx;
+        ctx.current_path = state.currentPath;
+        ctx.platform = pm->DetectPlatform();
+        ctx.distro_id = pm->DetectDistroId();
+        ctx.args = (sp == std::string::npos) ? nlohmann::json("") :
+                   nlohmann::json(payload.substr(sp + 1));
+
+        auto result = pm->ExecutePluginCommand(plugin_name, ctx);
+        if (!result.message.empty()) {
+            StatusMessage::Show(result.message);
+        } else if (result.success && result.data.is_object() &&
+                   result.data.contains("label") && result.data["label"].is_string() &&
+                   !result.data["label"].get<std::string>().empty()) {
+            StatusMessage::Show(result.data["label"].get<std::string>());
+        } else if (result.success) {
+            StatusMessage::Show("Plugin command executed: " + plugin_name);
+        } else {
+            StatusMessage::Show("Plugin command failed: " + result.error);
+        }
+#else
+        StatusMessage::Show("Plugins not enabled (compile with FTB_ENABLE_PLUGINS)");
+#endif
+        break;
+    }
     default:
         break;
     }
@@ -625,6 +660,7 @@ void RegisterPanelCommands(FTB::KeyBindings& keybindings, MainState& state) {
     keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::ToggleProtocol, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::ToggleProtocol); });
 #ifdef FTB_ENABLE_PLUGINS
     keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::Plugin, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::Plugin); });
+    keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::PluginCommand, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::PluginCommand); });
 #endif
 #ifdef FTB_ENABLE_SSH
     keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::SSH, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::SSH); });

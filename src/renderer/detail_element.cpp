@@ -43,11 +43,12 @@ using namespace FileManager;
 namespace FTB {
 
 static Element RenderLineWithSelection(const std::string& line,
-                                       FTB::Editor::Language lang,
-                                       int sel_x1, int sel_x2) {
+                                        FTB::Editor::Language lang,
+                                        int sel_x1, int sel_x2) {
     // sel_x1/sel_x2 are display column positions. Convert to byte offsets.
     size_t byte_x1 = UnicodeUtil::ByteOffsetFromDisplayColumn(line, std::max(0, sel_x1));
     size_t byte_x2 = UnicodeUtil::ByteOffsetFromDisplayColumn(line, std::max(0, sel_x2 + 1));
+    int tab_width = FTB::ConfigManager::GetInstance()->GetConfig().preview.tab_width;
 
     if (lang == FTB::Editor::Language::NONE) {
         ftxui::Elements parts;
@@ -75,6 +76,7 @@ static Element RenderLineWithSelection(const std::string& line,
     };
 
     size_t pos = 0;
+    int display_col = 0;
     while (pos < line.size()) {
         size_t clen = utf8_char_len(static_cast<unsigned char>(line[pos]));
         if (pos + clen > line.size()) clen = 1;
@@ -89,7 +91,17 @@ static Element RenderLineWithSelection(const std::string& line,
             }
         }
 
-        auto el = text(ch) | ftxui::color(fg);
+        Element el;
+        uint32_t codepoint = 0;
+        UnicodeUtil::DecodeUtf8(ch.c_str(), &codepoint);
+        if (codepoint == 0x09) {
+            int tab_w = tab_width - (display_col % tab_width);
+            el = text(std::string(tab_w, ' ')) | ftxui::color(fg);
+            display_col += tab_w;
+        } else {
+            el = text(ch) | ftxui::color(fg);
+            display_col += UnicodeUtil::CodepointDisplayWidth(codepoint);
+        }
 
         int byte_start = static_cast<int>(pos);
         int byte_end = static_cast<int>(pos + clen - 1);
@@ -129,17 +141,24 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
     int usable_line_width = std::max(20, preview_panel_width - 6);
 
     std::string ext;
+    bool is_md_file_preview = false;
+    bool is_spreadsheet = false;
+    bool is_media = false;
+    bool is_audio = false;
+    bool is_pdf = false;
+    bool is_doc = false;
+
     auto dot = data.selectedName.find_last_of('.');
     if (dot != std::string::npos) {
         ext = data.selectedName.substr(dot);
         for (auto& c : ext) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     }
-    bool is_md_file_preview = MarkdownPreview::IsMarkdownFile(data.selectedName);
-    bool is_spreadsheet = SpreadsheetPreview::IsSpreadsheetFile(data.selectedName);
-    bool is_media = MediaPreview::IsMediaFile(data.selectedName);
-    bool is_audio = AudioPreview::IsAudioFile(data.selectedName);
-    bool is_pdf = PdfPreview::IsPdfFile(data.selectedName);
-    bool is_doc = DocPreview::IsDocFile(data.selectedName);
+    is_md_file_preview = MarkdownPreview::IsMarkdownFile(data.selectedName);
+    is_spreadsheet = SpreadsheetPreview::IsSpreadsheetFile(data.selectedName);
+    is_media = MediaPreview::IsMediaFile(data.selectedName);
+    is_audio = AudioPreview::IsAudioFile(data.selectedName);
+    is_pdf = PdfPreview::IsPdfFile(data.selectedName);
+    is_doc = DocPreview::IsDocFile(data.selectedName);
 
     std::string preview_label = " Preview";
     if (HexPreview::IsBinaryFile(data.selectedName) && HexPreview::IsEnabled()
@@ -218,37 +237,51 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
             std::string plugin_name = pm->FindPreviewer(mime, ext);
             if (!plugin_name.empty()) {
                 std::string fp = (fs::path(currentPath) / data.selectedName).string();
-                FTB::PluginContext pctx;
-                pctx.current_path = currentPath;
-                pctx.selected_file = data.selectedName;
-                pctx.selected_file_path = fp;
-                pctx.selected_is_dir = data.is_dir;
-                pctx.selected_size = data.file_size;
-                pctx.panel_width = preview_panel_width;
 
-                pm->ExecutePluginPreview(plugin_name, pctx, preview_panel_width);
+                static std::string s_plugin_cache_key;
+                static ftxui::Element s_plugin_cached_element;
+                std::string plugin_cache_key = plugin_name + ":" + fp;
 
-                FTB::PluginPreviewResult ppr;
-                if (pm->PollPluginPreview(plugin_name, ppr)) {
-                    if (ppr.completed) {
-                        if (!ppr.failed && !ppr.output.empty()) {
-                            info_elements.push_back(separator() | color(TC("main_border")));
-                            std::vector<ftxui::Element> lines;
-                            std::istringstream stream(ppr.output);
-                            std::string line;
-                            while (std::getline(stream, line)) {
-                                lines.push_back(FTB::AnsiStringToElement(line));
+                if (plugin_cache_key == s_plugin_cache_key) {
+                    info_elements.push_back(separator() | color(TC("main_border")));
+                    info_elements.push_back(s_plugin_cached_element);
+                    plugin_preview_handled = true;
+                } else {
+                    FTB::PluginContext pctx;
+                    pctx.current_path = currentPath;
+                    pctx.selected_file = data.selectedName;
+                    pctx.selected_file_path = fp;
+                    pctx.selected_is_dir = data.is_dir;
+                    pctx.selected_size = data.file_size;
+                    pctx.panel_width = preview_panel_width;
+
+                    pm->ExecutePluginPreview(plugin_name, pctx, preview_panel_width);
+
+                    FTB::PluginPreviewResult ppr;
+                    if (pm->PollPluginPreview(plugin_name, ppr)) {
+                        if (ppr.completed) {
+                            if (!ppr.failed && !ppr.output.empty()) {
+                                std::vector<ftxui::Element> lines;
+                                std::istringstream stream(ppr.output);
+                                std::string line;
+                                while (std::getline(stream, line)) {
+                                    lines.push_back(FTB::AnsiStringToElement(line));
+                                }
+                                s_plugin_cached_element = vbox(std::move(lines)) | ftxui::flex;
+                                s_plugin_cache_key = std::move(plugin_cache_key);
+
+                                info_elements.push_back(separator() | color(TC("main_border")));
+                                info_elements.push_back(s_plugin_cached_element);
+                                plugin_preview_handled = true;
                             }
-                            info_elements.push_back(vbox(std::move(lines)) | ftxui::flex);
+                        } else {
+                            info_elements.push_back(separator() | color(TC("main_border")));
+                            std::string loading_label = ppr.label.empty() ? plugin_name : ppr.label;
+                            info_elements.push_back(
+                                text("  " + loading_label + " preview (loading...)") | color(TC("dim")) | dim
+                            );
                             plugin_preview_handled = true;
                         }
-                    } else {
-                        info_elements.push_back(separator() | color(TC("main_border")));
-                        std::string loading_label = ppr.label.empty() ? plugin_name : ppr.label;
-                        info_elements.push_back(
-                            text("  " + loading_label + " preview (loading...)") | color(TC("dim")) | dim
-                        );
-                        plugin_preview_handled = true;
                     }
                 }
             }
@@ -267,13 +300,16 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
 
         info_elements.push_back(separator() | color(TC("main_border")));
         if (data.dir_contents.empty()) {
-            info_elements.push_back(text("  Loading...") | color(TC("dim")) | dim);
+            if (data.dir_sorted) {
+                info_elements.push_back(text("  (empty)") | color(TC("dim")) | dim);
+            } else {
+                info_elements.push_back(text("  Loading...") | color(TC("dim")) | dim);
+            }
         } else {
             int max_dir = cfg_preview.max_dir_entries;
             int show_count = (max_dir > 0)
                 ? std::min(static_cast<int>(data.dir_contents.size()), max_dir)
                 : static_cast<int>(data.dir_contents.size());
-            // Cap to panel height for large directories
             int panel_usable = std::max(5, term_dim.dimy - 20);
             show_count = std::min(show_count, panel_usable);
             for (int i = 0; i < show_count; ++i) {
@@ -552,6 +588,7 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
         }
     }
 
+    
     if (is_spreadsheet) {
         std::string fp = (fs::path(currentPath) / data.selectedName).string();
         bool xleak_used = false;

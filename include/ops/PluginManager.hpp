@@ -65,6 +65,7 @@ struct PluginPermissions {
     bool env_read = false;      // Read environment variables
     bool clipboard = false;     // Access clipboard
     bool subprocess = false;    // Run subprocesses
+    bool python_exec = false;   // Execute Python code via ftb.python.call
     int64_t max_exec_ms = 5000; // Max execution time per call
 
     static PluginPermissions FromJson(const nlohmann::json& j);
@@ -82,6 +83,7 @@ struct PluginMetadata {
     PluginType type = PluginType::Functional;
     PluginPermissions permissions;
     std::vector<std::string> keywords;  // For previewer/fetcher matching
+    std::vector<std::string> commands;  // Commands registered by this plugin
     std::string min_ftb_version;        // Minimum FTB version required
 
     static PluginMetadata FromJson(const nlohmann::json& j);
@@ -100,6 +102,9 @@ struct PluginContext {
     std::string selected_mime;          // MIME type (if known)
     nlohmann::json args;               // Arguments passed to the plugin
     int panel_width = 0;               // Preview panel width
+    std::string platform;              // OS platform: "linux", "macos", "windows", "wsl", "freebsd"
+    std::string distro_id;             // Linux distro ID (e.g. "ubuntu", "arch"), empty for non-Linux
+    std::string plugin_dir;            // Plugin directory path (for python.call resolution)
 };
 
 // ─── Plugin Result ───────────────────────────────────────────────────
@@ -174,16 +179,15 @@ private:
     PluginMetadata metadata_;
     PluginState state_ = PluginState::Unloaded;
     std::string last_error_;
-    std::string compiled_code_;          // Compiled JS code
+    std::string compiled_code_;
 
-    // QuickJS context (opaque pointer to avoid header dependency)
     void* js_runtime_ = nullptr;
     void* js_context_ = nullptr;
 
-    bool CompileTypeScript();            // TS -> JS compilation
-    bool CreateSandbox();                // Create QuickJS sandboxed context
+    bool CompileTypeScript();
+    bool CreateSandbox();
     void DestroySandbox();
-    bool InjectAPI(const PluginContext& ctx);  // Inject FTB API into sandbox
+    bool InjectAPI(const PluginContext& ctx);
     PluginResult RunInSandbox(const std::string& code, const std::string& fn_name, const PluginContext& ctx);
 };
 
@@ -198,7 +202,7 @@ public:
     void Shutdown();
 
     // Discovery
-    void ScanPlugins();                  // Scan plugin directory
+    void ScanPlugins();
     std::vector<std::string> GetAvailablePlugins() const;
     const PluginMetadata* GetPluginMetadata(const std::string& name) const;
 
@@ -212,6 +216,11 @@ public:
     PluginResult ExecutePluginFunction(const std::string& name,
                                         const std::string& fn,
                                         const PluginContext& ctx);
+    PluginResult ExecutePluginCommand(const std::string& plugin_name,
+                                       const PluginContext& ctx);
+
+    // Plugin command completion
+    std::vector<std::string> CompletePluginCommand(const std::string& input) const;
 
     // Previewer matching
     std::string FindPreviewer(const std::string& mime_type,
@@ -222,7 +231,7 @@ public:
                                const PluginContext& ctx,
                                int panel_width);
     bool PollPluginPreview(const std::string& name,
-                            PluginPreviewResult& out);
+                             PluginPreviewResult& out);
 
     // Fetcher matching
     std::string FindFetcher(const std::string& mime_type) const;
@@ -241,10 +250,12 @@ public:
     nlohmann::json GetPluginStatus(const std::string& name) const;
 
     // Status bar: async background refresh
-    //   - GetStatusBarContent returns cached segments immediately (never blocks)
-    //   - UpdateContextSnapshot stores current context for background thread
     std::vector<StatusBarSegment> GetStatusBarContent(const PluginContext& ctx);
     void UpdateContextSnapshot(const PluginContext& ctx);
+
+    // Platform detection
+    static std::string DetectPlatform();
+    static std::string DetectDistroId();
 
     // Background refresh lifecycle
     void StartBackgroundRefresh(std::function<void()> on_updated);
@@ -254,41 +265,38 @@ private:
     PluginManager() = default;
     ~PluginManager() = default;
 
-    // Background worker: periodically executes StatusBar plugins
     void BackgroundRefreshWorker();
     std::vector<StatusBarSegment> ExecuteStatusBarPlugins(const PluginContext& ctx);
 
     std::string config_dir_;
     std::string plugins_dir_;
     std::map<std::string, std::unique_ptr<PluginInstance>> plugins_;
-    std::map<std::string, bool> enabled_map_;  // name -> enabled
+    std::map<std::string, bool> enabled_map_;
     mutable std::mutex plugins_mutex_;
     bool initialized_ = false;
 
-    // Cached status bar segments (read by UI thread, written by background thread)
     std::vector<StatusBarSegment> statusbar_cached_segments_;
     mutable std::mutex statusbar_mutex_;
 
-    // Context snapshot for background thread
     PluginContext statusbar_context_snapshot_;
     std::mutex ctx_mutex_;
 
-    // Background thread
     std::thread background_thread_;
     std::atomic<bool> background_running_{false};
     std::function<void()> on_statusbar_updated_;
     std::condition_variable shutdown_cv_;
     std::mutex shutdown_mutex_;
 
-    // Polling interval for background refresh
     static constexpr int STATUSBAR_REFRESH_INTERVAL_MS = 2000;
+
+    std::string platform_;
+    std::string distro_id_;
 
     void SaveEnabledState();
     void LoadEnabledState();
     std::string ResolvePluginPath(const std::string& name) const;
     bool ValidatePlugin(const std::string& dir) const;
 
-    // Previewer helpers
     PreviewerDefinition LoadPreviewerDefinition(const std::string& name, const PluginContext& ctx = {});
     void CancelPluginPreview();
 

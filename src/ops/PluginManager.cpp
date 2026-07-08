@@ -15,6 +15,61 @@ namespace fs = std::filesystem;
 
 namespace FTB {
 
+// ─── Platform Detection ───────────────────────────────────────────────
+
+std::string PluginManager::DetectPlatform() {
+#if defined(_WIN32)
+    return "windows";
+#elif defined(__APPLE__)
+    return "macos";
+#elif defined(__linux__)
+    // Check for WSL by reading /proc/version
+    std::ifstream ifs("/proc/version");
+    if (ifs) {
+        std::string content((std::istreambuf_iterator<char>(ifs)),
+                             std::istreambuf_iterator<char>());
+        if (content.find("Microsoft") != std::string::npos ||
+            content.find("microsoft") != std::string::npos ||
+            content.find("WSL") != std::string::npos) {
+            return "wsl";
+        }
+    }
+    return "linux";
+#elif defined(__FreeBSD__)
+    return "freebsd";
+#elif defined(__OpenBSD__)
+    return "openbsd";
+#elif defined(__NetBSD__)
+    return "netbsd";
+#else
+    return "unknown";
+#endif
+}
+
+std::string PluginManager::DetectDistroId() {
+#if defined(__linux__)
+    std::ifstream ifs("/etc/os-release");
+    if (!ifs) {
+        // Fallback: /usr/lib/os-release
+        ifs.open("/usr/lib/os-release");
+    }
+    if (ifs) {
+        std::string line;
+        while (std::getline(ifs, line)) {
+            if (line.rfind("ID=", 0) == 0) {
+                std::string id = line.substr(3);
+                // Remove surrounding quotes if present
+                if (id.size() >= 2 && id.front() == '"' && id.back() == '"') {
+                    id = id.substr(1, id.size() - 2);
+                }
+                return id;
+            }
+        }
+    }
+#endif
+    return "";
+}
+
 // ─── PluginPermissions ───────────────────────────────────────────────
 
 PluginPermissions PluginPermissions::FromJson(const nlohmann::json& j) {
@@ -26,6 +81,7 @@ PluginPermissions PluginPermissions::FromJson(const nlohmann::json& j) {
     if (j.contains("env_read"))   p.env_read = j["env_read"].get<bool>();
     if (j.contains("clipboard"))  p.clipboard = j["clipboard"].get<bool>();
     if (j.contains("subprocess")) p.subprocess = j["subprocess"].get<bool>();
+    if (j.contains("python_exec")) p.python_exec = j["python_exec"].get<bool>();
     if (j.contains("max_exec_ms")) p.max_exec_ms = j["max_exec_ms"].get<int64_t>();
     return p;
 }
@@ -34,7 +90,7 @@ nlohmann::json PluginPermissions::ToJson() const {
     return nlohmann::json{
         {"fs_read", fs_read}, {"fs_write", fs_write}, {"fs_list", fs_list},
         {"net_fetch", net_fetch}, {"env_read", env_read}, {"clipboard", clipboard},
-        {"subprocess", subprocess}, {"max_exec_ms", max_exec_ms}
+        {"subprocess", subprocess}, {"python_exec", python_exec}, {"max_exec_ms", max_exec_ms}
     };
 }
 
@@ -65,6 +121,11 @@ PluginMetadata PluginMetadata::FromJson(const nlohmann::json& j) {
             m.keywords.push_back(kw.get<std::string>());
     }
 
+    if (j.contains("commands") && j["commands"].is_array()) {
+        for (const auto& c : j["commands"])
+            m.commands.push_back(c.get<std::string>());
+    }
+
     if (j.contains("min_ftb_version"))
         m.min_ftb_version = j["min_ftb_version"].get<std::string>();
 
@@ -81,6 +142,7 @@ nlohmann::json PluginMetadata::ToJson() const {
         {"permissions", permissions.ToJson()},
     };
     if (!keywords.empty()) j["keywords"] = keywords;
+    if (!commands.empty()) j["commands"] = commands;
     if (!min_ftb_version.empty()) j["min_ftb_version"] = min_ftb_version;
     return j;
 }
@@ -159,8 +221,11 @@ PluginResult PluginInstance::ExecuteFunction(const std::string& fn, const Plugin
 
     state_ = PluginState::Running;
 
-    // Execute in sandbox with context
-    PluginResult result = RunInSandbox(compiled_code_, fn, ctx);
+    // Set plugin_dir for ftb.python.call() resolution
+    PluginContext ctx_with_dir = ctx;
+    ctx_with_dir.plugin_dir = plugin_dir_;
+
+    PluginResult result = RunInSandbox(compiled_code_, fn, ctx_with_dir);
 
     if (result.success) {
         state_ = PluginState::Loaded;
@@ -178,9 +243,7 @@ bool PluginInstance::Reload() {
 }
 
 bool PluginInstance::CompileTypeScript() {
-
     // Phase 1: Remove `interface X { ... }` blocks with a brace-depth counter
-    // to handle nested braces (e.g. interface with fs: { ... } properties)
     {
         std::string result;
         std::istringstream stream(compiled_code_);
@@ -191,7 +254,6 @@ bool PluginInstance::CompileTypeScript() {
             std::string trimmed = line;
             trimmed.erase(0, trimmed.find_first_not_of(" \t\r\n"));
 
-            // Check if this line starts an interface declaration
             if (interface_depth == 0 && trimmed.find("interface ") == 0) {
                 interface_depth = 0;
                 for (char c : line) {
@@ -215,35 +277,26 @@ bool PluginInstance::CompileTypeScript() {
         compiled_code_ = result;
     }
 
-
     // Phase 2: Apply regex replacements for other TypeScript constructs
     static const std::vector<std::pair<std::string, std::string>> replacements = {
-        // Remove `type X = ...;` declarations
         {"type\\s+\\w+\\s*(<[^>]*>)?\\s*=\\s*[^;]+;", ""},
-        // Remove type imports: `import type { X } from ...`
         {"import\\s+type\\s+\\{[^}]*\\}\\s+from\\s+['\"][^'\"]*['\"];?", ""},
-        // Remove `as Type` assertions
         {"\\s+as\\s+[A-Z]\\w*(<[^>]*>)?", ""},
-        // Remove return type annotations before => or {
         {"\\)\\s*:\\s*[A-Za-z_]\\w*(?:\\[\\])?\\s*=>", ") =>"},
         {"\\)\\s*:\\s*[A-Za-z_]\\w*(?:\\[\\])?\\s*\\{", ") {"},
-        // Remove return type annotations before => or { (with array/union types)
         {"\\)\\s*:\\s*(?:[A-Za-z_]\\w*(?:\\[\\])?(?:\\s*\\|\\s*[A-Za-z_]\\w*(?:\\[\\])?)*)\\s*=>", ") =>"},
         {"\\)\\s*:\\s*(?:[A-Za-z_]\\w*(?:\\[\\])?(?:\\s*\\|\\s*[A-Za-z_]\\w*(?:\\[\\])?)*)\\s*\\{", ") {"},
-        // Remove param type annotations in arrow functions: `(x: Type) =>`
         {"\\((\\w+):\\s*[A-Za-z_]\\w*(?:\\[\\])?\\s*\\)", "($1)"},
-        // Remove first param in multi-param functions: `(x: Type, y: Type)`
         {"\\(\\s*(\\w+):\\s*[A-Za-z_]\\w*(?:\\[\\])?,\\s*", "($1, "},
-        // Remove middle params: `, x: Type` - match uppercase types + known primitives; avoid matching object literal properties
         {",\\s*(\\w+):\\s*(?:[A-Z]\\w*|string|number|boolean|bigint|symbol)(?:\\[\\])?(?:\\s*=\\s*[^,)]+)?", ",$1"},
-        // Remove variable type annotations: `const x: Type =`
-        {"(const|let|var)\\s+(\\w+):\\s*[A-Za-z_]\\w*(?:\\[\\])?\\s*=", "$1 $2 ="},
+        {"(let|var)\\s+(\\w+):\\s*[A-Za-z_]\\w*(?:<[^>]*>)?(?:\\[\\])?\\s*;", "$1 $2;"},
+        {"(const|let|var)\\s+(\\w+):\\s*[A-Za-z_]\\w*(?:<[^>]*>)?(?:\\[\\])?\\s*=", "$1 $2 ="},
     };
 
     for (const auto& [pattern, replacement] : replacements) {
         try {
             compiled_code_ = std::regex_replace(compiled_code_, std::regex(pattern), replacement);
-        } catch (const std::regex_error& e) {
+        } catch (const std::regex_error&) {
         }
     }
 
@@ -293,16 +346,6 @@ bool PluginInstance::InjectAPI(const PluginContext& /*ctx*/) {
 }
 
 PluginResult PluginInstance::RunInSandbox(const std::string& code, const std::string& fn_name, const PluginContext& ctx) {
-    // Execution strategy:
-    // For security, plugins run in an isolated subprocess using QuickJS
-    // standalone interpreter. This provides:
-    //   - Process-level isolation
-    //   - Memory limits via OS
-    //   - Execution timeout via kill()
-    //   - No access to FTB's memory space
-    //
-    // Communication is via JSON on stdin/stdout
-
     PluginResult result;
 
     // Build the execution wrapper with QuickJS built-in modules for subprocess mode
@@ -311,6 +354,7 @@ PluginResult PluginInstance::RunInSandbox(const std::string& code, const std::st
     'use strict';
     // ---- FTB Plugin Runtime (subprocess mode with QuickJS-ng) ----
     var __ftb_tmpdir = '/tmp/ftb_plugin_' + os.getpid();
+    var __ftb_plugin_dir = )" + nlohmann::json(plugin_dir_).dump() + R"(;
 
     function __ftb_result(data) {
         std.out.puts(data);
@@ -376,6 +420,53 @@ PluginResult PluginInstance::RunInSandbox(const std::string& code, const std::st
             case 'statusBar.set': {
                 return '';
             }
+            case 'python.call': {
+                var pyFile = String(args[0] || '');
+                var pyFunc = String(args[1] || '');
+                var pyArgs = args[2] || {};
+                var plugDir = __ftb_plugin_dir;
+                var outfile = __ftb_tmpdir + '_pyout.json';
+                var argsfile = __ftb_tmpdir + '_pyargs.json';
+                var wrapfile = __ftb_tmpdir + '_pywrap.py';
+
+                // Write args as JSON to temp file
+                os.exec(['/bin/sh', '-c',
+                    "printf '%s' '" + JSON.stringify(pyArgs).replace(/'/g,"'\\''") + "' > '" + argsfile + "'"]);
+
+                // Build Python wrapper script
+                var modName = pyFile.replace(/\.py$/g,'').replace(/\//g,'.');
+                var pyScript = "import sys,json\\n";
+                pyScript += "sys.path.insert(0,'" + plugDir.replace(/'/g,"'\\''") + "')\\n";
+                pyScript += "try:\\n";
+                pyScript += "    mod = __import__('" + modName.replace(/'/g,"'\\''") + "')\\n";
+                pyScript += "    with open('" + argsfile.replace(/'/g,"'\\''") + "') as f: a = json.load(f)\\n";
+                pyScript += "    r = mod." + pyFunc + "(**a)\\n";
+                pyScript += "    print(json.dumps({'success':True,'data':r}))\\n";
+                pyScript += "except Exception as e:\\n";
+                pyScript += "    print(json.dumps({'success':False,'error':str(e)}))\\n";
+
+                // Write wrapper file
+                os.exec(['/bin/sh', '-c',
+                    "printf '%s' '" + pyScript.replace(/'/g,"'\\''") + "' > '" + wrapfile + "'"]);
+
+                // Execute Python
+                os.exec(['/bin/sh', '-c', "python3 -u '" + wrapfile + "' > '" + outfile + "' 2>&1"]);
+
+                // Read result
+                try {
+                    var output = std.loadFile(outfile);
+                    if (output) {
+                        output = output.trim();
+                        if (output.length > 0) return JSON.parse(output);
+                    }
+                } catch(e) {}
+                finally {
+                    try { os.remove(argsfile); } catch(e) {}
+                    try { os.remove(wrapfile); } catch(e) {}
+                    try { os.remove(outfile); } catch(e) {}
+                }
+                return {success: false, error: 'Python call failed'};
+            }
             default: {
                 throw new Error('Unknown API method: ' + method);
             }
@@ -391,7 +482,10 @@ PluginResult PluginInstance::RunInSandbox(const std::string& code, const std::st
             {"selected_is_dir", ctx.selected_is_dir},
             {"selected_size", ctx.selected_size},
             {"selected_mime", ctx.selected_mime},
-            {"args", ctx.args}
+            {"args", ctx.args},
+            {"platform", ctx.platform},
+            {"distro_id", ctx.distro_id},
+            {"plugin_dir", ctx.plugin_dir}
         }).dump() + R"(,
         fs: {
             readFile: function(path) { return __ftb_call('fs.readFile', [path]); },
@@ -411,6 +505,9 @@ PluginResult PluginInstance::RunInSandbox(const std::string& code, const std::st
         },
         statusBar: {
             set: function(segments) { return __ftb_call('statusBar.set', [segments]); },
+        },
+        python: {
+            call: function(file, func, args) { return __ftb_call('python.call', [file, func, args || {}]); },
         },
         log: function(msg) { __ftb_call('log', [msg]); },
         exec: function(cmd, args) { return __ftb_call('exec', [cmd, args || []]); },
@@ -450,7 +547,8 @@ PluginResult PluginInstance::RunInSandbox(const std::string& code, const std::st
         // Execute with timeout (--std makes std/os/bjson globals in QuickJS-ng)
         // stderr goes to separate file to keep stdout clean for JSON parsing
         std::string err_path = tmp_path + ".err";
-        std::string cmd = "timeout " + std::to_string(metadata_.permissions.max_exec_ms / 1000) +
+        int timeout_secs = std::max<int>(metadata_.permissions.max_exec_ms / 1000, 1);
+        std::string cmd = "timeout " + std::to_string(timeout_secs) +
                          " " + qjs_path + " --std " + tmp_path + " 2>" + err_path;
 
         FILE* pipe = popen(cmd.c_str(), "r");
@@ -533,6 +631,10 @@ void PluginManager::Initialize(const std::string& config_dir) {
         fs::create_directories(plugins_dir_);
     }
 
+    // Detect platform once at startup
+    platform_ = DetectPlatform();
+    distro_id_ = DetectDistroId();
+
     // Scan for plugins
     ScanPlugins();
 
@@ -559,7 +661,6 @@ void PluginManager::ScanPlugins() {
         return;
     }
 
-    int count = 0;
     for (const auto& entry : fs::directory_iterator(plugins_dir_)) {
         if (!entry.is_directory()) continue;
 
@@ -589,12 +690,9 @@ void PluginManager::ScanPlugins() {
                         if (enabled_map_.find(plugin_name) == enabled_map_.end()) {
                             enabled_map_[plugin_name] = true;
                         }
-                        count++;
-                    } catch (const std::exception& e) {
+                    } catch (const std::exception&) {
                     }
-                } else {
                 }
-            } else {
             }
         }
     }
@@ -671,31 +769,35 @@ PluginResult PluginManager::ExecutePlugin(const std::string& name, const PluginC
         }
     }
 
-    auto result = it->second->Execute(ctx);
-    return result;
+    return it->second->Execute(ctx);
 }
 
 PluginResult PluginManager::ExecutePluginFunction(const std::string& name,
                                                     const std::string& fn,
                                                     const PluginContext& ctx) {
-    std::lock_guard<std::mutex> lock(plugins_mutex_);
+    PluginInstance* instance = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(plugins_mutex_);
 
-    auto it = plugins_.find(name);
-    if (it == plugins_.end()) {
-        return {false, "Plugin not found: " + name, {}, ""};
-    }
-
-    if (!enabled_map_[name]) {
-        return {false, "Plugin is disabled: " + name, {}, ""};
-    }
-
-    if (it->second->GetState() != PluginState::Loaded) {
-        if (!it->second->Load()) {
-            return {false, "Failed to load plugin: " + it->second->GetLastError(), {}, ""};
+        auto it = plugins_.find(name);
+        if (it == plugins_.end()) {
+            return {false, "Plugin not found: " + name, {}, ""};
         }
+
+        if (!enabled_map_[name]) {
+            return {false, "Plugin is disabled: " + name, {}, ""};
+        }
+
+        if (it->second->GetState() != PluginState::Loaded) {
+            if (!it->second->Load()) {
+                return {false, "Failed to load plugin: " + it->second->GetLastError(), {}, ""};
+            }
+        }
+
+        instance = it->second.get();
     }
 
-    return it->second->ExecuteFunction(fn, ctx);
+    return instance->ExecuteFunction(fn, ctx);
 }
 
 std::string PluginManager::FindPreviewer(const std::string& mime_type,
@@ -826,14 +928,93 @@ bool PluginManager::ValidatePlugin(const std::string& dir) const {
            fs::exists(fs::path(dir) / "package.json");
 }
 
+PluginResult PluginManager::ExecutePluginCommand(const std::string& plugin_name,
+                                                   const PluginContext& ctx) {
+    PluginContext cmd_ctx = ctx;
+    cmd_ctx.args = nlohmann::json::object();
+    if (!ctx.args.is_null() && ctx.args.is_string()) {
+        cmd_ctx.args["command"] = ctx.args.get<std::string>();
+    }
+    auto result = ExecutePlugin(plugin_name, cmd_ctx);
+
+    // Invalidate previewer definitions cache for this plugin
+    if (result.success) {
+        std::string prefix = plugin_name + "|";
+        for (auto it = previewer_definitions_.begin(); it != previewer_definitions_.end(); ) {
+            if (it->first.size() >= prefix.size() &&
+                it->first.substr(0, prefix.size()) == prefix) {
+                it = previewer_definitions_.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+
+    return result;
+}
+
+std::vector<std::string> PluginManager::CompletePluginCommand(const std::string& input) const {
+    std::lock_guard<std::mutex> lock(plugins_mutex_);
+
+    auto sp = input.find(' ');
+    if (sp == std::string::npos) {
+        // Completing plugin name
+        std::vector<std::string> matches;
+        std::string lower = input;
+        std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+        for (const auto& [name, _] : plugins_) {
+            std::string name_lower = name;
+            std::transform(name_lower.begin(), name_lower.end(), name_lower.begin(), ::tolower);
+            if (name_lower.size() >= lower.size() &&
+                name_lower.substr(0, lower.size()) == lower) {
+                matches.push_back(name);
+            }
+        }
+        return matches;
+    }
+
+    // Completing plugin command after plugin name
+    std::string plugin_name = input.substr(0, sp);
+    std::string cmd_partial = input.substr(sp + 1);
+    std::string cmd_lower = cmd_partial;
+    std::transform(cmd_lower.begin(), cmd_lower.end(), cmd_lower.begin(), ::tolower);
+
+    auto it = plugins_.find(plugin_name);
+    if (it == plugins_.end()) {
+        // Try case-insensitive match
+        for (const auto& [name, plugin] : plugins_) {
+            std::string name_lower = name;
+            std::transform(name_lower.begin(), name_lower.end(), name_lower.begin(), ::tolower);
+            if (name_lower == plugin_name) {
+                it = plugins_.find(name);
+                break;
+            }
+        }
+    }
+
+    if (it == plugins_.end()) return {};
+
+    std::vector<std::string> matches;
+    for (const auto& cmd : it->second->GetMetadata().commands) {
+        std::string cmd_lc = cmd;
+        std::transform(cmd_lc.begin(), cmd_lc.end(), cmd_lc.begin(), ::tolower);
+        if (cmd_lc.size() >= cmd_lower.size() &&
+            cmd_lc.substr(0, cmd_lower.size()) == cmd_lower) {
+            matches.push_back(plugin_name + " " + cmd);
+        }
+    }
+    return matches;
+}
+
 // ─── Previewer: Load Definition ───────────────────────────────────────
 // Runs the plugin's entry() once (via qjs) to extract the command template.
 // The definition is cached for subsequent previews.
 
 PreviewerDefinition PluginManager::LoadPreviewerDefinition(const std::string& name, const PluginContext& ctx) {
+    std::string cache_key = name + "|" + fs::path(ctx.selected_file_path).extension().string();
     {
         std::lock_guard<std::mutex> lock(plugins_mutex_);
-        auto it = previewer_definitions_.find(name);
+        auto it = previewer_definitions_.find(cache_key);
         if (it != previewer_definitions_.end() && it->second.loaded) {
             return it->second;
         }
@@ -870,7 +1051,7 @@ PreviewerDefinition PluginManager::LoadPreviewerDefinition(const std::string& na
 
     if (def.loaded) {
         std::lock_guard<std::mutex> lock(plugins_mutex_);
-        previewer_definitions_[name] = def;
+        previewer_definitions_[cache_key] = def;
     }
 
     return def;
@@ -912,11 +1093,21 @@ void PluginManager::ExecutePluginPreview(const std::string& name,
 
     CancelPluginPreview();
 
+    auto ShellQuote = [](const std::string& val) -> std::string {
+        std::string result = "'";
+        for (char c : val) {
+            if (c == '\'') result += "'\\''";
+            else result += c;
+        }
+        result += '\'';
+        return result;
+    };
+
     auto Expand = [&](std::string s) -> std::string {
         auto r = [&](const std::string& from, const std::string& to) -> bool {
             size_t p;
             if ((p = s.find(from)) != std::string::npos) {
-                s.replace(p, from.size(), to);
+                s.replace(p, from.size(), ShellQuote(to));
                 return true;
             }
             return false;
@@ -982,7 +1173,8 @@ void PluginManager::ExecutePluginPreview(const std::string& name,
             result.append(buf, n);
         ::close(pipefd[0]);
 
-        ::waitpid(pid, nullptr, 0);
+        int status;
+        ::waitpid(pid, &status, 0);
 
         {
             std::lock_guard<std::mutex> lock(preview_mutex_);
@@ -992,13 +1184,14 @@ void PluginManager::ExecutePluginPreview(const std::string& name,
             preview_entry_.completed = true;
             preview_entry_.child_pid = 0;
         }
+
     }).detach();
 }
 
 // ─── Previewer: Poll Result ───────────────────────────────────────────
 
 bool PluginManager::PollPluginPreview(const std::string& name,
-                                       PluginPreviewResult& out) {
+                                        PluginPreviewResult& out) {
     std::lock_guard<std::mutex> lock(preview_mutex_);
     if (preview_entry_.plugin_name != name || !preview_entry_.loaded) {
         return false;
@@ -1033,7 +1226,9 @@ void PluginManager::UpdateContextSnapshot(const PluginContext& ctx) {
 // ─── Background Refresh ──────────────────────────────────────────────
 
 void PluginManager::StartBackgroundRefresh(std::function<void()> on_updated) {
-    if (background_running_.exchange(true)) return;
+    if (background_running_.exchange(true)) {
+        return;
+    }
 
     on_statusbar_updated_ = std::move(on_updated);
     background_thread_ = std::thread(&PluginManager::BackgroundRefreshWorker, this);
@@ -1058,7 +1253,6 @@ void PluginManager::StopBackgroundRefresh() {
 
 void PluginManager::BackgroundRefreshWorker() {
     while (background_running_) {
-        // Wait for interval or shutdown signal
         {
             std::unique_lock<std::mutex> lock(shutdown_mutex_);
             shutdown_cv_.wait_for(lock,
@@ -1067,24 +1261,23 @@ void PluginManager::BackgroundRefreshWorker() {
         }
         if (!background_running_) break;
 
-        // Snapshot the current context
         PluginContext ctx;
         {
             std::lock_guard<std::mutex> lock(ctx_mutex_);
             ctx = statusbar_context_snapshot_;
         }
+        ctx.platform = platform_;
+        ctx.distro_id = distro_id_;
 
         if (ctx.current_path.empty()) continue;
 
         auto segments = ExecuteStatusBarPlugins(ctx);
 
-        // Update the cache
         {
             std::lock_guard<std::mutex> lock(statusbar_mutex_);
             statusbar_cached_segments_ = std::move(segments);
         }
 
-        // Notify UI thread to re-render
         if (on_statusbar_updated_) {
             on_statusbar_updated_();
         }
@@ -1093,20 +1286,27 @@ void PluginManager::BackgroundRefreshWorker() {
 
 std::vector<StatusBarSegment> PluginManager::ExecuteStatusBarPlugins(const PluginContext& ctx) {
     std::vector<StatusBarSegment> all_segments;
+    std::vector<PluginInstance*> instances;
 
-    std::lock_guard<std::mutex> lock(plugins_mutex_);
+    {
+        std::lock_guard<std::mutex> lock(plugins_mutex_);
 
-    for (auto& [name, plugin] : plugins_) {
-        if (plugin->GetMetadata().type != PluginType::StatusBar) continue;
-        if (!enabled_map_.count(name) || !enabled_map_.at(name)) continue;
+        for (auto& [name, plugin] : plugins_) {
+            if (plugin->GetMetadata().type != PluginType::StatusBar) continue;
+            if (!enabled_map_.count(name) || !enabled_map_.at(name)) continue;
 
-        // Auto-load if needed
-        if (plugin->GetState() != PluginState::Loaded) {
-            if (!plugin->Load()) continue;
+            if (plugin->GetState() != PluginState::Loaded) {
+                if (!plugin->Load()) {
+                    continue;
+                }
+            }
+
+            instances.push_back(plugin.get());
         }
+    }
 
-        // Execute the plugin's entry function
-        PluginResult result = plugin->Execute(ctx);
+    for (auto* instance : instances) {
+        PluginResult result = instance->Execute(ctx);
 
         if (result.success && result.data.is_array()) {
             for (const auto& seg : result.data) {
