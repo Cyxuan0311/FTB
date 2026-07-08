@@ -1,5 +1,6 @@
 #include "config/KeyBindings.hpp"
 #include <algorithm>
+#include <fstream>
 #include <iostream>
 
 namespace FTB {
@@ -236,6 +237,35 @@ bool KeyBindings::HandlePrefixInput(const ftxui::Event& event) {
         return true;
     }
 
+    if (event == ftxui::Event::ArrowUp) {
+        if (!command_history_.empty()) {
+            if (history_pos_ == -1) {
+                history_saved_input_ = command_input_;
+                history_pos_ = static_cast<int>(command_history_.size()) - 1;
+            } else if (history_pos_ > 0) {
+                history_pos_--;
+            }
+            command_input_ = command_history_[history_pos_];
+            command_cursor_ = command_input_.size();
+        }
+        return true;
+    }
+
+    if (event == ftxui::Event::ArrowDown) {
+        if (history_pos_ != -1) {
+            history_pos_++;
+            if (history_pos_ >= static_cast<int>(command_history_.size())) {
+                history_pos_ = -1;
+                command_input_ = history_saved_input_;
+                history_saved_input_.clear();
+            } else {
+                command_input_ = command_history_[history_pos_];
+            }
+            command_cursor_ = command_input_.size();
+        }
+        return true;
+    }
+
     if (event == ftxui::Event::Home) {
         command_cursor_ = 0;
         return true;
@@ -395,6 +425,16 @@ void KeyBindings::EnterPrefixMode() {
     command_cursor_ = 0;
     current_command_ = PanelCommand::None;
     command_payload_.clear();
+
+    // Reset history browsing
+    history_pos_ = -1;
+    history_saved_input_.clear();
+
+    // Lazy-load history file on first use
+    if (!history_loaded_) {
+        LoadHistory();
+        history_loaded_ = true;
+    }
 }
 
 void KeyBindings::ExitPrefixMode() {
@@ -405,6 +445,48 @@ void KeyBindings::ExitPrefixMode() {
     command_payload_.clear();
 }
 
+void KeyBindings::SaveToHistory(const std::string& cmd) {
+    if (cmd.empty()) return;
+    // Avoid consecutive duplicates
+    if (!command_history_.empty() && command_history_.back() == cmd) return;
+    command_history_.push_back(cmd);
+    if (command_history_.size() > kMaxHistory) {
+        command_history_.erase(command_history_.begin());
+    }
+    SaveHistory();
+}
+
+void KeyBindings::LoadHistory() {
+    if (history_path_.empty()) {
+        const char* home = std::getenv("HOME");
+        if (!home) return;
+        history_path_ = std::string(home) + "/.config/ftb/command_history";
+    }
+    std::ifstream ifs(history_path_);
+    if (!ifs.is_open()) return;
+    command_history_.clear();
+    std::string line;
+    while (std::getline(ifs, line)) {
+        if (!line.empty()) {
+            command_history_.push_back(line);
+        }
+    }
+    // Trim to max size
+    if (command_history_.size() > kMaxHistory) {
+        command_history_.erase(command_history_.begin(),
+                               command_history_.begin() + (command_history_.size() - kMaxHistory));
+    }
+}
+
+void KeyBindings::SaveHistory() {
+    if (history_path_.empty()) return;
+    std::ofstream ofs(history_path_);
+    if (!ofs.is_open()) return;
+    for (const auto& cmd : command_history_) {
+        ofs << cmd << "\n";
+    }
+}
+
 KeyBindings::PanelCommand KeyBindings::ExecuteCommand() {
     std::string lower_input = command_input_;
     std::transform(lower_input.begin(), lower_input.end(), lower_input.begin(), ::tolower);
@@ -413,6 +495,7 @@ KeyBindings::PanelCommand KeyBindings::ExecuteCommand() {
     if (it != command_map_.end()) {
         current_command_ = it->second;
         command_payload_.clear();
+        SaveToHistory(command_input_);
         return current_command_;
     }
 
@@ -423,6 +506,7 @@ KeyBindings::PanelCommand KeyBindings::ExecuteCommand() {
         if (it != command_map_.end()) {
             current_command_ = it->second;
             command_payload_ = command_input_.substr(space_pos + 1);
+            SaveToHistory(command_input_);
             return current_command_;
         }
     }

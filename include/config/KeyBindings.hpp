@@ -110,6 +110,9 @@ public:
     const std::string& GetPrefixKeyName() const { return prefix_key_name_; }
     std::vector<PrefixKeyInfo> GetAvailablePrefixKeys() const;
 
+    void LoadHistory();
+    void SaveHistory();
+
 private:
     KeyBindings() = default;
 
@@ -125,6 +128,16 @@ private:
     std::string prefix_key_name_ = "CtrlB";
 
     ExternalCompleter plugin_completer_;
+
+    // Command history
+    std::vector<std::string> command_history_;
+    int history_pos_ = -1;
+    std::string history_saved_input_;
+    static constexpr size_t kMaxHistory = 100;
+    std::string history_path_;
+    bool history_loaded_ = false;
+
+    void SaveToHistory(const std::string& cmd);
 
     static const std::map<std::string, PanelCommand> command_map_;
     static std::map<std::string, PanelCommand> InitCommandMap();
