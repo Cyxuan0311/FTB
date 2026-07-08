@@ -2793,6 +2793,430 @@ void ThemeManager::InitializePredefinedThemes() {
     noctis_theme.colors_syntax.decorator = "#e66565";
     noctis_theme.colors_syntax.line_number = "#262d39";
     predefined_themes_["noctis"] = noctis_theme;
+
+    // ---- sonokai (VSCode-inspired, warm vibrant) ----
+    FTBConfig sonokai_theme;
+    sonokai_theme.colors_main.background = "#2c2e34";
+    sonokai_theme.colors_main.foreground = "#e2e0d4";
+    sonokai_theme.colors_main.border = "#3c3e44";
+    sonokai_theme.colors_main.selection_bg = "#4a4c54";
+    sonokai_theme.colors_main.selection_fg = "#e2e0d4";
+
+    sonokai_theme.colors_files.directory = "#76cce0";
+    sonokai_theme.colors_files.file = "#e2e0d4";
+    sonokai_theme.colors_files.executable = "#f39660";
+    sonokai_theme.colors_files.link = "#f9e2af";
+    sonokai_theme.colors_files.hidden = "#7f8490";
+    sonokai_theme.colors_files.system = "#fc5b7b";
+
+    sonokai_theme.colors_status.background = "#363840";
+    sonokai_theme.colors_status.foreground = "#e2e0d4";
+    sonokai_theme.colors_status.border = "#3c3e44";
+
+    sonokai_theme.colors_search.background = "#2c2e34";
+    sonokai_theme.colors_search.foreground = "#e2e0d4";
+    sonokai_theme.colors_search.border = "#76cce0";
+
+    sonokai_theme.colors_dialog.background = "#2c2e34";
+    sonokai_theme.colors_dialog.foreground = "#e2e0d4";
+    sonokai_theme.colors_dialog.border = "#76cce0";
+
+    sonokai_theme.colors_syntax.keyword = "#fc5b7b";
+    sonokai_theme.colors_syntax.string = "#9ed072";
+    sonokai_theme.colors_syntax.comment = "#7f8490";
+    sonokai_theme.colors_syntax.number = "#f39660";
+    sonokai_theme.colors_syntax.function = "#76cce0";
+    sonokai_theme.colors_syntax.type = "#f9e2af";
+    sonokai_theme.colors_syntax.operator_ = "#89dceb";
+    sonokai_theme.colors_syntax.preprocessor = "#fc5b7b";
+    sonokai_theme.colors_syntax.identifier = "#e2e0d4";
+    sonokai_theme.colors_syntax.punctuation = "#7f8490";
+    sonokai_theme.colors_syntax.property = "#89dceb";
+    sonokai_theme.colors_syntax.tag = "#fc5b7b";
+    sonokai_theme.colors_syntax.attribute = "#f9e2af";
+    sonokai_theme.colors_syntax.regex = "#9ed072";
+    sonokai_theme.colors_syntax.decorator = "#f39660";
+    sonokai_theme.colors_syntax.line_number = "#4a4c54";
+
+    sonokai_theme.style.show_icons = true;
+    sonokai_theme.style.show_file_size = true;
+    sonokai_theme.style.show_modified_time = true;
+    sonokai_theme.style.show_permissions = true;
+    sonokai_theme.style.enable_mouse = true;
+    sonokai_theme.style.enable_animations = false;
+
+    predefined_themes_["sonokai"] = sonokai_theme;
+
+    // ---- mariana (Sublime Text, deep teal-blue) ----
+    FTBConfig mariana_theme;
+    mariana_theme.colors_main.background = "#343d46";
+    mariana_theme.colors_main.foreground = "#d8dee9";
+    mariana_theme.colors_main.border = "#4f5b66";
+    mariana_theme.colors_main.selection_bg = "#4f5b66";
+    mariana_theme.colors_main.selection_fg = "#d8dee9";
+
+    mariana_theme.colors_files.directory = "#6699cc";
+    mariana_theme.colors_files.file = "#d8dee9";
+    mariana_theme.colors_files.executable = "#c594c5";
+    mariana_theme.colors_files.link = "#99c794";
+    mariana_theme.colors_files.hidden = "#65737e";
+    mariana_theme.colors_files.system = "#ec5f67";
+
+    mariana_theme.colors_status.background = "#2b303b";
+    mariana_theme.colors_status.foreground = "#d8dee9";
+    mariana_theme.colors_status.border = "#4f5b66";
+
+    mariana_theme.colors_search.background = "#343d46";
+    mariana_theme.colors_search.foreground = "#d8dee9";
+    mariana_theme.colors_search.border = "#6699cc";
+
+    mariana_theme.colors_dialog.background = "#343d46";
+    mariana_theme.colors_dialog.foreground = "#d8dee9";
+    mariana_theme.colors_dialog.border = "#6699cc";
+
+    mariana_theme.colors_syntax.keyword = "#c594c5";
+    mariana_theme.colors_syntax.string = "#99c794";
+    mariana_theme.colors_syntax.comment = "#65737e";
+    mariana_theme.colors_syntax.number = "#f99157";
+    mariana_theme.colors_syntax.function = "#6699cc";
+    mariana_theme.colors_syntax.type = "#fac863";
+    mariana_theme.colors_syntax.operator_ = "#5fb3b3";
+    mariana_theme.colors_syntax.preprocessor = "#ec5f67";
+    mariana_theme.colors_syntax.identifier = "#d8dee9";
+    mariana_theme.colors_syntax.punctuation = "#65737e";
+    mariana_theme.colors_syntax.property = "#5fb3b3";
+    mariana_theme.colors_syntax.tag = "#c594c5";
+    mariana_theme.colors_syntax.attribute = "#fac863";
+    mariana_theme.colors_syntax.regex = "#99c794";
+    mariana_theme.colors_syntax.decorator = "#ec5f67";
+    mariana_theme.colors_syntax.line_number = "#4f5b66";
+
+    mariana_theme.style.show_icons = true;
+    mariana_theme.style.show_file_size = true;
+    mariana_theme.style.show_modified_time = true;
+    mariana_theme.style.show_permissions = true;
+    mariana_theme.style.enable_mouse = true;
+    mariana_theme.style.enable_animations = false;
+
+    predefined_themes_["mariana"] = mariana_theme;
+
+    // ---- seti (Seti UI, green-blue tones) ----
+    FTBConfig seti_theme;
+    seti_theme.colors_main.background = "#151718";
+    seti_theme.colors_main.foreground = "#d4d7d6";
+    seti_theme.colors_main.border = "#2b3a3b";
+    seti_theme.colors_main.selection_bg = "#2f3a3b";
+    seti_theme.colors_main.selection_fg = "#d4d7d6";
+
+    seti_theme.colors_files.directory = "#55b5db";
+    seti_theme.colors_files.file = "#d4d7d6";
+    seti_theme.colors_files.executable = "#a074c4";
+    seti_theme.colors_files.link = "#8dc56d";
+    seti_theme.colors_files.hidden = "#41535b";
+    seti_theme.colors_files.system = "#db7b55";
+
+    seti_theme.colors_status.background = "#1b2a2b";
+    seti_theme.colors_status.foreground = "#d4d7d6";
+    seti_theme.colors_status.border = "#2b3a3b";
+
+    seti_theme.colors_search.background = "#151718";
+    seti_theme.colors_search.foreground = "#d4d7d6";
+    seti_theme.colors_search.border = "#55b5db";
+
+    seti_theme.colors_dialog.background = "#151718";
+    seti_theme.colors_dialog.foreground = "#d4d7d6";
+    seti_theme.colors_dialog.border = "#55b5db";
+
+    seti_theme.colors_syntax.keyword = "#a074c4";
+    seti_theme.colors_syntax.string = "#55db8d";
+    seti_theme.colors_syntax.comment = "#41535b";
+    seti_theme.colors_syntax.number = "#db7b55";
+    seti_theme.colors_syntax.function = "#55b5db";
+    seti_theme.colors_syntax.type = "#cbcb41";
+    seti_theme.colors_syntax.operator_ = "#55b5db";
+    seti_theme.colors_syntax.preprocessor = "#db7b55";
+    seti_theme.colors_syntax.identifier = "#d4d7d6";
+    seti_theme.colors_syntax.punctuation = "#41535b";
+    seti_theme.colors_syntax.property = "#55b5db";
+    seti_theme.colors_syntax.tag = "#a074c4";
+    seti_theme.colors_syntax.attribute = "#cbcb41";
+    seti_theme.colors_syntax.regex = "#55db8d";
+    seti_theme.colors_syntax.decorator = "#db7b55";
+    seti_theme.colors_syntax.line_number = "#2f3a3b";
+
+    seti_theme.style.show_icons = true;
+    seti_theme.style.show_file_size = true;
+    seti_theme.style.show_modified_time = true;
+    seti_theme.style.show_permissions = true;
+    seti_theme.style.enable_mouse = true;
+    seti_theme.style.enable_animations = false;
+
+    predefined_themes_["seti"] = seti_theme;
+
+    // ---- ir-black (classic IR_Black, high contrast) ----
+    FTBConfig ir_black_theme;
+    ir_black_theme.colors_main.background = "#000000";
+    ir_black_theme.colors_main.foreground = "#b5b5b5";
+    ir_black_theme.colors_main.border = "#242424";
+    ir_black_theme.colors_main.selection_bg = "#363636";
+    ir_black_theme.colors_main.selection_fg = "#b5b5b5";
+
+    ir_black_theme.colors_files.directory = "#96cbfe";
+    ir_black_theme.colors_files.file = "#b5b5b5";
+    ir_black_theme.colors_files.executable = "#ffb47c";
+    ir_black_theme.colors_files.link = "#a8ff60";
+    ir_black_theme.colors_files.hidden = "#666666";
+    ir_black_theme.colors_files.system = "#ff6c60";
+
+    ir_black_theme.colors_status.background = "#1c1c1c";
+    ir_black_theme.colors_status.foreground = "#b5b5b5";
+    ir_black_theme.colors_status.border = "#242424";
+
+    ir_black_theme.colors_search.background = "#000000";
+    ir_black_theme.colors_search.foreground = "#b5b5b5";
+    ir_black_theme.colors_search.border = "#96cbfe";
+
+    ir_black_theme.colors_dialog.background = "#000000";
+    ir_black_theme.colors_dialog.foreground = "#b5b5b5";
+    ir_black_theme.colors_dialog.border = "#96cbfe";
+
+    ir_black_theme.colors_syntax.keyword = "#96cbfe";
+    ir_black_theme.colors_syntax.string = "#a8ff60";
+    ir_black_theme.colors_syntax.comment = "#7c7c7c";
+    ir_black_theme.colors_syntax.number = "#ffb47c";
+    ir_black_theme.colors_syntax.function = "#ffd2a7";
+    ir_black_theme.colors_syntax.type = "#ffffb6";
+    ir_black_theme.colors_syntax.operator_ = "#b5b5b5";
+    ir_black_theme.colors_syntax.preprocessor = "#ff6c60";
+    ir_black_theme.colors_syntax.identifier = "#b5b5b5";
+    ir_black_theme.colors_syntax.punctuation = "#7c7c7c";
+    ir_black_theme.colors_syntax.property = "#96cbfe";
+    ir_black_theme.colors_syntax.tag = "#96cbfe";
+    ir_black_theme.colors_syntax.attribute = "#ffffb6";
+    ir_black_theme.colors_syntax.regex = "#a8ff60";
+    ir_black_theme.colors_syntax.decorator = "#ff6c60";
+    ir_black_theme.colors_syntax.line_number = "#363636";
+
+    ir_black_theme.style.show_icons = true;
+    ir_black_theme.style.show_file_size = true;
+    ir_black_theme.style.show_modified_time = true;
+    ir_black_theme.style.show_permissions = true;
+    ir_black_theme.style.enable_mouse = true;
+    ir_black_theme.style.enable_animations = false;
+
+    predefined_themes_["ir-black"] = ir_black_theme;
+
+    // ---- vibrant-ink (classic bold syntax highlighting) ----
+    FTBConfig vibrant_ink_theme;
+    vibrant_ink_theme.colors_main.background = "#000000";
+    vibrant_ink_theme.colors_main.foreground = "#d5d5d5";
+    vibrant_ink_theme.colors_main.border = "#333333";
+    vibrant_ink_theme.colors_main.selection_bg = "#333333";
+    vibrant_ink_theme.colors_main.selection_fg = "#d5d5d5";
+
+    vibrant_ink_theme.colors_files.directory = "#ff6600";
+    vibrant_ink_theme.colors_files.file = "#d5d5d5";
+    vibrant_ink_theme.colors_files.executable = "#ffcc00";
+    vibrant_ink_theme.colors_files.link = "#99cc00";
+    vibrant_ink_theme.colors_files.hidden = "#666666";
+    vibrant_ink_theme.colors_files.system = "#ff3333";
+
+    vibrant_ink_theme.colors_status.background = "#1a1a1a";
+    vibrant_ink_theme.colors_status.foreground = "#d5d5d5";
+    vibrant_ink_theme.colors_status.border = "#333333";
+
+    vibrant_ink_theme.colors_search.background = "#000000";
+    vibrant_ink_theme.colors_search.foreground = "#d5d5d5";
+    vibrant_ink_theme.colors_search.border = "#ff6600";
+
+    vibrant_ink_theme.colors_dialog.background = "#000000";
+    vibrant_ink_theme.colors_dialog.foreground = "#d5d5d5";
+    vibrant_ink_theme.colors_dialog.border = "#ff6600";
+
+    vibrant_ink_theme.colors_syntax.keyword = "#cc7833";
+    vibrant_ink_theme.colors_syntax.string = "#66cc33";
+    vibrant_ink_theme.colors_syntax.comment = "#666666";
+    vibrant_ink_theme.colors_syntax.number = "#cc7833";
+    vibrant_ink_theme.colors_syntax.function = "#ffc66d";
+    vibrant_ink_theme.colors_syntax.type = "#ffffff";
+    vibrant_ink_theme.colors_syntax.operator_ = "#d5d5d5";
+    vibrant_ink_theme.colors_syntax.preprocessor = "#ff3333";
+    vibrant_ink_theme.colors_syntax.identifier = "#d5d5d5";
+    vibrant_ink_theme.colors_syntax.punctuation = "#666666";
+    vibrant_ink_theme.colors_syntax.property = "#ffc66d";
+    vibrant_ink_theme.colors_syntax.tag = "#cc7833";
+    vibrant_ink_theme.colors_syntax.attribute = "#ffffff";
+    vibrant_ink_theme.colors_syntax.regex = "#66cc33";
+    vibrant_ink_theme.colors_syntax.decorator = "#ff3333";
+    vibrant_ink_theme.colors_syntax.line_number = "#333333";
+
+    vibrant_ink_theme.style.show_icons = true;
+    vibrant_ink_theme.style.show_file_size = true;
+    vibrant_ink_theme.style.show_modified_time = true;
+    vibrant_ink_theme.style.show_permissions = true;
+    vibrant_ink_theme.style.enable_mouse = true;
+    vibrant_ink_theme.style.enable_animations = false;
+
+    predefined_themes_["vibrant-ink"] = vibrant_ink_theme;
+
+    // ---- tender (soft pastel, unique palette) ----
+    FTBConfig tender_theme;
+    tender_theme.colors_main.background = "#282828";
+    tender_theme.colors_main.foreground = "#c6d0f5";
+    tender_theme.colors_main.border = "#3b3d47";
+    tender_theme.colors_main.selection_bg = "#3e4052";
+    tender_theme.colors_main.selection_fg = "#c6d0f5";
+
+    tender_theme.colors_files.directory = "#b7e1f0";
+    tender_theme.colors_files.file = "#c6d0f5";
+    tender_theme.colors_files.executable = "#e5b4e6";
+    tender_theme.colors_files.link = "#b5e8b5";
+    tender_theme.colors_files.hidden = "#6b7089";
+    tender_theme.colors_files.system = "#efb4c5";
+
+    tender_theme.colors_status.background = "#32343f";
+    tender_theme.colors_status.foreground = "#c6d0f5";
+    tender_theme.colors_status.border = "#3b3d47";
+
+    tender_theme.colors_search.background = "#282828";
+    tender_theme.colors_search.foreground = "#c6d0f5";
+    tender_theme.colors_search.border = "#b7e1f0";
+
+    tender_theme.colors_dialog.background = "#282828";
+    tender_theme.colors_dialog.foreground = "#c6d0f5";
+    tender_theme.colors_dialog.border = "#b7e1f0";
+
+    tender_theme.colors_syntax.keyword = "#e5b4e6";
+    tender_theme.colors_syntax.string = "#b5e8b5";
+    tender_theme.colors_syntax.comment = "#6b7089";
+    tender_theme.colors_syntax.number = "#efb4c5";
+    tender_theme.colors_syntax.function = "#b7e1f0";
+    tender_theme.colors_syntax.type = "#efdcb4";
+    tender_theme.colors_syntax.operator_ = "#c6d0f5";
+    tender_theme.colors_syntax.preprocessor = "#efb4c5";
+    tender_theme.colors_syntax.identifier = "#c6d0f5";
+    tender_theme.colors_syntax.punctuation = "#6b7089";
+    tender_theme.colors_syntax.property = "#b7e1f0";
+    tender_theme.colors_syntax.tag = "#e5b4e6";
+    tender_theme.colors_syntax.attribute = "#efdcb4";
+    tender_theme.colors_syntax.regex = "#b5e8b5";
+    tender_theme.colors_syntax.decorator = "#efb4c5";
+    tender_theme.colors_syntax.line_number = "#3e4052";
+
+    tender_theme.style.show_icons = true;
+    tender_theme.style.show_file_size = true;
+    tender_theme.style.show_modified_time = true;
+    tender_theme.style.show_permissions = true;
+    tender_theme.style.enable_mouse = true;
+    tender_theme.style.enable_animations = false;
+
+    predefined_themes_["tender"] = tender_theme;
+
+    // ---- breeze (KDE Breeze, blue-clean) ----
+    FTBConfig breeze_theme;
+    breeze_theme.colors_main.background = "#232629";
+    breeze_theme.colors_main.foreground = "#eff0f1";
+    breeze_theme.colors_main.border = "#31363b";
+    breeze_theme.colors_main.selection_bg = "#3daee9";
+    breeze_theme.colors_main.selection_fg = "#eff0f1";
+
+    breeze_theme.colors_files.directory = "#3daee9";
+    breeze_theme.colors_files.file = "#eff0f1";
+    breeze_theme.colors_files.executable = "#27ae60";
+    breeze_theme.colors_files.link = "#c9ce3b";
+    breeze_theme.colors_files.hidden = "#7a7c7d";
+    breeze_theme.colors_files.system = "#da4453";
+
+    breeze_theme.colors_status.background = "#2a2d30";
+    breeze_theme.colors_status.foreground = "#eff0f1";
+    breeze_theme.colors_status.border = "#31363b";
+
+    breeze_theme.colors_search.background = "#232629";
+    breeze_theme.colors_search.foreground = "#eff0f1";
+    breeze_theme.colors_search.border = "#3daee9";
+
+    breeze_theme.colors_dialog.background = "#232629";
+    breeze_theme.colors_dialog.foreground = "#eff0f1";
+    breeze_theme.colors_dialog.border = "#3daee9";
+
+    breeze_theme.colors_syntax.keyword = "#c674d6";
+    breeze_theme.colors_syntax.string = "#27ae60";
+    breeze_theme.colors_syntax.comment = "#7a7c7d";
+    breeze_theme.colors_syntax.number = "#f67400";
+    breeze_theme.colors_syntax.function = "#3daee9";
+    breeze_theme.colors_syntax.type = "#fdbc4b";
+    breeze_theme.colors_syntax.operator_ = "#eff0f1";
+    breeze_theme.colors_syntax.preprocessor = "#da4453";
+    breeze_theme.colors_syntax.identifier = "#eff0f1";
+    breeze_theme.colors_syntax.punctuation = "#7a7c7d";
+    breeze_theme.colors_syntax.property = "#3daee9";
+    breeze_theme.colors_syntax.tag = "#c674d6";
+    breeze_theme.colors_syntax.attribute = "#fdbc4b";
+    breeze_theme.colors_syntax.regex = "#27ae60";
+    breeze_theme.colors_syntax.decorator = "#da4453";
+    breeze_theme.colors_syntax.line_number = "#31363b";
+
+    breeze_theme.style.show_icons = true;
+    breeze_theme.style.show_file_size = true;
+    breeze_theme.style.show_modified_time = true;
+    breeze_theme.style.show_permissions = true;
+    breeze_theme.style.enable_mouse = true;
+    breeze_theme.style.enable_animations = false;
+
+    predefined_themes_["breeze"] = breeze_theme;
+
+    // ---- selenized (scientifically optimized contrast) ----
+    FTBConfig selenized_theme;
+    selenized_theme.colors_main.background = "#103c48";
+    selenized_theme.colors_main.foreground = "#adbcbc";
+    selenized_theme.colors_main.border = "#285360";
+    selenized_theme.colors_main.selection_bg = "#2d5b69";
+    selenized_theme.colors_main.selection_fg = "#adbcbc";
+
+    selenized_theme.colors_files.directory = "#67b6bd";
+    selenized_theme.colors_files.file = "#adbcbc";
+    selenized_theme.colors_files.executable = "#ed856a";
+    selenized_theme.colors_files.link = "#73b965";
+    selenized_theme.colors_files.hidden = "#518a94";
+    selenized_theme.colors_files.system = "#d05c4a";
+
+    selenized_theme.colors_status.background = "#0e3440";
+    selenized_theme.colors_status.foreground = "#adbcbc";
+    selenized_theme.colors_status.border = "#285360";
+
+    selenized_theme.colors_search.background = "#103c48";
+    selenized_theme.colors_search.foreground = "#adbcbc";
+    selenized_theme.colors_search.border = "#67b6bd";
+
+    selenized_theme.colors_dialog.background = "#103c48";
+    selenized_theme.colors_dialog.foreground = "#adbcbc";
+    selenized_theme.colors_dialog.border = "#67b6bd";
+
+    selenized_theme.colors_syntax.keyword = "#ed856a";
+    selenized_theme.colors_syntax.string = "#73b965";
+    selenized_theme.colors_syntax.comment = "#518a94";
+    selenized_theme.colors_syntax.number = "#e1a53b";
+    selenized_theme.colors_syntax.function = "#67b6bd";
+    selenized_theme.colors_syntax.type = "#dbbc7f";
+    selenized_theme.colors_syntax.operator_ = "#adbcbc";
+    selenized_theme.colors_syntax.preprocessor = "#d05c4a";
+    selenized_theme.colors_syntax.identifier = "#adbcbc";
+    selenized_theme.colors_syntax.punctuation = "#518a94";
+    selenized_theme.colors_syntax.property = "#67b6bd";
+    selenized_theme.colors_syntax.tag = "#ed856a";
+    selenized_theme.colors_syntax.attribute = "#dbbc7f";
+    selenized_theme.colors_syntax.regex = "#73b965";
+    selenized_theme.colors_syntax.decorator = "#d05c4a";
+    selenized_theme.colors_syntax.line_number = "#285360";
+
+    selenized_theme.style.show_icons = true;
+    selenized_theme.style.show_file_size = true;
+    selenized_theme.style.show_modified_time = true;
+    selenized_theme.style.show_permissions = true;
+    selenized_theme.style.enable_mouse = true;
+    selenized_theme.style.enable_animations = false;
+
+    predefined_themes_["selenized"] = selenized_theme;
 }
 
 void ThemeManager::ApplyThemeConfig(const std::string& theme_name) {
