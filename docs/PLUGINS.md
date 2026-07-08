@@ -140,6 +140,7 @@ function entry(ftb: FtbAPI): Record<string, any> {
 | `selected_size` | number | File size in bytes |
 | `selected_mime` | string | MIME type (if known) |
 | `args` | object | Arguments passed to the plugin |
+| `plugin_dir` | string | Plugin directory path (for `python.call` module resolution) |
 
 ### `ftb.fs` - File System (requires permissions)
 
@@ -185,6 +186,27 @@ Write to FTB's debug log (only when `-l` flag is used).
 
 Execute a command and return its output. **Use with caution**.
 
+### `ftb.python.call(file, func, args)` - Python Call (requires `python_exec`)
+
+Call a Python function from a module file in the plugin directory. Returns JSON result:
+
+```typescript
+// In utils.py:
+// def compute(data, mode="stats"):
+//     return {"sum": sum(data), "mean": sum(data)/len(data)}
+
+const result = ftb.python.call("utils.py", "compute", { data: [1,2,3,4,5], mode: "stats" });
+ftb.ui.message(`Mean: ${result.mean}`);
+```
+
+Parameters:
+- `file` — Python file path (relative to plugin dir, e.g. `"utils.py"` or `"subdir/module.py"`)
+- `func` — Function name
+- `args` — Arguments object (passed as **kwargs to the function)
+- Returns — Python function's return dict, serialized as JSON
+
+Python code runs in an isolated `python3` subprocess, bounded by `max_exec_ms`.
+
 ## Permissions
 
 Plugins run in a sandboxed environment. Each permission must be explicitly declared in `package.json`:
@@ -198,6 +220,7 @@ Plugins run in a sandboxed environment. Each permission must be explicitly decla
 | `env_read` | `false` | Read environment variables |
 | `clipboard` | `false` | Access system clipboard |
 | `subprocess` | `false` | Execute subprocesses |
+| `python_exec` | `false` | Execute Python code (`ftb.python.call`) |
 | `max_exec_ms` | `5000` | Maximum execution time (ms) |
 
 ## Security Model
@@ -227,6 +250,13 @@ TypeScript files are automatically transpiled to JavaScript before execution. Fo
 npm install -g esbuild
 ```
 
+Plugins using `ftb.python.call()` or Python-based previewers also require **Python 3** (`python3`):
+
+```bash
+# Most systems have Python 3 pre-installed
+python3 --version
+```
+
 ## Examples
 
 See the `plugins/` directory for example plugins:
@@ -234,6 +264,7 @@ See the `plugins/` directory for example plugins:
 - **hello-world.ftb** - Basic greeting plugin (`functional`)
 - **file-info.ftb** - File information with size formatting (`functional`)
 - **git-status.ftb** - Git branch and status in status bar (`statusbar`)
+- **preview-external.ftb** - File preview using external tools + Python APK binary analysis (`previewer`)
 
 ### git-status Plugin
 

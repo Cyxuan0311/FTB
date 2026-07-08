@@ -138,6 +138,7 @@ function entry(ftb: FtbAPI): Record<string, any> {
 | `selected_size` | number | 文件大小（字节） |
 | `selected_mime` | string | MIME 类型（如果已知） |
 | `args` | object | 传递给插件的参数 |
+| `plugin_dir` | string | 插件目录路径（用于 `python.call` 解析模块路径） |
 
 ### `ftb.fs` - 文件系统（需要权限）
 
@@ -183,6 +184,27 @@ function entry(ftb: FtbAPI): Record<string, any> {
 
 执行命令并返回输出。**请谨慎使用**。
 
+### `ftb.python.call(file, func, args)` - Python 调用（需要 `python_exec` 权限）
+
+调用插件目录下的 Python 模块函数，返回 JSON 结果。Python 文件放在插件目录中，TS 入口文件可按需调用：
+
+```typescript
+// utils.py 中定义:
+// def compute(data, mode="stats"):
+//     return {"sum": sum(data), "mean": sum(data)/len(data)}
+
+const result = ftb.python.call("utils.py", "compute", { data: [1,2,3,4,5], mode: "stats" });
+ftb.ui.message(`Mean: ${result.mean}`);
+```
+
+参数说明：
+- `file` — Python 文件路径（相对于插件目录，如 `"utils.py"` 或 `"subdir/module.py"`）
+- `func` — 函数名
+- `args` — 传递给函数的参数对象（作为 **kwargs 解包）
+- 返回值 — Python 函数返回的字典，自动序列化为 JSON
+
+Python 代码在独立的 `python3` 子进程中运行，受 `max_exec_ms` 超时限制。
+
 ## 权限
 
 插件在沙箱环境中运行。每个权限必须在 `package.json` 中显式声明：
@@ -196,6 +218,7 @@ function entry(ftb: FtbAPI): Record<string, any> {
 | `env_read` | `false` | 读取环境变量 |
 | `clipboard` | `false` | 访问系统剪贴板 |
 | `subprocess` | `false` | 执行子进程 |
+| `python_exec` | `false` | 执行 Python 代码（`ftb.python.call`） |
 | `max_exec_ms` | `5000` | 最大执行时间（毫秒） |
 
 ## 安全模型
@@ -225,6 +248,12 @@ TypeScript 文件在执行前会自动编译为 JavaScript。对于复杂的 Typ
 npm install -g esbuild
 ```
 
+使用 `ftb.python.call()` 或基于 Python 的预览器还需要 **Python 3**（`python3`）：
+
+```bash
+python3 --version
+```
+
 ## 示例
 
 参见 `plugins/` 目录中的示例插件：
@@ -232,6 +261,7 @@ npm install -g esbuild
 - **hello-world.ftb** - 基本问候插件（`functional`）
 - **file-info.ftb** - 带格式的文件信息插件（`functional`）
 - **git-status.ftb** - 状态栏中的 Git 分支和状态（`statusbar`）
+- **preview-external.ftb** - 使用外部工具 + Python APK 二进制分析的预览器（`previewer`）
 
 ### git-status 插件
 
