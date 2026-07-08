@@ -1,4 +1,5 @@
 #include "../../include/ops/PluginManager.hpp"
+#include "../../include/utils/PerfLogger.hpp"
 
 #include <fstream>
 #include <sstream>
@@ -161,46 +162,52 @@ bool PluginInstance::Load() {
         return true;
     }
 
-    // Read entry file
+    PERF_LOG("PluginLoad", "Loading: " + metadata_.name + " from " + plugin_dir_);
+
     fs::path entry_path = fs::path(plugin_dir_) / metadata_.entry;
     if (!fs::exists(entry_path)) {
-        // Try .js fallback
         entry_path = fs::path(plugin_dir_) /
                      fs::path(metadata_.entry).replace_extension(".js");
+        PERF_LOG("PluginLoad", "  entry not found, trying .js fallback");
     }
 
     if (!fs::exists(entry_path)) {
         last_error_ = "Entry file not found: " + metadata_.entry;
         state_ = PluginState::Error;
+        PERF_LOG("PluginLoad", "  ERROR: " + last_error_);
         return false;
     }
 
-    // Read source code
     std::ifstream ifs(entry_path);
     if (!ifs.is_open()) {
         last_error_ = "Cannot open entry file";
         state_ = PluginState::Error;
+        PERF_LOG("PluginLoad", "  ERROR: " + last_error_);
         return false;
     }
     std::ostringstream oss;
     oss << ifs.rdbuf();
     compiled_code_ = oss.str();
+    PERF_LOG("PluginLoad", "  read " + std::to_string(compiled_code_.size()) + " bytes from " + entry_path.string());
 
-    // If it's TypeScript (.ts), we need to transpile
     if (entry_path.extension() == ".ts") {
+        PERF_LOG("PluginLoad", "  transpiling TypeScript...");
         if (!CompileTypeScript()) {
             state_ = PluginState::Error;
+            PERF_LOG("PluginLoad", "  ERROR: TypeScript compilation failed");
             return false;
         }
+        PERF_LOG("PluginLoad", "  transpilation OK, " + std::to_string(compiled_code_.size()) + " bytes");
     }
 
-    // Create sandbox
     if (!CreateSandbox()) {
         state_ = PluginState::Error;
+        PERF_LOG("PluginLoad", "  ERROR: CreateSandbox failed");
         return false;
     }
 
     state_ = PluginState::Loaded;
+    PERF_LOG("PluginLoad", "  loaded OK");
     return true;
 }
 
@@ -288,7 +295,7 @@ bool PluginInstance::CompileTypeScript() {
         {"\\)\\s*:\\s*(?:[A-Za-z_]\\w*(?:\\[\\])?(?:\\s*\\|\\s*[A-Za-z_]\\w*(?:\\[\\])?)*)\\s*\\{", ") {"},
         {"\\((\\w+):\\s*[A-Za-z_]\\w*(?:\\[\\])?\\s*\\)", "($1)"},
         {"\\(\\s*(\\w+):\\s*[A-Za-z_]\\w*(?:\\[\\])?,\\s*", "($1, "},
-        {",\\s*(\\w+):\\s*(?:[A-Z]\\w*|string|number|boolean|bigint|symbol)(?:\\[\\])?(?:\\s*=\\s*[^,)]+)?", ",$1"},
+        {",\\s*(\\w+):\\s*(?:[A-Z]\\w*|string|number|boolean|bigint|symbol)(?:\\[\\])?(?!\\s*[\\.\\(])(?:\\s*=\\s*[^,)]+)?", ",$1"},
         {"(let|var)\\s+(\\w+):\\s*[A-Za-z_]\\w*(?:<[^>]*>)?(?:\\[\\])?\\s*;", "$1 $2;"},
         {"(const|let|var)\\s+(\\w+):\\s*[A-Za-z_]\\w*(?:<[^>]*>)?(?:\\[\\])?\\s*=", "$1 $2 ="},
     };
@@ -447,7 +454,7 @@ PluginResult PluginInstance::RunInSandbox(const std::string& code, const std::st
 
                 // Write wrapper file
                 os.exec(['/bin/sh', '-c',
-                    "printf '%s' '" + pyScript.replace(/'/g,"'\\''") + "' > '" + wrapfile + "'"]);
+                    "printf '%b' '" + pyScript.replace(/'/g,"'\\''") + "' > '" + wrapfile + "'"]);
 
                 // Execute Python
                 os.exec(['/bin/sh', '-c', "python3 -u '" + wrapfile + "' > '" + outfile + "' 2>&1"]);
@@ -535,26 +542,27 @@ PluginResult PluginInstance::RunInSandbox(const std::string& code, const std::st
     if (!fs::exists(qjs_path)) {
         qjs_path = "/usr/bin/qjs";
     }
+    PERF_LOG("PluginExec", "qjs path: " + qjs_path + " (exists=" + (fs::exists(qjs_path) ? "yes" : "no") + ")");
 
     if (fs::exists(qjs_path)) {
-        // Write temp script
         std::string tmp_path = "/tmp/ftb_plugin_" + metadata_.name + ".js";
         {
             std::ofstream ofs(tmp_path);
             ofs << wrapped_code;
         }
+        PERF_LOG("PluginExec", "wrote temp JS: " + tmp_path + " (" + std::to_string(wrapped_code.size()) + " bytes)");
 
-        // Execute with timeout (--std makes std/os/bjson globals in QuickJS-ng)
-        // stderr goes to separate file to keep stdout clean for JSON parsing
         std::string err_path = tmp_path + ".err";
         int timeout_secs = std::max<int>(metadata_.permissions.max_exec_ms / 1000, 1);
         std::string cmd = "timeout " + std::to_string(timeout_secs) +
                          " " + qjs_path + " --std " + tmp_path + " 2>" + err_path;
+        PERF_LOG("PluginExec", "cmd: " + cmd);
 
         FILE* pipe = popen(cmd.c_str(), "r");
         if (!pipe) {
             result.success = false;
             result.error = "Failed to start JS runtime";
+            PERF_LOG("PluginExec", "ERROR: popen failed");
             fs::remove(tmp_path);
             fs::remove(err_path);
             return result;
@@ -567,7 +575,6 @@ PluginResult PluginInstance::RunInSandbox(const std::string& code, const std::st
         }
         int exit_code = pclose(pipe);
 
-        // Read stderr output if non-zero exit
         std::string err_output;
         if (exit_code != 0) {
             std::ifstream err_ifs(err_path);
@@ -576,34 +583,37 @@ PluginResult PluginInstance::RunInSandbox(const std::string& code, const std::st
                 err_oss << err_ifs.rdbuf();
                 err_output = err_oss.str();
             }
+            PERF_LOG("PluginExec", "exit_code=" + std::to_string(exit_code) + " stderr=" + err_output);
         }
 
-        // Clean up temp files
         fs::remove(tmp_path);
         fs::remove(err_path);
 
         if (exit_code != 0) {
             result.success = false;
             result.error = "Plugin exited with code " + std::to_string(exit_code) + ": " + err_output;
+            PERF_LOG("PluginExec", "FAILED: " + result.error);
             return result;
         }
 
-        // Parse output (stdout should contain only JSON)
+        PERF_LOG("PluginExec", "stdout (" + std::to_string(output.size()) + " bytes): " + output.substr(0, 200));
+
         try {
             auto j = nlohmann::json::parse(output);
             result.success = j.value("success", false);
             if (j.contains("data")) result.data = j["data"];
             if (j.contains("error")) result.error = j["error"].get<std::string>();
             if (j.contains("message")) result.message = j.value("message", "");
+            PERF_LOG("PluginExec", "parse OK, success=" + std::string(result.success ? "true" : "false"));
         } catch (const nlohmann::json::parse_error& e) {
-            // If output is not JSON, treat as raw message
             result.success = true;
             result.message = output;
+            PERF_LOG("PluginExec", "JSON parse error, treating as raw message: " + std::string(e.what()));
         }
     } else {
-        // No JS runtime available - return error
         result.success = false;
         result.error = "No JavaScript runtime found. Install QuickJS (qjs) to enable plugins.";
+        PERF_LOG("PluginExec", "ERROR: " + result.error);
     }
 
     return result;
@@ -626,22 +636,28 @@ void PluginManager::Initialize(const std::string& config_dir) {
     config_dir_ = config_dir;
     plugins_dir_ = config_dir + "/plugins";
 
-    // Create plugins directory if it doesn't exist
+    PERF_LOG("Plugin", "Init from: " + plugins_dir_);
+
     if (!fs::exists(plugins_dir_)) {
         fs::create_directories(plugins_dir_);
+        PERF_LOG("Plugin", "Created plugins dir");
     }
 
-    // Detect platform once at startup
     platform_ = DetectPlatform();
     distro_id_ = DetectDistroId();
+    PERF_LOG("Plugin", "Platform: " + platform_ + ", Distro: " + distro_id_);
 
-    // Scan for plugins
     ScanPlugins();
 
-    // Load persisted enabled state (overrides ScanPlugins defaults)
     LoadEnabledState();
 
     initialized_ = true;
+
+    PERF_LOG("Plugin", "Loaded " + std::to_string(plugins_.size()) + " plugins");
+    for (const auto& [name, inst] : plugins_) {
+        bool en = enabled_map_.count(name) && enabled_map_.at(name);
+        PERF_LOG("Plugin", "  " + name + " (type=" + std::to_string(static_cast<int>(inst->GetMetadata().type)) + " enabled=" + (en ? "yes" : "no") + ")");
+    }
 }
 
 void PluginManager::Shutdown() {
@@ -658,20 +674,20 @@ void PluginManager::Shutdown() {
 
 void PluginManager::ScanPlugins() {
     if (!fs::exists(plugins_dir_)) {
+        PERF_LOG("Plugin", "ScanPlugins: dir not found: " + plugins_dir_);
         return;
     }
 
+    int found = 0, skipped = 0;
     for (const auto& entry : fs::directory_iterator(plugins_dir_)) {
         if (!entry.is_directory()) continue;
 
         std::string dir_name = entry.path().filename().string();
 
-        // Plugin directories end with .ftb
         if (dir_name.size() > 4 && dir_name.substr(dir_name.size() - 4) == ".ftb") {
             std::string plugin_name = dir_name.substr(0, dir_name.size() - 4);
 
             if (ValidatePlugin(entry.path().string())) {
-                // Read package.json
                 fs::path pkg_path = entry.path() / "package.json";
                 if (fs::exists(pkg_path)) {
                     try {
@@ -686,16 +702,23 @@ void PluginManager::ScanPlugins() {
                             entry.path().string(), meta);
                         plugins_[plugin_name] = std::move(instance);
 
-                        // Enabled by default unless explicitly disabled
                         if (enabled_map_.find(plugin_name) == enabled_map_.end()) {
                             enabled_map_[plugin_name] = true;
                         }
-                    } catch (const std::exception&) {
+                        found++;
+                        PERF_LOG("Plugin", "  Found plugin: " + plugin_name + " (" + meta.entry + ")");
+                    } catch (const std::exception& e) {
+                        PERF_LOG("Plugin", "  ERROR loading " + plugin_name + ": " + e.what());
+                        skipped++;
                     }
                 }
+            } else {
+                PERF_LOG("Plugin", "  Validation failed: " + plugin_name);
+                skipped++;
             }
         }
     }
+    PERF_LOG("Plugin", "ScanPlugins: found=" + std::to_string(found) + ", skipped=" + std::to_string(skipped));
 }
 
 std::vector<std::string> PluginManager::GetAvailablePlugins() const {
@@ -1305,10 +1328,14 @@ std::vector<StatusBarSegment> PluginManager::ExecuteStatusBarPlugins(const Plugi
         }
     }
 
+    PERF_LOG("StatusBar", "executing " + std::to_string(instances.size()) + " statusbar plugins");
+
     for (auto* instance : instances) {
+        PERF_LOG("StatusBar", "  running: " + instance->GetMetadata().name);
         PluginResult result = instance->Execute(ctx);
 
         if (result.success && result.data.is_array()) {
+            PERF_LOG("StatusBar", "    OK, segments=" + std::to_string(result.data.size()));
             for (const auto& seg : result.data) {
                 StatusBarSegment s;
                 s.text = seg.value("text", "");
@@ -1318,9 +1345,12 @@ std::vector<StatusBarSegment> PluginManager::ExecuteStatusBarPlugins(const Plugi
                 s.align = seg.value("align", "left");
                 all_segments.push_back(std::move(s));
             }
+        } else {
+            PERF_LOG("StatusBar", "    FAILED: " + result.error);
         }
     }
 
+    PERF_LOG("StatusBar", "total segments: " + std::to_string(all_segments.size()));
     return all_segments;
 }
 
