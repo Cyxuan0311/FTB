@@ -43,7 +43,7 @@ public:
     bool IsWindowsTerminal() const { return is_windows_terminal_; }
 
     // Wrap an escape sequence in tmux passthrough format:
-    //   \ePtmux;<seq>\e\\
+    //   \ePtmux;<seq>\e\\ 
     // Only call when InTmux() && PassthroughEnabled()
     std::string WrapPassthrough(const std::string& seq) const;
 

@@ -158,7 +158,7 @@ std::string TmuxContext::RunTmuxCommand(const std::string& cmd) {
     if (!pipe) {
         return {};
     }
-    while (auto len = std::fgets(buf.data(), static_cast<int>(buf.size()), pipe)) {
+    while (std::fgets(buf.data(), static_cast<int>(buf.size()), pipe)) {
         output.append(buf.data(), std::strlen(buf.data()));
     }
     ::pclose(pipe);

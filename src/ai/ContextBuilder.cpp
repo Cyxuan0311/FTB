@@ -21,6 +21,7 @@ std::string ContextBuilder::buildSystemPrompt(
     const std::string& tool_schemas_json,
     const std::string& custom_prompt)
 {
+    (void)history;
     if (!custom_prompt.empty()) {
         return custom_prompt;
     }
@@ -87,13 +88,13 @@ std::vector<Message> ContextBuilder::buildMessages(
     const std::string& user_input)
 {
     std::vector<Message> messages;
-    messages.push_back({Message::System, system_prompt});
+    messages.push_back({Message::System, system_prompt, ""});
 
     for (const auto& m : history) {
         messages.push_back(m);
     }
 
-    messages.push_back({Message::User, user_input});
+    messages.push_back({Message::User, user_input, ""});
     return messages;
 }
 

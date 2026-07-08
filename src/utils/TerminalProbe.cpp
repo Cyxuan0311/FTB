@@ -2,10 +2,12 @@
 #include "../../include/utils/TmuxContext.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
 #include <unistd.h>
+#include <vector>
 
 namespace FTB {
 
@@ -358,7 +360,7 @@ std::string TerminalProbe::RunCommand(const std::string& cmd) {
     std::string output;
     FILE* pipe = ::popen(cmd.c_str(), "r");
     if (!pipe) return {};
-    while (auto len = std::fgets(buf.data(), static_cast<int>(buf.size()), pipe)) {
+    while (std::fgets(buf.data(), static_cast<int>(buf.size()), pipe)) {
         output.append(buf.data(), std::strlen(buf.data()));
     }
     ::pclose(pipe);
