@@ -174,6 +174,20 @@ chmod +x ./build.sh
 ./build.sh
 ```
 
+### Docker
+
+Run FTB in a container without installing dependencies locally:
+
+```bash
+# Build with mirror (recommended in China)
+docker build --build-arg GIT_MIRROR=https://gh-proxy.com/https://github.com -t ftb .
+
+# Run
+docker run -it --rm -v ~/.ftb:/root/.ftb -v ~/:/mnt/host ftb
+```
+
+See [Docker Guide](docs/DOCKER.md) for details.
+
 ## Usage
 
 ```bash
@@ -239,6 +253,7 @@ See [Configuration Guide](docs/CONFIGURATION.md) for details.
 - [Configuration Guide](docs/CONFIGURATION.md) ([配置指南](docs/CONFIGURATION_CN.md))
 - [Plugin Guide](docs/PLUGINS.md) ([插件系统](docs/PLUGINS_CN.md))
 - [External Prerequisites](docs/PREREQUISITES.md) ([外部依赖](docs/PREREQUISITES_CN.md))
+- [Docker Guide](docs/DOCKER.md) ([Docker 支持](docs/DOCKER_CN.md))
 
 ## License
 

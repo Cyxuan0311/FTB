@@ -168,6 +168,20 @@ chmod +x ./build.sh
 ./build.sh
 ```
 
+### Docker 运行
+
+无需在宿主机安装依赖，直接在容器中运行 FTB：
+
+```bash
+# 使用镜像构建（国内推荐）
+docker build --build-arg GIT_MIRROR=https://gh-proxy.com/https://github.com -t ftb .
+
+# 运行
+docker run -it --rm -v ~/.ftb:/root/.ftb -v ~/:/mnt/host ftb
+```
+
+详见 [Docker 支持](docs/DOCKER_CN.md)。
+
 ## 使用
 
 ```bash
@@ -231,6 +245,7 @@ cp config/.ftb.template ~/.ftb
 - [配置指南](docs/CONFIGURATION_CN.md) ([English](docs/CONFIGURATION.md))
 - [插件系统](docs/PLUGINS_CN.md) ([English](docs/PLUGINS.md))
 - [外部依赖](docs/PREREQUISITES_CN.md) ([English](docs/PREREQUISITES.md))
+- [Docker 支持](docs/DOCKER_CN.md) ([English](docs/DOCKER.md))
 
 ## 许可证
 
