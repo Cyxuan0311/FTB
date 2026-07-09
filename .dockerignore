@@ -1,0 +1,11 @@
+.git/
+.gitignore
+.gitattributes
+build/
+*.md
+docs/
+images/
+resource/
+useway.cpp
+.mimocode/
+.trae/

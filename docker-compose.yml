@@ -1,0 +1,10 @@
+services:
+  ftb:
+    build: .
+    container_name: ftb
+    stdin_open: true
+    tty: true
+    init: true
+    volumes:
+      - ~/.ftb:/root/.ftb
+      - ~/:/mnt/host
