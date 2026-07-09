@@ -29,6 +29,10 @@ public:
     static int  CurrentMaxRows();
     static bool IsActive();
 
+    // --- Overlay state (popup/dialog covering image area) ---
+    static void SetOverlayActive(bool active);
+    static bool IsOverlayActive();
+
     // --- Clear ---
     static void ClearCurrent();
 
@@ -82,6 +86,9 @@ private:
     static std::string s_last_flushed_path;
     static int s_last_flushed_render_w;
     static int s_last_flushed_render_h;
+
+    // Overlay state
+    static bool s_overlay_active;
 
     // Protocol enable flag
     static bool s_protocol_enabled_;

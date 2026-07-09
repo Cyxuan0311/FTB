@@ -52,6 +52,8 @@ std::string ImageOutputManager::s_failed_path;
 
 bool ImageOutputManager::s_protocol_enabled_ = true;
 
+bool ImageOutputManager::s_overlay_active = false;
+
 std::string ImageOutputManager::s_last_flushed_path;
 int ImageOutputManager::s_last_flushed_render_w = 0;
 int ImageOutputManager::s_last_flushed_render_h = 0;
@@ -159,27 +161,27 @@ bool ImageOutputManager::GetCached(const std::string& path,
 
 int ImageOutputManager::CurrentRow() {
     std::lock_guard<std::mutex> lock(s_manager_mutex);
-    return s_term_rows;
+    return s_overlay_active ? 0 : s_term_rows;
 }
 
 int ImageOutputManager::CurrentCol() {
     std::lock_guard<std::mutex> lock(s_manager_mutex);
-    return s_term_cols;
+    return s_overlay_active ? 0 : s_term_cols;
 }
 
 int ImageOutputManager::CurrentImageRows() {
     std::lock_guard<std::mutex> lock(s_manager_mutex);
-    return s_image_rows;
+    return s_overlay_active ? 0 : s_image_rows;
 }
 
 int ImageOutputManager::CurrentMaxRows() {
     std::lock_guard<std::mutex> lock(s_manager_mutex);
-    return s_max_image_rows;
+    return s_overlay_active ? 0 : s_max_image_rows;
 }
 
 bool ImageOutputManager::IsActive() {
     std::lock_guard<std::mutex> lock(s_manager_mutex);
-    return !s_cached_path.empty() && !s_cached_data.empty();
+    return !s_overlay_active && !s_cached_path.empty() && !s_cached_data.empty();
 }
 
 // ---- Clear ----
@@ -235,6 +237,33 @@ void ImageOutputManager::ClearCurrent() {
     if (s_protocol && n > 0 && w > 0) {
         s_protocol->ClearArea(r, n, c, w);
     }
+}
+
+// ---- Overlay state (popup/dialog active) ----
+
+void ImageOutputManager::SetOverlayActive(bool active) {
+    if (!s_protocol) return;
+
+    std::lock_guard<std::mutex> lock(s_manager_mutex);
+
+    if (active && !s_overlay_active) {
+        // Panel just opened: clear sixel display from terminal so popup text shows through
+        if (s_image_rows > 0 && s_panel_width > 0) {
+            s_protocol->ClearArea(s_term_rows, s_image_rows, s_term_cols, s_panel_width);
+        }
+    } else if (!active && s_overlay_active) {
+        // Panel just closed: force re-flush on next FlushPendingIfDirty()
+        s_last_flushed_path.clear();
+        s_last_flushed_render_w = 0;
+        s_last_flushed_render_h = 0;
+    }
+
+    s_overlay_active = active;
+}
+
+bool ImageOutputManager::IsOverlayActive() {
+    std::lock_guard<std::mutex> lock(s_manager_mutex);
+    return s_overlay_active;
 }
 
 // ---- Deferred flush ----

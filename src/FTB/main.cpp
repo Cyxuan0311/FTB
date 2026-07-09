@@ -303,6 +303,9 @@ int main(int argc, char* argv[])
                 : BuildNormalStatusBar(state)
         }) | bgcolor(TC("main_bg"));
 
+        // Sync overlay state so sixel image doesn't cover popup dialogs
+        FTB::ImageOutputManager::SetOverlayActive(state.active_panel != ActivePanel::None);
+
         Element result;
         if (state.vim_mode_active && state.vimEditor != nullptr) {
             result = dbox({
