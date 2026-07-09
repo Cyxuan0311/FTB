@@ -246,6 +246,7 @@ cp config/.ftb.template ~/.ftb
 - [插件系统](docs/PLUGINS_CN.md) ([English](docs/PLUGINS.md))
 - [外部依赖](docs/PREREQUISITES_CN.md) ([English](docs/PREREQUISITES.md))
 - [Docker 支持](docs/DOCKER_CN.md) ([English](docs/DOCKER.md))
+- [贡献指南](.github/CONTRIBUTING.md)
 
 ## 许可证
 

@@ -1,0 +1,54 @@
+name: Other Question
+description: Ask a question, get help with configuration, or discuss something that doesn't fit Bug Report or Feature Request
+title: "[Question] "
+labels: [question]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have a question or need help? You're in the right place.
+        For open-ended discussions, you can also use [GitHub Discussions](https://github.com/anomalyco/FTB/discussions).
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: Question Type
+      options:
+        - Usage question
+        - Configuration help
+        - Compatibility inquiry
+        - Performance concern
+        - Plugin development
+        - Build / compilation
+        - Docker
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Your Question
+      description: A clear and concise description of your question.
+      placeholder: "How can I [...]?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: What I've Tried
+      description: What have you already tried or checked?
+      placeholder: "I've checked the docs and tried [...] but it didn't work because [...]"
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating System
+      placeholder: "e.g. Ubuntu 22.04, macOS 14, Windows 11 WSL2"
+
+  - type: input
+    id: terminal
+    attributes:
+      label: Terminal Emulator
+      placeholder: "e.g. Kitty, Alacritty, Windows Terminal, iTerm2"

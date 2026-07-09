@@ -254,6 +254,7 @@ See [Configuration Guide](docs/CONFIGURATION.md) for details.
 - [Plugin Guide](docs/PLUGINS.md) ([插件系统](docs/PLUGINS_CN.md))
 - [External Prerequisites](docs/PREREQUISITES.md) ([外部依赖](docs/PREREQUISITES_CN.md))
 - [Docker Guide](docs/DOCKER.md) ([Docker 支持](docs/DOCKER_CN.md))
+- [Contributing Guide](.github/CONTRIBUTING.md)
 
 ## License
 

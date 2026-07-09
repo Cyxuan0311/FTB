@@ -1,0 +1,131 @@
+name: Bug Report
+description: Report a bug to help improve FTB
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report. Please provide as much detail as possible.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of the bug.
+      placeholder: "e.g. FTB crashes when opening a directory with 10,000 files"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Step-by-step instructions to reproduce the issue.
+      placeholder: |
+        1. Run `./FTB /some/directory`
+        2. Press `j` to scroll to the bottom
+        3. FTB crashes
+      render: bash
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Terminal Output / Screenshots
+      description: If applicable, paste terminal output or attach screenshots.
+      placeholder: "Paste error messages, stack traces, or terminal output here"
+      render: shell
+
+  - type: input
+    id: ftb_version
+    attributes:
+      label: FTB Version
+      description: "Run `./FTB` and check the version shown in the status bar, or provide the git commit hash (`git log --oneline -1`)."
+      placeholder: "v2.1.0 / commit abc123"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      options:
+        - Linux (Ubuntu/Debian)
+        - Linux (Arch/Manjaro)
+        - Linux (Fedora/RHEL)
+        - Linux (Others)
+        - macOS
+        - Windows (WSL)
+        - Windows (MSYS2/Cygwin)
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: terminal
+    attributes:
+      label: Terminal Emulator
+      description: "Which terminal are you using? (e.g. GNOME Terminal, Kitty, iTerm2, Alacritty, Windows Terminal)"
+      placeholder: "Kitty 0.35"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: build_method
+    attributes:
+      label: Build Method
+      options:
+        - Built from source
+        - Docker
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: compiler
+    attributes:
+      label: Compiler
+      options:
+        - GCC
+        - Clang
+        - Other
+        - Not sure (N/A for Docker)
+
+  - type: checkboxes
+    id: features
+    attributes:
+      label: Enabled Features (optional dependencies)
+      description: Which optional features were enabled when you built FTB?
+      options:
+        - label: SSH (`-DFTB_ENABLE_SSH=ON`)
+        - label: Tree-sitter syntax highlighting (`-DFTB_ENABLE_TREE_SITTER=ON`)
+        - label: libchafa image preview (`-DFTB_ENABLE_LIBCHAFA=ON`)
+        - label: libsixel image output (`-DFTB_ENABLE_LIBSIXEL=ON`)
+        - label: AI assistant (`-DFTB_ENABLE_AI=ON`)
+        - label: Plugins (`-DFTB_ENABLE_PLUGINS=ON`)
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Configuration
+      description: "Paste your `~/.ftb` config file (omit if contains sensitive info)."
+      placeholder: "Paste ~/.ftb content here"
+      render: json
