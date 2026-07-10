@@ -8,6 +8,14 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Debug CACHE STRING "Choose the type of build." FORCE)
 endif()
 
+# 检测编译器特性
+include(CheckCXXSourceCompiles)
+
+# Apple ld 不支持 --no-as-needed，检测并跳过
+set(CMAKE_REQUIRED_FLAGS "-Wl,--no-as-needed")
+check_cxx_source_compiles("int main(){return 0;}" LINKER_SUPPORTS_NO_AS_NEEDED)
+set(CMAKE_REQUIRED_FLAGS "")
+
 # 添加编译选项
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0 -Wall -Wextra -Wpedantic")
 
@@ -61,6 +69,10 @@ if(FTB_ENABLE_LIBSIXEL)
     add_compile_definitions(FTB_ENABLE_LIBSIXEL)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(SIXEL REQUIRED libsixel)
+    # libsixel may install header as <sixel.h> (flat) or <sixel/sixel.h> (subdir)
+    if(EXISTS "${SIXEL_INCLUDE_DIRS}/sixel/sixel.h")
+        add_compile_definitions(LIBSIXEL_HAS_SUBDIR)
+    endif()
     message(STATUS "libsixel support: ENABLED (native sixel image preview)")
 else()
     message(STATUS "libsixel support: DISABLED")
@@ -249,13 +261,17 @@ if(FTB_ENABLE_AI AND OpenSSL_FOUND)
 endif()
 
 if(FTB_ENABLE_SSH)
-    # --no-as-needed 确保 SSHConnection 尚未被实际引用时 libssh2 仍被链接
-    target_link_libraries(FTB_core PUBLIC
-        "-Wl,--no-as-needed"
-        ${LIBSSH2_LIBRARIES}
-        "-Wl,--as-needed"
-    )
     target_include_directories(FTB_core PUBLIC ${LIBSSH2_INCLUDE_DIRS})
+    if(LINKER_SUPPORTS_NO_AS_NEEDED)
+        # --no-as-needed 确保 SSHConnection 尚未被实际引用时 libssh2 仍被链接
+        target_link_libraries(FTB_core PUBLIC
+            "-Wl,--no-as-needed"
+            ${LIBSSH2_LIBRARIES}
+            "-Wl,--as-needed"
+        )
+    else()
+        target_link_libraries(FTB_core PUBLIC ${LIBSSH2_LIBRARIES})
+    endif()
 endif()
 
 if(FTB_ENABLE_LIBCHAFA)
@@ -316,12 +332,16 @@ if(FTB_ENABLE_TREE_SITTER)
     endforeach()
     message(STATUS "tree-sitter grammars: ${_found_count}/${_grammar_count} found")
 
-    # --as-needed 会丢弃静态库引用的共享库, 用 --no-as-needed 强制保留
-    target_link_libraries(FTB_core PUBLIC
-        "-Wl,--no-as-needed"
-        ${_ts_libs}
-        "-Wl,--as-needed"
-    )
+    if(LINKER_SUPPORTS_NO_AS_NEEDED)
+        # --as-needed 会丢弃静态库引用的共享库, 用 --no-as-needed 强制保留
+        target_link_libraries(FTB_core PUBLIC
+            "-Wl,--no-as-needed"
+            ${_ts_libs}
+            "-Wl,--as-needed"
+        )
+    else()
+        target_link_libraries(FTB_core PUBLIC ${_ts_libs})
+    endif()
 endif()
 
 # 构建主程序

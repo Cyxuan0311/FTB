@@ -19,7 +19,11 @@
 #include "../../third_party/stb_image.h"
 
 #ifdef FTB_ENABLE_LIBSIXEL
-#include <sixel/sixel.h>
+#  ifdef LIBSIXEL_HAS_SUBDIR
+#    include <sixel/sixel.h>
+#  else
+#    include <sixel.h>
+#  endif
 #endif
 
 namespace FTB {
