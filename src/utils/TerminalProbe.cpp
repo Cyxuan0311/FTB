@@ -86,6 +86,7 @@ std::string TerminalProbe::FindTerminalByProcessTree(int start_pid) {
         if (lower.find("gnome-terminal") != std::string::npos) return "gnome-terminal";
         if (lower.find("konsole") != std::string::npos) return "konsole";
         if (lower.find("mintty") != std::string::npos) return "mintty";
+        if (lower.find("mlterm") != std::string::npos) return "mlterm";
         if (lower.find("rxvt") != std::string::npos) return "rxvt";
         if (lower == "st" || lower.find("st-term") != std::string::npos) return "st";
         if (lower.find("tilix") != std::string::npos) return "tilix";
@@ -226,6 +227,8 @@ TerminalInfo TerminalProbe::NameToCapabilities(const std::string& name) {
     } else if (name == "contour") {
         info.sixel = true;
     } else if (name == "xterm") {
+        info.sixel = true;
+    } else if (name == "mlterm") {
         info.sixel = true;
     }
     // Other terminals: no known image protocol by default
