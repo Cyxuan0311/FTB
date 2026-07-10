@@ -105,6 +105,10 @@ struct AIPanelState {
     int total_display_lines = 0;
     int conv_height = 0;
 
+    // Tool permission confirmation
+    bool waiting_confirmation = false;
+    ToolCall pending_tool_call;
+
     ~AIPanelState();
     AIPanelState();
     AIPanelState(AIPanelState&&) noexcept;

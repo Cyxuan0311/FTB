@@ -2,6 +2,7 @@
 
 #include <string>
 #include <memory>
+#include <unordered_map>
 #include "ai/AIClient.hpp"
 #include "ai/ContextBuilder.hpp"
 #include "ai/ToolRegistry.hpp"
@@ -34,12 +35,20 @@ public:
     ToolRegistry& tools() { return tools_; }
     MemoryManager& memory() { return memory_; }
 
+    // Tool confirmation
+    void confirmCurrentTool();
+    void skipCurrentTool();
+    void alwaysAllowCurrentTool();
+
+    bool hasPendingConfirmations() const { return pending_tool_idx_ < static_cast<int>(pending_tool_calls_.size()); }
+
 private:
     void handleStreamChunk(const std::string& delta);
     void handleResponseDone(const std::string& full_response);
     void handleError(const std::string& error);
     void processPendingResponse();
     void continueProcessing();
+    void advanceAfterConfirm();
     int stream_visible_len() const;
 
     MainState& state_;
@@ -56,6 +65,15 @@ private:
     bool needs_auto_continue_ = false;
     int auto_continue_count_ = 0;
     static constexpr int max_auto_continue_ = 5;
+
+    // Tool permission confirmation
+    std::vector<ToolCall> pending_tool_calls_;
+    int pending_tool_idx_ = 0;
+
+    // Doom loop detection
+    std::unordered_map<std::string, int> consecutive_tool_errors_;
+    std::vector<std::string> skipped_tools_;
+    static constexpr int max_consecutive_errors_ = 3;
 };
 
 } // namespace FTB

@@ -191,7 +191,10 @@ void ActionExecutor::registerDefaultTools(ToolRegistry& registry) {
         t.parameters_schema = make_schema(required, props);
         t.executor = nullptr;
         t.dangerous = danger;
-        registry.registerTool(std::move(t));
+        t.permission = danger ? PermissionLevel::Prompt : PermissionLevel::Allowed;
+        if (!registry.registerTool(std::move(t))) {
+            // Tool name collision - should not happen with static registration
+        }
     };
 
     // Original actions
