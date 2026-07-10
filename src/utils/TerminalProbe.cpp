@@ -93,6 +93,7 @@ std::string TerminalProbe::FindTerminalByProcessTree(int start_pid) {
         if (lower.find("ghostty") != std::string::npos) return "ghostty";
         if (lower.find("rio") != std::string::npos) return "rio";
         if (lower.find("blackbox") != std::string::npos) return "blackbox";
+        if (lower.find("bobcat") != std::string::npos) return "bobcat";
         if (lower.find("lagrange") != std::string::npos) return "lagrange";
         if (lower.find("yakuake") != std::string::npos) return "yakuake";
         if (lower.find("terminology") != std::string::npos) return "terminology";
@@ -229,6 +230,9 @@ TerminalInfo TerminalProbe::NameToCapabilities(const std::string& name) {
     } else if (name == "xterm") {
         info.sixel = true;
     } else if (name == "mlterm") {
+        info.sixel = true;
+    } else if (name == "bobcat") {
+        info.kitty = true;
         info.sixel = true;
     }
     // Other terminals: no known image protocol by default
