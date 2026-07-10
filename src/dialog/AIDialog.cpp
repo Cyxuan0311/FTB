@@ -126,6 +126,8 @@ static Element makeTextLine(const std::string& str, ftxui::Color col,
     return withDim(base);
 }
 
+static Element RenderAIStatusPanel(const MainState& state, int width);
+
 Element RenderAIPanel(MainState& state, int tw, int th, bool fullscreen) {
 
     if (!state.ai_agent) {
@@ -625,7 +627,9 @@ Element RenderAIPanel(MainState& state, int tw, int th, bool fullscreen) {
     }
 
     if (fullscreen) {
-        return vbox(std::move(main_els))
+        auto left = vbox(std::move(main_els)) | bgcolor(TC("main_bg")) | size(WIDTH, EQUAL, conv_pw);
+        auto right = RenderAIStatusPanel(state, status_w) | GetPanelBorder();
+        return hbox({left, separator() | color(TC("main_border")), right})
             | bgcolor(TC("main_bg"));
     }
     return vbox(std::move(main_els))
@@ -633,6 +637,87 @@ Element RenderAIPanel(MainState& state, int tw, int th, bool fullscreen) {
         | GetPanelBorder()
         | size(WIDTH, EQUAL, pw)
         | center;
+}
+
+static Element RenderAIStatusPanel(const MainState& state, int width) {
+    auto& ai = state.ai;
+    if (!state.ai_agent) {
+        return vbox({}) | size(WIDTH, EQUAL, width);
+    }
+    auto& agent = *state.ai_agent;
+
+    Elements lines;
+
+    // ── Session ──
+    lines.push_back(text("  Session") | bold | color(TC("title")));
+    {
+        auto& sm = SessionManager::getInstance();
+        std::string sname;
+        if (auto* s = sm.getSession(ai.current_session_id))
+            sname = s->name;
+        lines.push_back(text("    " + (sname.empty() ? "(current)" : sname)) | color(TC("main_fg")));
+        lines.push_back(text("    msgs: " + std::to_string(ai.entries.size())) | color(TC("dim")) | dim);
+    }
+    lines.push_back(text(""));
+
+    // ── Model ──
+    lines.push_back(text("  Model") | bold | color(TC("title")));
+    {
+        auto& cfg = ConfigManager::GetInstance()->GetConfig();
+        const auto& active_key = cfg.ai.keys.empty()
+            ? AIKeyConfig{} : cfg.ai.keys[cfg.ai.active_key % cfg.ai.keys.size()];
+        lines.push_back(text("    " + active_key.model) | color(TC("main_fg")));
+        std::string backend = (active_key.backend == "openai") ? "OpenAI" : "Ollama";
+        lines.push_back(text("    [" + backend + "]") | color(TC("dim")) | dim);
+    }
+    lines.push_back(text(""));
+
+    // ── Tokens ──
+    lines.push_back(text("  Tokens") | bold | color(TC("title")));
+    {
+        auto metrics = agent.memory().getMetrics();
+        std::string tok_str = std::to_string(metrics.total_tokens);
+        lines.push_back(text("    total: " + tok_str) | color(TC("main_fg")));
+        lines.push_back(text("    user: " + std::to_string(metrics.user_message_count)
+            + "  asst: " + std::to_string(metrics.assistant_message_count)) | color(TC("dim")) | dim);
+    }
+    lines.push_back(text(""));
+
+    // ── Tools ──
+    lines.push_back(text("  Tools") | bold | color(TC("title")));
+    {
+        int steps = 0, successes = 0, errors = 0;
+        for (const auto& e : ai.entries) {
+            if (e.type == AILogEntry::Step) steps++;
+            else if (e.type == AILogEntry::Success) successes++;
+            else if (e.type == AILogEntry::Error) errors++;
+        }
+        lines.push_back(text("    calls: " + std::to_string(steps)) | color(TC("main_fg")));
+        lines.push_back(hbox({
+            text("    OK:") | color(TC("success")),
+            text(std::to_string(successes)) | color(TC("success")),
+            text("  FAIL:") | color(TC("error")),
+            text(std::to_string(errors)) | color(TC("error")),
+        }));
+    }
+    lines.push_back(text(""));
+
+    // ── State ──
+    lines.push_back(text("  State") | bold | color(TC("title")));
+    {
+        std::string s;
+        ftxui::Color c = TC("main_fg");
+        if (agent.isProcessing()) {
+            if (agent.isStreaming()) { s = "Receiving"; c = TC("warning"); }
+            else { s = "Thinking"; c = TC("warning"); }
+        } else {
+            s = "Idle";
+            c = TC("success");
+        }
+        lines.push_back(text("    " + s) | bold | color(c));
+    }
+
+    return vbox(std::move(lines)) | size(WIDTH, EQUAL, width);
 }
 
 static void switchToSession(MainState& state, const std::string& session_id) {
