@@ -105,6 +105,9 @@ struct AIPanelState {
     int total_display_lines = 0;
     int conv_height = 0;
 
+    // Scrollbar dragging
+    bool sb_dragging = false;
+
     // Tool permission confirmation
     bool waiting_confirmation = false;
     ToolCall pending_tool_call;

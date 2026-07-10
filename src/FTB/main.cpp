@@ -428,6 +428,26 @@ int main(int argc, char* argv[])
                 }
 
                 if (mouse.button == Mouse::Left) {
+                    // Scrollbar drag (right side of conversation)
+                    int sb_x = state.ai.conv_area_x + state.ai.conv_content_width;
+                    bool on_scrollbar = (mouse.x >= sb_x && mouse.x < sb_x + 2);
+
+                    if (on_scrollbar && (mouse.motion == Mouse::Pressed || mouse.motion == Mouse::Moved)) {
+                        int max_scroll = std::max(0, state.ai.total_display_lines - state.ai.conv_height);
+                        int rel_y = mouse.y - state.ai.conv_area_y;
+                        int track_h = state.ai.conv_height;
+                        int target = (track_h > 1) ? max_scroll * rel_y / (track_h - 1) : 0;
+                        state.ai.log_scroll = std::clamp(target, 0, max_scroll);
+                        state.ai.auto_scroll = (state.ai.log_scroll >= max_scroll);
+                        if (mouse.motion == Mouse::Pressed) state.ai.sb_dragging = true;
+                        return true;
+                    }
+                    if (mouse.motion == Mouse::Released && state.ai.sb_dragging) {
+                        state.ai.sb_dragging = false;
+                        return true;
+                    }
+
+                    // Text selection
                     if (mouse.motion == Mouse::Pressed) {
                         state.ai.sel_dragging = true;
                         int abs_line = state.ai.log_scroll + mouse.y - state.ai.conv_area_y;
