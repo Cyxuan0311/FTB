@@ -4,6 +4,7 @@
 #include "config/ConfigManager.hpp"
 #include "renderer/detail_element.hpp"
 
+
 namespace FTB {
 
 AIAgent::AIAgent(MainState& state)
@@ -242,6 +243,7 @@ void AIAgent::processPendingResponse() {
         state_.ai.pending_tool_call = pending_tool_calls_[0];
         state_.ai.entries.push_back({AILogEntry::System,
             "[pending] Tool '" + pending_tool_calls_[0].name + "' needs confirmation"});
+        stream_buffer_.clear();
         processing_ = false;
         if (state_.screen) {
             state_.screen->Post(ftxui::Event::Custom);
@@ -263,6 +265,7 @@ void AIAgent::processPendingResponse() {
         needs_auto_continue_ = true;
     }
 
+    stream_buffer_.clear();
     processing_ = false;
     if (state_.screen) {
         state_.screen->Post(ftxui::Event::Custom);
