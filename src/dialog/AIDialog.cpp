@@ -4,6 +4,7 @@
 #include "config/ConfigManager.hpp"
 #include "renderer/detail_element.hpp"
 
+
 #include <sstream>
 #include <algorithm>
 
@@ -63,6 +64,22 @@ static Element makeRoleSeparator(const std::string& role, ftxui::Color role_colo
 
 
 
+static Element renderScrollbar(int log_scroll, int track_h, int total_lines) {
+    int max_scroll = std::max(0, total_lines - track_h);
+    if (max_scroll <= 0)
+        return vbox(Elements(track_h, text("  ") | dim));
+    int thumb_h = std::max(1, track_h * track_h / std::max(1, total_lines));
+    int thumb_pos = (track_h - thumb_h) * log_scroll / std::max(1, max_scroll);
+    Elements rows;
+    for (int i = 0; i < track_h; i++) {
+        if (i >= thumb_pos && i < thumb_pos + thumb_h)
+            rows.push_back(text(" \u2588") | color(TC("selection_bg")));
+        else
+            rows.push_back(text(" \u2502") | dim);
+    }
+    return vbox(std::move(rows));
+}
+
 // Character-level run-length highlighted text line
 static Element makeTextLine(const std::string& str, ftxui::Color col,
                             int abs_line, const AIPanelState& ai,
@@ -120,7 +137,12 @@ Element RenderAIPanel(MainState& state, int tw, int th, bool fullscreen) {
     agent.onRenderTick();
 
     int pw = fullscreen ? (tw - 2) : std::min(76, tw - 6);
-    int content_width = pw - 4;
+    int status_w = fullscreen ? std::clamp(pw / 4, 18, 30) : 0;
+    int sep_w = (status_w > 0 && fullscreen) ? 1 : 0;
+    int conv_pw = pw - status_w - sep_w;
+    int content_width = conv_pw - 4;
+    int scrollbar_w = 2;
+    int text_width = content_width - scrollbar_w;
     int conv_height = fullscreen
         ? std::clamp(th - 10, 6, th - 6)
         : std::clamp(th * 6 / 10, 8, 30);
@@ -131,13 +153,13 @@ Element RenderAIPanel(MainState& state, int tw, int th, bool fullscreen) {
         if (fullscreen) {
             ai.conv_area_x = 1;
             ai.conv_area_y = 3;
-            ai.conv_content_width = content_width;
+            ai.conv_content_width = text_width;
         } else {
             int dialog_top = std::max(0, (th - dialog_height) / 2);
             int dialog_left = (tw - pw) / 2;
             ai.conv_area_x = dialog_left + 1;
             ai.conv_area_y = dialog_top + 3;
-            ai.conv_content_width = content_width;
+            ai.conv_content_width = text_width;
         }
     }
 
@@ -153,21 +175,21 @@ Element RenderAIPanel(MainState& state, int tw, int th, bool fullscreen) {
             if (type == AILogEntry::User) {
                 int text_lines = 0;
                 while (ei < static_cast<int>(entries.size()) && entries[ei].type == AILogEntry::User) {
-                    text_lines += calcWrappedLines(entries[ei].text, content_width);
+                    text_lines += calcWrappedLines(entries[ei].text, text_width);
                     ei++;
                 }
-                group_lines = text_lines + 3;  // header + text + footer + trailing blank
+                group_lines = text_lines + 2;  // header + text + trailing blank
             } else if (type == AILogEntry::Assistant) {
                 int text_lines = 0, step_lines = 0, success_lines = 0, error_lines = 0, system_lines = 0;
                 while (ei < static_cast<int>(entries.size()) && entries[ei].type != AILogEntry::User) {
                     auto t = entries[ei].type;
                     int w;
-                    if (t == AILogEntry::Assistant) w = calcWrappedLines(entries[ei].text, content_width - 2);
-                    else if (t == AILogEntry::Step) w = calcWrappedLines(entries[ei].text, content_width - 4);
-                    else if (t == AILogEntry::Success) w = calcWrappedLines(entries[ei].text, content_width - 4);
-                    else if (t == AILogEntry::Error) w = calcWrappedLines(entries[ei].text, content_width - 4);
-                    else if (t == AILogEntry::System) w = calcWrappedLines(entries[ei].text, content_width - 2);
-                    else w = calcWrappedLines(entries[ei].text, content_width);
+                    if (t == AILogEntry::Assistant) w = calcWrappedLines(entries[ei].text, text_width - 2);
+                    else if (t == AILogEntry::Step) w = calcWrappedLines(entries[ei].text, text_width - 4);
+                    else if (t == AILogEntry::Success) w = calcWrappedLines(entries[ei].text, text_width - 4);
+                    else if (t == AILogEntry::Error) w = calcWrappedLines(entries[ei].text, text_width - 4);
+                    else if (t == AILogEntry::System) w = calcWrappedLines(entries[ei].text, text_width - 2);
+                    else w = calcWrappedLines(entries[ei].text, text_width);
                     if (t == AILogEntry::Assistant) text_lines += w;
                     else if (t == AILogEntry::Step) step_lines += w;
                     else if (t == AILogEntry::Success) success_lines += w;
@@ -180,7 +202,7 @@ Element RenderAIPanel(MainState& state, int tw, int th, bool fullscreen) {
                 while (ei < static_cast<int>(entries.size())
                        && entries[ei].type != AILogEntry::User
                        && entries[ei].type != AILogEntry::Assistant) {
-                    group_lines += calcWrappedLines(entries[ei].text, content_width);
+                    group_lines += calcWrappedLines(entries[ei].text, text_width);
                     ei++;
                 }
             }
@@ -191,7 +213,7 @@ Element RenderAIPanel(MainState& state, int tw, int th, bool fullscreen) {
         if (agent.isProcessing() && !agent.getStreamBuffer().empty()) {
             int vis = std::min(ai.stream_visible_len, static_cast<int>(agent.getStreamBuffer().size()));
             std::string sb = agent.getStreamBuffer().substr(0, vis);
-            int sb_lines = calcWrappedLines(sb, content_width - 2);
+            int sb_lines = calcWrappedLines(sb, text_width - 2);
             bool has_assistant = false;
             for (int j = static_cast<int>(ai.entries.size()) - 1; j >= 0; --j) {
                 if (ai.entries[j].type == AILogEntry::Assistant) { has_assistant = true; break; }
@@ -348,7 +370,7 @@ Element RenderAIPanel(MainState& state, int tw, int th, bool fullscreen) {
                                     int indent, const std::string& prefix,
                                     ftxui::Color col, bool dim_flag) {
                 for (const auto& s : src) {
-                    auto wl = wrapText(s, content_width - indent);
+                    auto wl = wrapText(s, text_width - indent);
                     for (const auto& l : wl) {
                         conversation.push_back(makeTextLine(prefix + l, col, current_abs_line, ai, dim_flag));
                         current_abs_line++;
@@ -370,7 +392,7 @@ Element RenderAIPanel(MainState& state, int tw, int th, bool fullscreen) {
                             if (ai.entries[j].type == AILogEntry::User) break;
                         }
                         if (!has_assistant) {
-                            conversation.push_back(makeRoleSeparator("Assistant", TC("success"), content_width));
+                            conversation.push_back(makeRoleSeparator("Assistant", TC("success"), text_width));
                             current_abs_line++;
                         }
                         renderLines(std::vector<std::string>(1, sb), 2, "  ", TC("success"), false);
@@ -388,14 +410,14 @@ Element RenderAIPanel(MainState& state, int tw, int th, bool fullscreen) {
                 if (current_type == AILogEntry::User) {
                     // Role separator
                     {
-                        auto el = makeRoleSeparator("You", TC("syn_keyword"), content_width);
+                        auto el = makeRoleSeparator("You", TC("syn_keyword"), text_width);
                         if (isSelected(current_abs_line)) el = el | bgcolor(TC("selection_bg"));
                         conversation.push_back(el);
                         current_abs_line++;
                     }
                     // Wrapped text lines (left-aligned with indent)
                     for (int j = gs; j <= ge; ++j) {
-                        auto wl = wrapText(ai.entries[j].text, content_width);
+                        auto wl = wrapText(ai.entries[j].text, text_width);
                         for (const auto& l : wl) {
                             auto el = text("    " + l) | color(TC("main_fg"));
                             if (isSelected(current_abs_line)) el = el | bgcolor(TC("selection_bg"));
@@ -408,7 +430,7 @@ Element RenderAIPanel(MainState& state, int tw, int th, bool fullscreen) {
                 else if (current_type == AILogEntry::Assistant) {
                     // Role separator
                     {
-                        conversation.push_back(makeRoleSeparator("Assistant", TC("success"), content_width));
+                        conversation.push_back(makeRoleSeparator("Assistant", TC("success"), text_width));
                         current_abs_line++;
                     }
                     // Collect content by type
@@ -442,7 +464,7 @@ Element RenderAIPanel(MainState& state, int tw, int th, bool fullscreen) {
                 }
                 else {
                     for (int j = gs; j <= ge; ++j) {
-                        auto wl = wrapText(ai.entries[j].text, content_width);
+                        auto wl = wrapText(ai.entries[j].text, text_width);
                         for (const auto& l : wl) {
                             conversation.push_back(makeTextLine(" " + l, TC("dim"), current_abs_line, ai));
                             current_abs_line++;
@@ -451,7 +473,11 @@ Element RenderAIPanel(MainState& state, int tw, int th, bool fullscreen) {
                 }
             }
 
-            main_els.push_back(vbox(std::move(conversation)) | size(HEIGHT, EQUAL, conv_height));
+            auto sb = renderScrollbar(ai.log_scroll, conv_height, ai.total_display_lines);
+            main_els.push_back(hbox({
+                vbox(std::move(conversation)) | size(HEIGHT, EQUAL, conv_height),
+                sb | size(HEIGHT, EQUAL, conv_height),
+            }));
         }
     }
 
@@ -514,14 +540,14 @@ Element RenderAIPanel(MainState& state, int tw, int th, bool fullscreen) {
             main_els.push_back(
                 vbox(std::move(confirm_lines))
                 | bgcolor(TC("main_bg"))
-                | borderStyled(ROUNDED, TC("main_border"))
+                | borderStyled(ROUNDED, TC("selection_bg"))
             );
         } else if (agent.isProcessing()) {
             auto input_content = text("  waiting for response...") | color(TC("dim")) | flex_grow;
             main_els.push_back(
                 hbox({ input_content })
                 | bgcolor(TC("main_bg"))
-                | borderStyled(ROUNDED, TC("main_border"))
+                | borderStyled(ROUNDED, TC("selection_bg"))
             );
         } else {
             ftxui::Color text_color = ai.input_focused
@@ -566,7 +592,7 @@ Element RenderAIPanel(MainState& state, int tw, int th, bool fullscreen) {
 
             main_els.push_back(
                 vbox(std::move(rows))
-                | borderStyled(ROUNDED, TC("main_border"))
+                | borderStyled(ROUNDED, TC("selection_bg"))
             );
         }
     }
@@ -591,9 +617,9 @@ Element RenderAIPanel(MainState& state, int tw, int th, bool fullscreen) {
         }
 
         auto hint_el = hbox({
-            text(hints) | color(TC("dim")) | dim,
+            text(hints) | color(TC("syn_keyword")) | dim,
             filler(),
-            text(line_info + ctx_info) | color(TC("dim")) | dim,
+            text(line_info + ctx_info) | color(TC("syn_keyword")) | dim,
         });
         main_els.push_back(hint_el);
     }
