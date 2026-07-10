@@ -13,11 +13,11 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0 -Wall -Wextra -Wpedan
 
 # ---- 可选功能开关 ----
 option(FTB_ENABLE_SSH "Enable SSH connection support" OFF)
-option(FTB_ENABLE_ICONS "Enable Nerd Font icons (requires patched font)" ON)
+option(FTB_ENABLE_ICONS "Enable Nerd Font icons (requires patched font)" OFF)
 option(FTB_ENABLE_LIBCHAFA "Enable libchafa for advanced image preview" OFF)
 option(FTB_ENABLE_LIBSIXEL "Enable libsixel for native sixel image preview" OFF)
 option(FTB_ENABLE_TREE_SITTER "Enable tree-sitter for advanced syntax highlighting" OFF)
-option(FTB_ENABLE_PLUGINS "Enable TypeScript/JavaScript plugin system" ON)
+option(FTB_ENABLE_PLUGINS "Enable TypeScript/JavaScript plugin system" OFF)
 option(FTB_ENABLE_AI "Enable AI assistant panel (requires httplib)" OFF)
 
 # 设置包含目录

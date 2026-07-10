@@ -4,7 +4,9 @@
 #include <string>
 #include <sys/types.h>
 
-namespace ftxui { class ScreenInteractive; }
+#include <ftxui/component/screen_interactive.hpp>
+// Include header instead of forward-declaring ScreenInteractive
+// to handle ftxui version differences (class vs using alias)
 
 namespace FTB {
 
