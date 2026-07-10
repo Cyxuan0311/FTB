@@ -3,6 +3,9 @@
 #include "config/ConfigManager.hpp"
 #include "preview/PreviewCache.hpp"
 #include "utils/FilesystemUtil.hpp"
+#ifdef FTB_ENABLE_AI
+#include "ai/SessionManager.hpp"
+#endif
 #include <filesystem>
 #include <mutex>
 
@@ -55,6 +58,7 @@ bool TabClipboard::paste(const std::string& targetPath) {
 // ---- Tab ----
 
 std::string Tab::displayName() const {
+    if (!display_name_override.empty()) return display_name_override;
     try {
         fs::path p(currentPath);
         std::string name = p.filename().string();
@@ -98,12 +102,40 @@ TabManager::TabManager() {
 
 int TabManager::createTab(const std::string& path) {
     Tab tab;
+    tab.type = TabType::FileBrowser;
     tab.init(path);
     tabs_.push_back(std::move(tab));
     int newIndex = static_cast<int>(tabs_.size()) - 1;
     switchTo(newIndex);
     return newIndex;
 }
+
+#ifdef FTB_ENABLE_AI
+int TabManager::createAITab(const std::string& path, const std::string& session_id, const std::string& display_name) {
+    Tab tab;
+    tab.type = TabType::AIAgent;
+    tab.currentPath = path;
+    tab.ai_session_id = session_id;
+    tab.display_name_override = display_name;
+    tabs_.push_back(std::move(tab));
+    int newIndex = static_cast<int>(tabs_.size()) - 1;
+    switchTo(newIndex);
+    return newIndex;
+}
+
+bool TabManager::isAITab(int index) const {
+    if (index < 0 || index >= static_cast<int>(tabs_.size())) return false;
+    return tabs_[index].type == TabType::AIAgent;
+}
+
+int TabManager::aiTabCount() const {
+    int count = 0;
+    for (const auto& t : tabs_) {
+        if (t.type == TabType::AIAgent) count++;
+    }
+    return count;
+}
+#endif
 
 bool TabManager::closeTab(int index) {
     if (tabs_.size() <= 1) return false;
@@ -154,6 +186,15 @@ const Tab& TabManager::tabAt(int index) const {
 
 void TabManager::saveActiveTabState(MainState& state) {
     auto& tab = active();
+#ifdef FTB_ENABLE_AI
+    if (tab.type == TabType::AIAgent) {
+        if (state.ai_agent) {
+            state.ai_agent->syncToSessionManager();
+        }
+        tab.ai_session_id = state.ai.current_session_id;
+        return;
+    }
+#endif
     tab.currentPath = state.currentPath;
     tab.selected = state.selected;
     tab.hovered_index = state.hovered_index;
@@ -177,6 +218,22 @@ void TabManager::saveActiveTabState(MainState& state) {
 void TabManager::loadTabState(MainState& state, int index) {
     switchTo(index);
     const auto& tab = active();
+#ifdef FTB_ENABLE_AI
+    if (tab.type == TabType::AIAgent) {
+        if (state.ai_agent) {
+            auto& sm = SessionManager::getInstance();
+            sm.setActiveSession(tab.ai_session_id);
+            state.ai.current_session_id = tab.ai_session_id;
+            state.ai.entries.clear();
+            state.ai.log_scroll = 0;
+            state.ai.auto_scroll = true;
+            if (auto* session = sm.getSession(tab.ai_session_id)) {
+                state.ai_agent->loadSession(session->messages);
+            }
+        }
+        return;
+    }
+#endif
     state.currentPath = tab.currentPath;
     state.selected = tab.selected;
     state.hovered_index = tab.hovered_index;

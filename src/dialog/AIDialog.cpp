@@ -39,6 +39,28 @@ static std::vector<std::string> wrapText(const std::string& str, int max_width) 
     return result;
 }
 
+static int calcWrappedLines(const std::string& str, int max_width) {
+    if (max_width <= 0 || str.empty()) return 1;
+    return (static_cast<int>(str.size()) + max_width - 1) / max_width;
+}
+
+static Element makeRoleSeparator(const std::string& role, ftxui::Color role_color, int width) {
+    std::string prefix = "  ";
+    std::string head = "\u2500\u2500 ";
+    std::string body = " " + role + " ";
+    int remaining = width - static_cast<int>(prefix.size() + head.size() + body.size());
+    if (remaining < 0) remaining = 0;
+    std::string tail;
+    for (int i = 0; i < remaining; i++) tail += "\u2500";
+    return hbox({
+        text(prefix),
+        text(head) | color(TC("main_border")),
+        text(role) | bold | color(role_color),
+        text(" ") | color(TC("main_border")),
+        text(tail) | color(TC("main_border")),
+    }) | color(TC("main_border"));
+}
+
 
 
 // Character-level run-length highlighted text line
@@ -87,7 +109,7 @@ static Element makeTextLine(const std::string& str, ftxui::Color col,
     return withDim(base);
 }
 
-Element RenderAIPanel(MainState& state, int tw, int th) {
+Element RenderAIPanel(MainState& state, int tw, int th, bool fullscreen) {
 
     if (!state.ai_agent) {
         state.ai_agent = std::make_unique<AIAgent>(state);
@@ -97,18 +119,26 @@ Element RenderAIPanel(MainState& state, int tw, int th) {
 
     agent.onRenderTick();
 
-    int pw = std::min(76, tw - 6);
+    int pw = fullscreen ? (tw - 2) : std::min(76, tw - 6);
     int content_width = pw - 4;
-    int conv_height = std::clamp(th * 6 / 10, 8, 30);
+    int conv_height = fullscreen
+        ? std::clamp(th - 10, 6, th - 6)
+        : std::clamp(th * 6 / 10, 8, 30);
     ai.conv_height = conv_height;
     {
         int input_lines = std::max(1, 1 + static_cast<int>(ai.input_text.size()) / std::max(1, content_width - 4));
         int dialog_height = conv_height + input_lines + 8;
-        int dialog_top = std::max(0, (th - dialog_height) / 2);
-        int dialog_left = (tw - pw) / 2;
-        ai.conv_area_x = dialog_left + 1;
-        ai.conv_area_y = dialog_top + 3;
-        ai.conv_content_width = content_width;
+        if (fullscreen) {
+            ai.conv_area_x = 1;
+            ai.conv_area_y = 3;
+            ai.conv_content_width = content_width;
+        } else {
+            int dialog_top = std::max(0, (th - dialog_height) / 2);
+            int dialog_left = (tw - pw) / 2;
+            ai.conv_area_x = dialog_left + 1;
+            ai.conv_area_y = dialog_top + 3;
+            ai.conv_content_width = content_width;
+        }
     }
 
     // Pre-compute display line count per entry group
@@ -123,29 +153,56 @@ Element RenderAIPanel(MainState& state, int tw, int th) {
             if (type == AILogEntry::User) {
                 int text_lines = 0;
                 while (ei < static_cast<int>(entries.size()) && entries[ei].type == AILogEntry::User) {
-                    text_lines += std::max(1, static_cast<int>(entries[ei].text.size()) / std::max(1, content_width));
+                    text_lines += calcWrappedLines(entries[ei].text, content_width);
                     ei++;
                 }
-                group_lines = text_lines + 2;
+                group_lines = text_lines + 3;  // header + text + footer + trailing blank
             } else if (type == AILogEntry::Assistant) {
-                int text_lines = 0, step_lines = 0;
+                int text_lines = 0, step_lines = 0, success_lines = 0, error_lines = 0, system_lines = 0;
                 while (ei < static_cast<int>(entries.size()) && entries[ei].type != AILogEntry::User) {
-                    int w = std::max(1, static_cast<int>(entries[ei].text.size()) / std::max(1, content_width - 2));
-                    if (entries[ei].type == AILogEntry::Assistant) text_lines += w;
-                    else step_lines += w;
+                    auto t = entries[ei].type;
+                    int w;
+                    if (t == AILogEntry::Assistant) w = calcWrappedLines(entries[ei].text, content_width - 2);
+                    else if (t == AILogEntry::Step) w = calcWrappedLines(entries[ei].text, content_width - 4);
+                    else if (t == AILogEntry::Success) w = calcWrappedLines(entries[ei].text, content_width - 4);
+                    else if (t == AILogEntry::Error) w = calcWrappedLines(entries[ei].text, content_width - 4);
+                    else if (t == AILogEntry::System) w = calcWrappedLines(entries[ei].text, content_width - 2);
+                    else w = calcWrappedLines(entries[ei].text, content_width);
+                    if (t == AILogEntry::Assistant) text_lines += w;
+                    else if (t == AILogEntry::Step) step_lines += w;
+                    else if (t == AILogEntry::Success) success_lines += w;
+                    else if (t == AILogEntry::Error) error_lines += w;
+                    else if (t == AILogEntry::System) system_lines += w;
                     ei++;
                 }
-                group_lines = 1 + text_lines + step_lines;
+                group_lines = 1 + text_lines + step_lines + success_lines + error_lines + system_lines + 1;  // header + all content + trailing blank
             } else {
                 while (ei < static_cast<int>(entries.size())
                        && entries[ei].type != AILogEntry::User
                        && entries[ei].type != AILogEntry::Assistant) {
-                    group_lines += std::max(1, static_cast<int>(entries[ei].text.size()) / std::max(1, content_width));
+                    group_lines += calcWrappedLines(entries[ei].text, content_width);
                     ei++;
                 }
             }
             ai.entry_line_heights.push_back(group_lines);
             ai.total_display_lines += group_lines;
+        }
+        // Add stream buffer / spinner lines as a virtual group for scroll calculation
+        if (agent.isProcessing() && !agent.getStreamBuffer().empty()) {
+            int vis = std::min(ai.stream_visible_len, static_cast<int>(agent.getStreamBuffer().size()));
+            std::string sb = agent.getStreamBuffer().substr(0, vis);
+            int sb_lines = calcWrappedLines(sb, content_width - 2);
+            bool has_assistant = false;
+            for (int j = static_cast<int>(ai.entries.size()) - 1; j >= 0; --j) {
+                if (ai.entries[j].type == AILogEntry::Assistant) { has_assistant = true; break; }
+                if (ai.entries[j].type == AILogEntry::User) break;
+            }
+            if (!has_assistant) sb_lines += 1;
+            ai.entry_line_heights.push_back(sb_lines);
+            ai.total_display_lines += sb_lines;
+        } else if (agent.isProcessing()) {
+            ai.entry_line_heights.push_back(1);
+            ai.total_display_lines += 1;
         }
     }
 
@@ -180,28 +237,35 @@ Element RenderAIPanel(MainState& state, int tw, int th) {
         auto& cfg = ConfigManager::GetInstance()->GetConfig();
         const auto& active_key = cfg.ai.keys.empty()
             ? AIKeyConfig{} : cfg.ai.keys[cfg.ai.active_key % cfg.ai.keys.size()];
-        std::string title = " AI  " + active_key.model + "  [";
-        title += (active_key.backend == "openai") ? "OpenAI" : "Ollama";
-        title += "]";
+        std::string model_part = active_key.model;
+        std::string backend_part = (active_key.backend == "openai") ? "OpenAI" : "Ollama";
+
+        std::string status_part;
+        if (agent.isProcessing()) {
+            if (agent.isStreaming() && !agent.getStreamBuffer().empty()) {
+                status_part = std::string(" ") + spinner_chars[ai.spinner_index] + " Receiving";
+            } else {
+                status_part = std::string(" ") + spinner_chars[ai.spinner_index] + " Thinking";
+            }
+        }
 
         auto& sm = SessionManager::getInstance();
         std::string session_info;
         if (auto* s = sm.getSession(ai.current_session_id)) {
-            session_info = "  <" + s->name + ">";
-        }
-
-        if (agent.isProcessing()) {
-            if (agent.isStreaming() && !agent.getStreamBuffer().empty()) {
-                title += std::string("  ") + spinner_chars[ai.spinner_index] + " Receiving";
-            } else {
-                title += std::string("  ") + spinner_chars[ai.spinner_index] + " Thinking";
-            }
+            session_info = s->name;
         }
 
         main_els.push_back(
-            hbox({ text(title) | bold | color(TC("title")),
-                   filler(),
-                   text(session_info) | color(TC("syn_keyword")) | dim })
+            hbox({
+                text(" AI ") | bold | color(TC("title")),
+                text(model_part) | color(TC("main_fg")),
+                text(" [") | color(TC("dim")),
+                text(backend_part) | color(TC("syn_keyword")),
+                text("]") | color(TC("dim")),
+                text(status_part) | color(TC("warning")),
+                filler(),
+                text(session_info) | color(TC("syn_keyword")) | dim,
+            })
         );
         main_els.push_back(separator() | color(TC("main_border")));
     }
@@ -224,7 +288,7 @@ Element RenderAIPanel(MainState& state, int tw, int th) {
                 line_offset -= ai.entry_line_heights[g];
             }
 
-            // Count visible groups
+            // Count visible groups (include at least the first group, even partially)
             int rem = conv_height;
             int visible_groups = 0;
             for (int g = first_group; g < static_cast<int>(ai.entry_line_heights.size()); ++g) {
@@ -232,11 +296,9 @@ Element RenderAIPanel(MainState& state, int tw, int th) {
                     rem -= ai.entry_line_heights[g];
                     visible_groups++;
                 } else {
+                    if (visible_groups == 0) visible_groups = 1;
                     break;
                 }
-            }
-            if (visible_groups == 0 && first_group < static_cast<int>(ai.entry_line_heights.size())) {
-                visible_groups = 1;
             }
 
             Elements conversation;
@@ -258,62 +320,95 @@ Element RenderAIPanel(MainState& state, int tw, int th) {
                 for (int g = 0; g < static_cast<int>(ai.entry_line_heights.size()); ++g) {
                     GMap gm;
                     gm.start_entry = ei;
-                    auto type = ai.entries[ei].type;
-                    if (type == AILogEntry::User) {
-                        while (ei < static_cast<int>(ai.entries.size()) && ai.entries[ei].type == AILogEntry::User) ei++;
-                    } else if (type == AILogEntry::Assistant) {
-                        while (ei < static_cast<int>(ai.entries.size()) && ai.entries[ei].type != AILogEntry::User) ei++;
+                    if (ei >= static_cast<int>(ai.entries.size())) {
+                        // Virtual group (stream buffer / spinner beyond real entries)
+                        gm.start_entry = -1;
+                        gm.end_entry = -1;
                     } else {
-                        while (ei < static_cast<int>(ai.entries.size())
-                            && ai.entries[ei].type != AILogEntry::User
-                            && ai.entries[ei].type != AILogEntry::Assistant) ei++;
+                        auto type = ai.entries[ei].type;
+                        if (type == AILogEntry::User) {
+                            while (ei < static_cast<int>(ai.entries.size()) && ai.entries[ei].type == AILogEntry::User) ei++;
+                        } else if (type == AILogEntry::Assistant) {
+                            while (ei < static_cast<int>(ai.entries.size()) && ai.entries[ei].type != AILogEntry::User) ei++;
+                        } else {
+                            while (ei < static_cast<int>(ai.entries.size())
+                                && ai.entries[ei].type != AILogEntry::User
+                                && ai.entries[ei].type != AILogEntry::Assistant) ei++;
+                        }
+                        gm.end_entry = ei - 1;
                     }
-                    gm.end_entry = ei - 1;
                     group_map.push_back(gm);
                 }
             }
 
-            int last_group_idx = std::min(first_group + visible_groups, static_cast<int>(ai.entry_line_heights.size()));
+            int last_group_idx = std::min(first_group + visible_groups, static_cast<int>(group_map.size()));
             int current_abs_line = ai.log_scroll;
+
+            auto renderLines = [&](const std::vector<std::string>& src,
+                                    int indent, const std::string& prefix,
+                                    ftxui::Color col, bool dim_flag) {
+                for (const auto& s : src) {
+                    auto wl = wrapText(s, content_width - indent);
+                    for (const auto& l : wl) {
+                        conversation.push_back(makeTextLine(prefix + l, col, current_abs_line, ai, dim_flag));
+                        current_abs_line++;
+                    }
+                }
+            };
 
             for (int g = first_group; g < last_group_idx; ++g) {
                 int gs = group_map[g].start_entry;
+                if (gs < 0) {
+                    // Virtual stream buffer / spinner group
+                    if (agent.isProcessing() && !agent.getStreamBuffer().empty()) {
+                        int vis = std::min(ai.stream_visible_len, static_cast<int>(agent.getStreamBuffer().size()));
+                        std::string sb = agent.getStreamBuffer().substr(0, vis);
+                        // Check if there's an assistant entry (header already rendered)
+                        bool has_assistant = false;
+                        for (int j = static_cast<int>(ai.entries.size()) - 1; j >= 0; --j) {
+                            if (ai.entries[j].type == AILogEntry::Assistant) { has_assistant = true; break; }
+                            if (ai.entries[j].type == AILogEntry::User) break;
+                        }
+                        if (!has_assistant) {
+                            conversation.push_back(makeRoleSeparator("Assistant", TC("success"), content_width));
+                            current_abs_line++;
+                        }
+                        renderLines(std::vector<std::string>(1, sb), 2, "  ", TC("success"), false);
+                    } else if (agent.isProcessing()) {
+                        std::string spin = std::string(1, spinner_chars[ai.spinner_index]);
+                        conversation.push_back(text("  ... " + spin + " Thinking ...") | color(TC("warning")) | dim);
+                        current_abs_line++;
+                    }
+                    continue;
+                }
+
                 int ge = group_map[g].end_entry;
                 auto current_type = ai.entries[gs].type;
 
                 if (current_type == AILogEntry::User) {
-                    // "You" header
+                    // Role separator
                     {
-                        auto el = hbox({ filler(), text("You") | bold | color(TC("syn_keyword")) });
+                        auto el = makeRoleSeparator("You", TC("syn_keyword"), content_width);
                         if (isSelected(current_abs_line)) el = el | bgcolor(TC("selection_bg"));
                         conversation.push_back(el);
                         current_abs_line++;
                     }
-                    // Wrapped text lines
-                    int text_lines = 0;
+                    // Wrapped text lines (left-aligned with indent)
                     for (int j = gs; j <= ge; ++j) {
                         auto wl = wrapText(ai.entries[j].text, content_width);
-                        text_lines += static_cast<int>(wl.size());
                         for (const auto& l : wl) {
-                            auto el = hbox({ filler(), text(l) | color(TC("main_fg")) });
+                            auto el = text("    " + l) | color(TC("main_fg"));
                             if (isSelected(current_abs_line)) el = el | bgcolor(TC("selection_bg"));
                             conversation.push_back(el);
                             current_abs_line++;
                         }
                     }
-                    // Footer
-                    {
-                        auto el = hbox({ filler(), text("[" + std::to_string(text_lines) + " lines]") | color(TC("dim")) | dim });
-                        if (isSelected(current_abs_line)) el = el | bgcolor(TC("selection_bg"));
-                        conversation.push_back(el);
-                        current_abs_line++;
-                    }
                     conversation.push_back(text(""));
                 }
                 else if (current_type == AILogEntry::Assistant) {
-                    // "Assistant" header
+                    // Role separator
                     {
-                        conversation.push_back(makeTextLine("Assistant", TC("success"), current_abs_line, ai) | bold);
+                        conversation.push_back(makeRoleSeparator("Assistant", TC("success"), content_width));
                         current_abs_line++;
                     }
                     // Collect content by type
@@ -335,21 +430,10 @@ Element RenderAIPanel(MainState& state, int tw, int th) {
                             sb = agent.getStreamBuffer().substr(0, vis);
                         }
                     }
-                    // Content lines (each type with its own prefix + wrap-width)
-                    auto renderLines = [&](const std::vector<std::string>& src,
-                                            int indent, const std::string& prefix,
-                                            ftxui::Color col, bool dim_flag) {
-                        for (const auto& s : src) {
-                            auto wl = wrapText(s, content_width - indent);
-                            for (const auto& l : wl) {
-                                conversation.push_back(makeTextLine(prefix + l, col, current_abs_line, ai, dim_flag));
-                                current_abs_line++;
-                            }
-                        }
-                    };
                     renderLines(texts, 2, "  ", TC("success"), false);
-                    renderLines(std::vector<std::string>(sb.empty() ? 0 : 1, sb),
-                                2, "  ", TC("success"), true);
+                    if (!sb.empty()) {
+                        renderLines(std::vector<std::string>(1, sb), 2, "  ", TC("success"), true);
+                    }
                     renderLines(steps, 4, "    > ", TC("warning"), false);
                     renderLines(successes, 4, "    + ", TC("success"), false);
                     renderLines(errors, 4, "    x ", TC("error"), false);
@@ -367,53 +451,73 @@ Element RenderAIPanel(MainState& state, int tw, int th) {
                 }
             }
 
-            // Stream buffer when no assistant entry yet
-            if (agent.isStreaming() && !agent.getStreamBuffer().empty()) {
-                bool has_assistant = false;
-                for (int j = static_cast<int>(ai.entries.size()) - 1; j >= 0; --j) {
-                    if (ai.entries[j].type == AILogEntry::Assistant) { has_assistant = true; break; }
-                    if (ai.entries[j].type == AILogEntry::User) break;
-                }
-                if (!has_assistant) {
-                    int vis = std::min(ai.stream_visible_len, static_cast<int>(agent.getStreamBuffer().size()));
-                    auto sb = agent.getStreamBuffer().substr(0, vis);
-                    {
-                        conversation.push_back(makeTextLine("Assistant", TC("success"), current_abs_line, ai) | bold);
-                        current_abs_line++;
-                    }
-                    auto wl = wrapText(sb, content_width - 2);
-                    for (const auto& l : wl) {
-                        conversation.push_back(makeTextLine("  " + l, TC("success"), current_abs_line, ai, true));
-                        current_abs_line++;
-                    }
-                }
-            }
-
-            if (agent.isProcessing() && !agent.isStreaming() && agent.getStreamBuffer().empty()) {
-                std::string spin = std::string(1, spinner_chars[ai.spinner_index]);
-                conversation.push_back(text("Assistant  " + spin) | color(TC("success")));
-            }
-
             main_els.push_back(vbox(std::move(conversation)) | size(HEIGHT, EQUAL, conv_height));
         }
+    }
 
-        if (ai.total_display_lines > 0) {
-            int vis_start = ai.log_scroll + 1;
-            int vis_end = std::min(ai.log_scroll + conv_height, ai.total_display_lines);
-            main_els.push_back(
-                text("  Ln " + std::to_string(vis_start) + "-" + std::to_string(vis_end)
-                    + " of " + std::to_string(ai.total_display_lines))
-                | color(TC("dim")) | dim
-            );
-        }
+    // Line number info
+    std::string line_info;
+    if (ai.total_display_lines > 0) {
+        int vis_start = ai.log_scroll + 1;
+        int vis_end = std::min(ai.log_scroll + conv_height, ai.total_display_lines);
+        line_info = "  Ln " + std::to_string(vis_start) + "-" + std::to_string(vis_end)
+            + "/" + std::to_string(ai.total_display_lines);
     }
 
     // Input area
     {
         main_els.push_back(separator() | color(TC("main_border")));
 
-        if (agent.isProcessing()) {
-            auto input_content = text("  waiting...") | color(TC("dim")) | flex_grow;
+        if (ai.waiting_confirmation) {
+            // Tool permission confirmation prompt
+            auto& tc = ai.pending_tool_call;
+            std::string params_str = tc.params.dump();
+            if (params_str.size() > 60) params_str = params_str.substr(0, 60) + "...";
+
+            Elements confirm_lines;
+            confirm_lines.push_back(
+                hbox({
+                    text("  ") | color(TC("dim")),
+                    text("\u2500\u2500 Confirm: ") | color(TC("main_border")),
+                    text(tc.name) | bold | color(TC("warning")),
+                    text(" \u2500\u2500") | color(TC("main_border")),
+                })
+            );
+            confirm_lines.push_back(
+                hbox({
+                    text("    ") | color(TC("dim")),
+                    text("params: ") | color(TC("dim")),
+                    text(params_str) | color(TC("main_fg")),
+                })
+            );
+            confirm_lines.push_back(
+                hbox({
+                    text("    ") | color(TC("dim")),
+                    text(tc.description) | color(TC("syn_comment")),
+                })
+            );
+            confirm_lines.push_back(
+                hbox({
+                    text("  ") | color(TC("dim")),
+                    text("[") | color(TC("dim")),
+                    text("y") | bold | color(TC("success")),
+                    text("]es  [") | color(TC("dim")),
+                    text("n") | bold | color(TC("error")),
+                    text("]o  [") | color(TC("dim")),
+                    text("a") | bold | color(TC("syn_keyword")),
+                    text("]lways allow  [") | color(TC("dim")),
+                    text("Esc") | color(TC("dim")),
+                    text("] Skip") | color(TC("dim")),
+                })
+            );
+
+            main_els.push_back(
+                vbox(std::move(confirm_lines))
+                | bgcolor(TC("main_bg"))
+                | borderStyled(ROUNDED, TC("main_border"))
+            );
+        } else if (agent.isProcessing()) {
+            auto input_content = text("  waiting for response...") | color(TC("dim")) | flex_grow;
             main_els.push_back(
                 hbox({ input_content })
                 | bgcolor(TC("main_bg"))
@@ -470,16 +574,34 @@ Element RenderAIPanel(MainState& state, int tw, int th) {
     // Footer hints
     {
         std::string hints;
-        if (ai.input_focused && !agent.isProcessing()) {
+        if (ai.input_focused && !agent.isProcessing() && !ai.waiting_confirmation) {
             hints = " [Enter]=Send  [Tab]=Log  [Esc]=Close";
+        } else if (ai.waiting_confirmation) {
+            hints = " [y]=Yes  [n]=No  [a]=Always allow  [Esc]=Skip";
         } else if (agent.isProcessing()) {
             hints = " [Esc]=Cancel";
         } else {
             hints = " j/k=Scroll  PgUp/PgDn=Page  g/G=Top/Bot  [Tab]=Input  [<]/[>]=Session  [Ctrl+N]=New  [Esc]=Close";
         }
-        main_els.push_back(text(hints) | color(TC("dim")) | dim);
+
+        auto metrics = agent.memory().getMetrics();
+        std::string ctx_info;
+        if (metrics.total_tokens > 0) {
+            ctx_info = " [" + std::to_string(metrics.total_tokens) + "t]";
+        }
+
+        auto hint_el = hbox({
+            text(hints) | color(TC("dim")) | dim,
+            filler(),
+            text(line_info + ctx_info) | color(TC("dim")) | dim,
+        });
+        main_els.push_back(hint_el);
     }
 
+    if (fullscreen) {
+        return vbox(std::move(main_els))
+            | bgcolor(TC("main_bg"));
+    }
     return vbox(std::move(main_els))
         | bgcolor(TC("main_bg"))
         | GetPanelBorder()
@@ -509,7 +631,9 @@ bool HandleAIEvent(MainState& state, const Event& event) {
     auto& ai = state.ai;
 
     if (event == Event::Escape) {
-        if (agent.isProcessing()) {
+        if (ai.waiting_confirmation) {
+            agent.skipCurrentTool();
+        } else if (agent.isProcessing()) {
             agent.cancel();
             state.ai.entries.push_back({AILogEntry::Error, "Cancelled by user"});
         } else {
@@ -518,6 +642,23 @@ bool HandleAIEvent(MainState& state, const Event& event) {
             state.panel_message.clear();
         }
         return true;
+    }
+
+    // Tool confirmation handling
+    if (ai.waiting_confirmation) {
+        if (event == Event::Character('y') || event == Event::Character('Y')) {
+            agent.confirmCurrentTool();
+            return true;
+        }
+        if (event == Event::Character('n') || event == Event::Character('N')) {
+            agent.skipCurrentTool();
+            return true;
+        }
+        if (event == Event::Character('a') || event == Event::Character('A')) {
+            agent.alwaysAllowCurrentTool();
+            return true;
+        }
+        return true;  // Consume all other events while waiting
     }
 
     if (event == Event::Tab) {
@@ -750,28 +891,38 @@ std::string ExtractAISelectedText(const MainState& state) {
         int g_end = accum + gh - 1;
         if (g_end < sel_start) {
             accum += gh;
-            auto t = ai.entries[ei].type;
-            if (t == AILogEntry::User) {
-                while (ei < static_cast<int>(ai.entries.size()) && ai.entries[ei].type == AILogEntry::User) ei++;
-            } else if (t == AILogEntry::Assistant) {
-                while (ei < static_cast<int>(ai.entries.size()) && ai.entries[ei].type != AILogEntry::User) ei++;
-            } else {
-                while (ei < static_cast<int>(ai.entries.size())
-                    && ai.entries[ei].type != AILogEntry::User
-                    && ai.entries[ei].type != AILogEntry::Assistant) ei++;
+            // Skip entries for this group
+            if (ei < static_cast<int>(ai.entries.size())) {
+                auto t = ai.entries[ei].type;
+                if (t == AILogEntry::User) {
+                    while (ei < static_cast<int>(ai.entries.size()) && ai.entries[ei].type == AILogEntry::User) ei++;
+                } else if (t == AILogEntry::Assistant) {
+                    while (ei < static_cast<int>(ai.entries.size()) && ai.entries[ei].type != AILogEntry::User) ei++;
+                } else {
+                    while (ei < static_cast<int>(ai.entries.size())
+                        && ai.entries[ei].type != AILogEntry::User
+                        && ai.entries[ei].type != AILogEntry::Assistant) ei++;
+                }
             }
             continue;
         }
 
         int local_start = std::max(0, sel_start - accum);
         int local_end = std::min(gh - 1, sel_end - accum);
+
+        // Virtual group (stream buffer) - skip text extraction
+        if (ei >= static_cast<int>(ai.entries.size())) {
+            accum += gh;
+            continue;
+        }
+
         auto type = ai.entries[ei].type;
 
         if (type == AILogEntry::User) {
-            // Lines: 0=header, 1..N-1=content, N=footer
+            // Lines: 0=separator, 1..N=content, no footer
             int line_in_group = 0;
-            // Header
             int abs_line = accum;
+            // Separator line (skip in extracted text or include identifier)
             if (line_in_group >= local_start && line_in_group <= local_end)
                 appendLine("You", abs_line);
             line_in_group++; abs_line++;
@@ -786,15 +937,11 @@ std::string ExtractAISelectedText(const MainState& state) {
                 }
                 temp_ei++;
             }
-            // Footer
-            if (line_in_group >= local_start && line_in_group <= local_end)
-                appendLine("[...]", abs_line);
-            line_in_group++; abs_line++;
         }
         else if (type == AILogEntry::Assistant) {
             int line_in_group = 0;
             int abs_line = accum;
-            // Header
+            // Separator line
             if (line_in_group >= local_start && line_in_group <= local_end)
                 appendLine("Assistant", abs_line);
             line_in_group++; abs_line++;
@@ -842,15 +989,17 @@ std::string ExtractAISelectedText(const MainState& state) {
         }
 
         accum += gh;
-        auto t = ai.entries[ei].type;
-        if (t == AILogEntry::User) {
-            while (ei < static_cast<int>(ai.entries.size()) && ai.entries[ei].type == AILogEntry::User) ei++;
-        } else if (t == AILogEntry::Assistant) {
-            while (ei < static_cast<int>(ai.entries.size()) && ai.entries[ei].type != AILogEntry::User) ei++;
-        } else {
-            while (ei < static_cast<int>(ai.entries.size())
-                && ai.entries[ei].type != AILogEntry::User
-                && ai.entries[ei].type != AILogEntry::Assistant) ei++;
+        if (ei < static_cast<int>(ai.entries.size())) {
+            auto t = ai.entries[ei].type;
+            if (t == AILogEntry::User) {
+                while (ei < static_cast<int>(ai.entries.size()) && ai.entries[ei].type == AILogEntry::User) ei++;
+            } else if (t == AILogEntry::Assistant) {
+                while (ei < static_cast<int>(ai.entries.size()) && ai.entries[ei].type != AILogEntry::User) ei++;
+            } else {
+                while (ei < static_cast<int>(ai.entries.size())
+                    && ai.entries[ei].type != AILogEntry::User
+                    && ai.entries[ei].type != AILogEntry::Assistant) ei++;
+            }
         }
     }
 

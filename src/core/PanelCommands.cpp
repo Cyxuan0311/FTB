@@ -113,7 +113,34 @@ Element BuildPanelModal(MainState& state) {
 }
 
 bool HandlePanelEvent(MainState& state, const Event& event) {
-    if (state.active_panel == ActivePanel::None) return false;
+    if (state.active_panel == ActivePanel::None) {
+#ifdef FTB_ENABLE_AI
+        if (state.tabManager.active().type == TabType::AIAgent) {
+            if (event == Event::Escape) {
+                auto& agent = state.ai_agent;
+                if (agent && agent->isProcessing()) {
+                    agent->cancel();
+                    state.ai.entries.push_back({AILogEntry::Error, "Cancelled by user"});
+                } else {
+                    state.saveTabState();
+                    int ai_idx = state.tabManager.activeIndex();
+                    if (!state.tabManager.closeTab(ai_idx) && state.tabManager.isAITab(ai_idx)) {
+                        // Last tab is AI - create a directory tab first
+                        const char* home = std::getenv("HOME");
+                        state.tabManager.createTab(home ? home : "/");
+                        state.tabManager.closeTab(ai_idx);
+                    }
+                    if (state.tabManager.count() > 0) {
+                        state.tabManager.loadTabState(state, state.tabManager.activeIndex());
+                    }
+                }
+                return true;
+            }
+            return UI::HandleAIEvent(state, event);
+        }
+#endif
+        return false;
+    }
 
     switch (state.active_panel) {
     case ActivePanel::UIStyle:         return UI::HandleUIStyleEvent(state, event);
@@ -450,16 +477,29 @@ void HandlePanelCommand(MainState& state, FTB::KeyBindings::PanelCommand cmd) {
         state.panel_message.clear();
         state.panel_suggestion.clear();
         state.active_panel = ActivePanel::NewTab; break;
-    case FTB::KeyBindings::PanelCommand::CloseTab:
+    case FTB::KeyBindings::PanelCommand::CloseTab: {
+        int idx = state.tabManager.activeIndex();
+#ifdef FTB_ENABLE_AI
+        if (state.tabManager.isAITab(idx) && !state.tabManager.canClose()) {
+            // Last tab is AI - create a directory tab first
+            state.saveTabState();
+            const char* home = std::getenv("HOME");
+            state.tabManager.createTab(home ? home : "/");
+            state.tabManager.closeTab(idx);
+            state.tabManager.loadTabState(state, state.tabManager.activeIndex());
+            StatusMessage::Show("Tab closed");
+        } else
+#endif
         if (state.tabManager.canClose()) {
             state.saveTabState();
             state.tabManager.closeTab(state.tabManager.activeIndex());
-            state.loadTabState();
+            state.tabManager.loadTabState(state, state.tabManager.activeIndex());
             StatusMessage::Show("Tab closed");
         } else {
             StatusMessage::Show("Cannot close the last tab");
         }
         break;
+    }
     case FTB::KeyBindings::PanelCommand::NextTab:
         state.saveTabState();
         state.tabManager.nextTab();
@@ -533,21 +573,33 @@ void HandlePanelCommand(MainState& state, FTB::KeyBindings::PanelCommand cmd) {
         state.active_panel = ActivePanel::SSH; break;
 #endif
 #ifdef FTB_ENABLE_AI
-    case FTB::KeyBindings::PanelCommand::AI:
+    case FTB::KeyBindings::PanelCommand::AI: {
         state.panel_input.clear();
         state.panel_message.clear();
+
+        // Save current file browser tab state before switching
+        state.saveTabState();
+
         if (!state.ai_agent) {
             state.ai = std::move(AIPanelState{});
             state.ai_agent = std::make_unique<AIAgent>(state);
-            auto& sm = SessionManager::getInstance();
-            state.ai.current_session_id = sm.activeSessionId();
-            if (auto* session = sm.getSession(sm.activeSessionId())) {
-                if (!session->messages.empty()) {
-                    state.ai_agent->loadSession(session->messages);
-                }
-            }
         }
-        state.active_panel = ActivePanel::AI; break;
+
+        auto& sm = SessionManager::getInstance();
+        std::string sid;
+        // Reuse existing session for first AI tab, create new for subsequent
+        if (state.tabManager.aiTabCount() == 0) {
+            sid = sm.activeSessionId();
+            if (sid.empty()) sid = sm.createSession();
+        } else {
+            sid = sm.createSession();
+        }
+        const AISession* s = sm.getSession(sid);
+        std::string tab_name = (s ? s->name : std::string("AI"));
+        int idx = state.tabManager.createAITab(state.currentPath, sid, tab_name);
+        state.tabManager.loadTabState(state, idx);
+        break;
+    }
     case FTB::KeyBindings::PanelCommand::AIConfig: {
         auto& ai_cfg = ConfigManager::GetInstance()->GetConfigMutable().ai;
         state.ai_config_tab = 0;

@@ -41,39 +41,49 @@ Element BuildTabBar(MainState& state) {
 
         g_tab_x_starts.push_back(current_x);
 
+#ifdef FTB_ENABLE_AI
+        bool is_ai = tab.type == TabType::AIAgent;
+#else
+        bool is_ai = false;
+#endif
+
         Element tab_element;
         if (is_active) {
+            // Active AI tab uses slightly different highlight color
+            Color active_fg = is_ai ? TC("syn_keyword") : tab_active_fg;
+            Color active_bg = is_ai ? TC("selection_bg") : tab_active_bg;
+
             if (style == "classic") {
                 std::string content = " " + label + " ";
-                tab_element = text(content) | bgcolor(tab_active_bg) | color(tab_active_fg) | bold;
+                tab_element = text(content) | bgcolor(active_bg) | color(active_fg) | bold;
                 current_x += content.size();
             } else if (style == "rounded") {
                 std::string content = " " + label + " ";
                 int cw = content.size();
                 tab_element = hbox({
-                    text(PowerlineChars::LeftRound) | color(tab_active_bg) | bgcolor(main_bg),
-                    text(content) | color(tab_active_fg) | bgcolor(tab_active_bg) | bold,
-                    text(PowerlineChars::RightRound) | color(tab_active_bg) | bgcolor(main_bg),
+                    text(PowerlineChars::LeftRound) | color(active_bg) | bgcolor(main_bg),
+                    text(content) | color(active_fg) | bgcolor(active_bg) | bold,
+                    text(PowerlineChars::RightRound) | color(active_bg) | bgcolor(main_bg),
                 });
                 current_x += cw + 2;
             } else if (style == "underline") {
                 std::string content = " " + label + " ";
-                tab_element = text(content) | color(tab_active_fg) | bgcolor(main_bg) | bold | underlined;
+                tab_element = text(content) | color(active_fg) | bgcolor(main_bg) | bold | underlined;
                 current_x += content.size();
             } else if (style == "elegant") {
                 std::string content = " " + label + " ";
                 int cw = content.size();
                 tab_element = hbox({
-                    text("\u251c ") | color(tab_active_bg) | bgcolor(main_bg),
-                    text(content) | color(tab_active_fg) | bgcolor(tab_active_bg) | bold,
-                    text(" \u2524") | color(tab_active_bg) | bgcolor(main_bg),
+                    text("\u251c ") | color(active_bg) | bgcolor(main_bg),
+                    text(content) | color(active_fg) | bgcolor(active_bg) | bold,
+                    text(" \u2524") | color(active_bg) | bgcolor(main_bg),
                 });
                 current_x += cw + 4;
             } else if (style == "minimal") {
                 std::string content = " " + label + " ";
                 tab_element = hbox({
-                    text(" \u25cf ") | color(tab_active_bg) | bgcolor(main_bg),
-                    text(label) | color(tab_active_fg) | bgcolor(main_bg) | bold,
+                    text(" \u25cf ") | color(active_bg) | bgcolor(main_bg),
+                    text(label) | color(active_fg) | bgcolor(main_bg) | bold,
                     text(" ") | bgcolor(main_bg),
                 });
                 current_x += content.size() + 1;
@@ -82,23 +92,24 @@ Element BuildTabBar(MainState& state) {
                 std::string content = " " + label + " ";
                 int cw = content.size();
                 tab_element = hbox({
-                    text("\u2590") | color(tab_active_bg) | bgcolor(main_bg),
-                    text(content) | color(tab_active_fg) | bgcolor(tab_active_bg) | bold,
-                    text("\u258c") | color(tab_active_bg) | bgcolor(main_bg),
+                    text("\u2590") | color(active_bg) | bgcolor(main_bg),
+                    text(content) | color(active_fg) | bgcolor(active_bg) | bold,
+                    text("\u258c") | color(active_bg) | bgcolor(main_bg),
                 });
                 current_x += cw + 2;
             }
         } else {
+            Color inactive_fg = is_ai ? TC("syn_keyword") : tab_inactive_fg;
             std::string content = " " + label + " ";
             if (style == "minimal") {
                 tab_element = hbox({
                     text("   ") | bgcolor(main_bg),
-                    text(label) | color(tab_inactive_fg) | bgcolor(main_bg),
+                    text(label) | color(inactive_fg) | bgcolor(main_bg),
                     text(" ") | bgcolor(main_bg),
                 });
                 current_x += content.size() + 1;
             } else {
-                tab_element = text(content) | color(tab_inactive_fg) | bgcolor(main_bg);
+                tab_element = text(content) | color(inactive_fg) | bgcolor(main_bg);
                 current_x += content.size();
             }
         }

@@ -289,15 +289,29 @@ int main(int argc, char* argv[])
 
         auto tab_bar = UI::BuildTabBar(state);
 
-        auto main_content = vbox({
-            tab_bar,
-            hbox({
+        auto term_dim = Terminal::Size();
+        int tw = term_dim.dimx;
+        int th = term_dim.dimy;
+
+        Element main_body;
+#ifdef FTB_ENABLE_AI
+        if (state.tabManager.active().type == TabType::AIAgent) {
+            main_body = UI::RenderAIPanel(state, tw, th, true) | flex;
+        } else
+#endif
+        {
+            main_body = hbox({
                 parent_col,
                 BuildColumnSeparator(),
                 current_col,
                 BuildColumnSeparator(),
                 preview_col
-            }) | flex,
+            }) | flex;
+        }
+
+        auto main_content = vbox({
+            tab_bar,
+            main_body,
             (KeyBindings::GetInstance().IsPrefixMode() || state.search_mode)
                 ? BuildCommandBar(state)
                 : BuildNormalStatusBar(state)
@@ -398,7 +412,9 @@ int main(int argc, char* argv[])
             }
 
 #ifdef FTB_ENABLE_AI
-            if (state.active_panel == ActivePanel::AI) {
+            bool is_ai_active = (state.active_panel == ActivePanel::AI)
+                             || (state.tabManager.active().type == TabType::AIAgent);
+            if (is_ai_active) {
                 if (mouse.button == Mouse::WheelUp) {
                     state.ai.log_scroll = std::max(0, state.ai.log_scroll - 3);
                     state.ai.auto_scroll = false;

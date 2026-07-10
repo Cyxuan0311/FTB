@@ -23,7 +23,15 @@ struct TabClipboard {
     bool paste(const std::string& targetPath);
 };
 
+enum class TabType {
+    FileBrowser,
+#ifdef FTB_ENABLE_AI
+    AIAgent,
+#endif
+};
+
 struct Tab {
+    TabType type = TabType::FileBrowser;
     std::string currentPath;
     int selected = 0;
     int hovered_index = -1;
@@ -50,6 +58,11 @@ struct Tab {
 
     TabClipboard clipboard;
 
+#ifdef FTB_ENABLE_AI
+    std::string ai_session_id;
+#endif
+    std::string display_name_override;
+
     std::string displayName() const;
     void init(const std::string& path);
     void refreshContents();
@@ -61,6 +74,9 @@ public:
     TabManager();
 
     int createTab(const std::string& path);
+#ifdef FTB_ENABLE_AI
+    int createAITab(const std::string& path, const std::string& session_id, const std::string& display_name);
+#endif
     bool closeTab(int index);
     void switchTo(int index);
     void nextTab();
@@ -75,6 +91,10 @@ public:
     int activeIndex() const { return activeIndex_; }
     int count() const { return static_cast<int>(tabs_.size()); }
     bool canClose() const { return tabs_.size() > 1; }
+#ifdef FTB_ENABLE_AI
+    bool isAITab(int index) const;
+    int aiTabCount() const;
+#endif
 
     void saveActiveTabState(MainState& state);
     void loadTabState(MainState& state, int index);
