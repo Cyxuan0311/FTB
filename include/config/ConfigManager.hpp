@@ -204,6 +204,8 @@ struct AIConfig {
     int active_key = 0;
     std::string system_prompt;
     bool require_confirmation = true;
+    int max_context_tokens = 8192;
+    int max_response_tokens = 2048;
 
     AIConfig() = default;
 };

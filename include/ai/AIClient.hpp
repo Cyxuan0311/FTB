@@ -27,6 +27,8 @@ public:
         std::string model = "llama3.2";
         std::string api_key;
         nlohmann::json tools;
+        int max_context_tokens = 8192;
+        int max_response_tokens = 2048;
     };
 
     using StreamCallback = std::function<void(const std::string& delta)>;
