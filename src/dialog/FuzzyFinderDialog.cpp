@@ -184,6 +184,10 @@ bool HandleFuzzyFinderEvent(MainState& state, const Event& event) {
             fs::path fullPath = fs::path(state.currentPath) / chosen.path;
 
             // 搜索只返回文件, 直接导航到父目录
+            if (!fs::exists(fullPath.parent_path())) {
+                state.panel_message = " Parent directory no longer exists!";
+                return true;
+            }
             state.currentPath = fs::canonical(fullPath.parent_path()).string();
 
             // 强制清除所有缓存, 确保读取最新目录内容

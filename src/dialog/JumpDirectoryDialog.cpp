@@ -154,6 +154,10 @@ bool HandleJumpDirectoryEvent(MainState& state, const Event& event) {
                     if (home) resolved = std::string(home) + resolved.substr(1);
                 }
 
+                if (!fs::exists(resolved)) {
+                    state.panel_message = " Directory does not exist!";
+                    return true;
+                }
                 fs::path target = fs::canonical(resolved);
                 if (fs::is_directory(target)) {
                     state.currentPath = target.string();

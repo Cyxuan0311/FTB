@@ -434,6 +434,10 @@ void HandlePanelCommand(MainState& state, FTB::KeyBindings::PanelCommand cmd) {
         std::string home = home_env ? home_env : "";
         if (!home.empty()) {
             std::string dl = (fs::path(home) / "Downloads").string();
+            if (!fs::exists(dl)) {
+                StatusMessage::Show("~/Downloads does not exist");
+                break;
+            }
             state.directoryHistory.push(state.currentPath);
             state.currentPath = fs::canonical(dl).string();
             state.cached_canonical_path.clear();
@@ -454,6 +458,10 @@ void HandlePanelCommand(MainState& state, FTB::KeyBindings::PanelCommand cmd) {
         std::string home = home_env ? home_env : "";
         if (!home.empty()) {
             std::string cfg = (fs::path(home) / ".config").string();
+            if (!fs::exists(cfg)) {
+                StatusMessage::Show("~/.config does not exist");
+                break;
+            }
             state.directoryHistory.push(state.currentPath);
             state.currentPath = fs::canonical(cfg).string();
             state.cached_canonical_path.clear();

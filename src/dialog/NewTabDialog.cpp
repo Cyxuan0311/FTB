@@ -135,6 +135,10 @@ bool HandleNewTabEvent(MainState& state, const Event& event) {
                 if (home) path_input = std::string(home) + path_input.substr(1);
             }
 
+            if (!fs::exists(path_input)) {
+                state.panel_message = " Path does not exist!";
+                return true;
+            }
             fs::path target = fs::canonical(path_input);
             if (!fs::is_directory(target)) {
                 state.panel_message = " Not a directory!";

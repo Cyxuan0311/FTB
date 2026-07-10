@@ -61,6 +61,11 @@ void NavigateToParent(MainState& state) {
         std::string newPath = current.has_parent_path()
             ? current.parent_path().string()
             : state.directoryHistory.pop();
+        if (!fs::exists(newPath)) {
+            state.directoryHistory.pop();
+            StatusMessage::Show("Directory no longer exists: " + newPath);
+            return;
+        }
         state.currentPath = fs::canonical(newPath).string();
         state.cached_canonical_path.clear();
         state.cached_current_path_for_entries.clear();
