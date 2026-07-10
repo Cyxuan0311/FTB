@@ -27,25 +27,6 @@ inline ftxui::Decorator GetPanelBorder() {
     return ftxui::borderStyled(ftxui::ROUNDED, border_color);
 }
 
-namespace DetailColor {
-    const ftxui::Color Base     = ftxui::Color::RGB(0x1e, 0x1e, 0x2e);
-    const ftxui::Color Mantle   = ftxui::Color::RGB(0x18, 0x18, 0x25);
-    const ftxui::Color Surface0 = ftxui::Color::RGB(0x31, 0x32, 0x44);
-    const ftxui::Color Surface1 = ftxui::Color::RGB(0x45, 0x47, 0x5a);
-    const ftxui::Color Surface2 = ftxui::Color::RGB(0x58, 0x5b, 0x70);
-    const ftxui::Color Overlay0 = ftxui::Color::RGB(0x6c, 0x70, 0x86);
-    const ftxui::Color Text     = ftxui::Color::RGB(0xcd, 0xd6, 0xf4);
-    const ftxui::Color Subtext  = ftxui::Color::RGB(0xa6, 0xad, 0xbc);
-    const ftxui::Color Blue     = ftxui::Color::RGB(0x89, 0xb4, 0xfa);
-    const ftxui::Color Green    = ftxui::Color::RGB(0xa6, 0xe3, 0xa1);
-    const ftxui::Color Red      = ftxui::Color::RGB(0xf3, 0x8b, 0xa8);
-    const ftxui::Color Yellow   = ftxui::Color::RGB(0xf9, 0xe2, 0xaf);
-    const ftxui::Color Peach    = ftxui::Color::RGB(0xfa, 0xb3, 0x87);
-    const ftxui::Color Mauve    = ftxui::Color::RGB(0xcb, 0xa6, 0xf7);
-    const ftxui::Color Pink     = ftxui::Color::RGB(0xf5, 0xc2, 0xe7);
-    const ftxui::Color Teal     = ftxui::Color::RGB(0x94, 0xe2, 0xd5);
-}
-
 ftxui::Element CreateDetailElement(const std::vector<FileManager::DirEntryInfo>& entries,
                                    int selected,
                                    const std::string& currentPath,
