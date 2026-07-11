@@ -2,7 +2,9 @@
 #include "ai/AIAgent.hpp"
 #include "ai/SessionManager.hpp"
 #include "config/ConfigManager.hpp"
+#include "editor/MD_transformer.hpp"
 #include "renderer/detail_element.hpp"
+#include "utils/PerfLogger.hpp"
 
 
 #include <sstream>
@@ -183,10 +185,11 @@ Element RenderAIPanel(MainState& state, int tw, int th, bool fullscreen) {
                 group_lines = text_lines + 2;  // header + text + trailing blank
             } else if (type == AILogEntry::Assistant) {
                 int text_lines = 0, step_lines = 0, success_lines = 0, error_lines = 0, system_lines = 0;
+                Editor::MDTransformer md_count;
                 while (ei < static_cast<int>(entries.size()) && entries[ei].type != AILogEntry::User) {
                     auto t = entries[ei].type;
                     int w;
-                    if (t == AILogEntry::Assistant) w = calcWrappedLines(entries[ei].text, text_width - 2);
+                    if (t == AILogEntry::Assistant) w = md_count.GetLineCount(entries[ei].text, text_width - 2);
                     else if (t == AILogEntry::Step) w = calcWrappedLines(entries[ei].text, text_width - 4);
                     else if (t == AILogEntry::Success) w = calcWrappedLines(entries[ei].text, text_width - 4);
                     else if (t == AILogEntry::Error) w = calcWrappedLines(entries[ei].text, text_width - 4);
@@ -233,6 +236,13 @@ Element RenderAIPanel(MainState& state, int tw, int th, bool fullscreen) {
     int max_scroll = std::max(0, ai.total_display_lines - conv_height);
     if (ai.auto_scroll) ai.log_scroll = max_scroll;
     ai.log_scroll = std::clamp(ai.log_scroll, 0, max_scroll);
+
+    PERF_LOG("AIPre", std::string("total_display=") + std::to_string(ai.total_display_lines)
+        + " conv_height=" + std::to_string(conv_height)
+        + " max_scroll=" + std::to_string(max_scroll)
+        + " log_scroll=" + std::to_string(ai.log_scroll)
+        + " entries=" + std::to_string(ai.entries.size())
+        + " groups=" + std::to_string(ai.entry_line_heights.size()));
 
     static const char spinner_chars[] = {'|', '/', '-', '\\'};
     static const int spinner_len = 4;
@@ -315,15 +325,20 @@ Element RenderAIPanel(MainState& state, int tw, int th, bool fullscreen) {
             // Count visible groups (include at least the first group, even partially)
             int rem = conv_height;
             int visible_groups = 0;
+            PERF_LOG("AIVis", std::string("first_group=") + std::to_string(first_group)
+                + " line_offset=" + std::to_string(line_offset)
+                + " total_groups=" + std::to_string(ai.entry_line_heights.size()));
             for (int g = first_group; g < static_cast<int>(ai.entry_line_heights.size()); ++g) {
-                if (ai.entry_line_heights[g] <= rem) {
-                    rem -= ai.entry_line_heights[g];
-                    visible_groups++;
-                } else {
-                    if (visible_groups == 0) visible_groups = 1;
-                    break;
-                }
+                PERF_LOG("AIVis", std::string("  g=") + std::to_string(g)
+                    + " height=" + std::to_string(ai.entry_line_heights[g])
+                    + " rem=" + std::to_string(rem));
+                if (rem <= 0) break;
+                visible_groups++;
+                rem -= ai.entry_line_heights[g];
             }
+            PERF_LOG("AIVis", std::string("visible_groups=") + std::to_string(visible_groups)
+                + " last_group_idx=" + std::to_string(first_group + visible_groups)
+                + " rem_after=" + std::to_string(rem));
 
             Elements conversation;
 
@@ -380,8 +395,15 @@ Element RenderAIPanel(MainState& state, int tw, int th, bool fullscreen) {
                 }
             };
 
+            PERF_LOG("AIRender", std::string("rendering groups: first=") + std::to_string(first_group)
+                + " last=" + std::to_string(last_group_idx)
+                + " total_groups=" + std::to_string(group_map.size()));
             for (int g = first_group; g < last_group_idx; ++g) {
                 int gs = group_map[g].start_entry;
+                PERF_LOG("AIRender", std::string("  render g=") + std::to_string(g)
+                    + " start_entry=" + std::to_string(gs)
+                    + " end_entry=" + std::to_string(group_map[g].end_entry)
+                    + " height=" + std::to_string(ai.entry_line_heights[g]));
                 if (gs < 0) {
                     // Virtual stream buffer / spinner group
                     if (agent.isProcessing() && !agent.getStreamBuffer().empty()) {
@@ -454,7 +476,18 @@ Element RenderAIPanel(MainState& state, int tw, int th, bool fullscreen) {
                             sb = agent.getStreamBuffer().substr(0, vis);
                         }
                     }
-                    renderLines(texts, 2, "  ", TC("success"), false);
+                    if (!texts.empty()) {
+                        std::string combined;
+                        for (size_t ti = 0; ti < texts.size(); ++ti) {
+                            if (ti > 0) combined += "\n\n";
+                            combined += texts[ti];
+                        }
+                        Editor::MDTransformer md;
+                        int md_lines = md.GetLineCount(combined, text_width - 2);
+                        auto md_element = md.TransformToElement(combined, text_width - 2);
+                        conversation.push_back(md_element);
+                        current_abs_line += md_lines;
+                    }
                     if (!sb.empty()) {
                         renderLines(std::vector<std::string>(1, sb), 2, "  ", TC("success"), true);
                     }
@@ -472,6 +505,14 @@ Element RenderAIPanel(MainState& state, int tw, int th, bool fullscreen) {
                             current_abs_line++;
                         }
                     }
+                }
+            }
+
+            // Log skipped groups (those beyond last_group_idx)
+            if (last_group_idx < static_cast<int>(group_map.size())) {
+                for (int sg = last_group_idx; sg < static_cast<int>(group_map.size()); ++sg) {
+                    PERF_LOG("AIRender", std::string("  SKIP g=") + std::to_string(sg)
+                        + " height=" + std::to_string(ai.entry_line_heights[sg]));
                 }
             }
 

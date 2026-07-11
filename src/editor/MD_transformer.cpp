@@ -1,4 +1,5 @@
 #include "editor/MD_transformer.hpp"
+#include "renderer/detail_element.hpp"
 #include "utils/UnicodeUtil.hpp"
 #include <ftxui/dom/elements.hpp>
 #include <regex>
@@ -37,7 +38,7 @@ int MDTransformer::CalculateDisplayWidth(const std::string& text) {
 
 // ==================== 构造与析构 ====================
 
-MDTransformer::MDTransformer() : scroll_offset_(0) {}
+MDTransformer::MDTransformer() : scroll_offset_(0), max_width_(-1) {}
 
 MDTransformer::~MDTransformer() {}
 
@@ -234,7 +235,7 @@ ftxui::Element MDTransformer::ParseInlineFormatting(const std::string& input_tex
         if (p[i] == '[' && i + 1 < len && p[i + 1] == '!' && i + 2 < len && p[i + 2] == '[') {
             // 保存之前的文本
             if (!buffer.empty()) {
-                elements.push_back(ftxui::text(buffer) | color(Color::White));
+                elements.push_back(ftxui::text(buffer) | color(TC("main_fg")));
                 buffer.clear();
             }
             
@@ -260,10 +261,10 @@ ftxui::Element MDTransformer::ParseInlineFormatting(const std::string& input_tex
                                 std::string link_url = input_text.substr(link_start, i - link_start);
                                 i++; // 跳过 )
                                 
-                                // 格式化为 "🖼️ alt → link"
-                                elements.push_back(ftxui::text("🖼️ " + alt) | color(Color::Magenta));
-                                elements.push_back(ftxui::text(" → ") | color(Color::GrayDark));
-                                elements.push_back(ftxui::text(link_url) | color(Color::BlueLight) | underlined);
+                // 格式化为 "[IMG] alt -> link"
+                elements.push_back(ftxui::text("[IMG] " + alt) | color(TC("syn_operator")));
+                elements.push_back(ftxui::text(" -> ") | color(TC("dim")));
+                                elements.push_back(ftxui::text(link_url) | color(TC("syn_string")) | underlined);
                                 continue;
                             }
                         }
@@ -276,7 +277,7 @@ ftxui::Element MDTransformer::ParseInlineFormatting(const std::string& input_tex
         if (p[i] == '!' && i + 1 < len && p[i + 1] == '[') {
             // 保存之前的文本
             if (!buffer.empty()) {
-                elements.push_back(ftxui::text(buffer) | color(Color::White));
+                elements.push_back(ftxui::text(buffer) | color(TC("main_fg")));
                 buffer.clear();
             }
             
@@ -290,8 +291,8 @@ ftxui::Element MDTransformer::ParseInlineFormatting(const std::string& input_tex
                 while (i < len && p[i] != ')') i++;
                 if (i < len && p[i] == ')') {
                     i++; // 跳过 )
-                    // 格式化为 "🖼️ alt"
-                    elements.push_back(ftxui::text("🖼️ " + alt) | color(Color::Magenta));
+                    // 格式化为 "[IMG] alt"
+                    elements.push_back(ftxui::text("[IMG] " + alt) | color(TC("syn_operator")));
                     continue;
                 }
             }
@@ -301,7 +302,7 @@ ftxui::Element MDTransformer::ParseInlineFormatting(const std::string& input_tex
         if (p[i] == '[') {
             // 保存之前的文本
             if (!buffer.empty()) {
-                elements.push_back(ftxui::text(buffer) | color(Color::White));
+                elements.push_back(ftxui::text(buffer) | color(TC("main_fg")));
                 buffer.clear();
             }
             
@@ -315,7 +316,7 @@ ftxui::Element MDTransformer::ParseInlineFormatting(const std::string& input_tex
                 while (i < len && p[i] != ')') i++;
                 if (i < len && p[i] == ')') {
                     i++; // 跳过 )
-                    elements.push_back(ftxui::text(link_text) | color(Color::BlueLight) | underlined);
+                    elements.push_back(ftxui::text(link_text) | color(TC("syn_string")) | underlined);
                     continue;
                 }
             }
@@ -325,7 +326,7 @@ ftxui::Element MDTransformer::ParseInlineFormatting(const std::string& input_tex
         if (p[i] == '`') {
             // 保存之前的文本
             if (!buffer.empty()) {
-                elements.push_back(ftxui::text(buffer) | color(Color::White));
+                elements.push_back(ftxui::text(buffer) | color(TC("main_fg")));
                 buffer.clear();
             }
             
@@ -335,7 +336,7 @@ ftxui::Element MDTransformer::ParseInlineFormatting(const std::string& input_tex
             if (i < len) {
                 std::string code_text = input_text.substr(code_start, i - code_start);
                 i++; // 跳过 `
-                elements.push_back(ftxui::text(code_text) | color(Color::Yellow) | bgcolor(Color::RGB(40, 40, 40)));
+                elements.push_back(ftxui::text(code_text) | color(TC("syn_string")) | bgcolor(TC("main_bg")));
                 continue;
             }
         }
@@ -344,7 +345,7 @@ ftxui::Element MDTransformer::ParseInlineFormatting(const std::string& input_tex
         if (i + 2 < len && p[i] == '*' && p[i + 1] == '*' && p[i + 2] == '*') {
             // 保存之前的文本
             if (!buffer.empty()) {
-                elements.push_back(ftxui::text(buffer) | color(Color::White));
+                elements.push_back(ftxui::text(buffer) | color(TC("main_fg")));
                 buffer.clear();
             }
             
@@ -354,7 +355,7 @@ ftxui::Element MDTransformer::ParseInlineFormatting(const std::string& input_tex
             if (i + 2 < len) {
                 std::string bold_italic_text = input_text.substr(start, i - start);
                 i += 3; // 跳过 ***
-                elements.push_back(ftxui::text(bold_italic_text) | color(Color::White) | bold);
+                elements.push_back(ftxui::text(bold_italic_text) | color(TC("main_fg")) | bold);
                 continue;
             }
         }
@@ -363,7 +364,7 @@ ftxui::Element MDTransformer::ParseInlineFormatting(const std::string& input_tex
         if (i + 1 < len && p[i] == '*' && p[i + 1] == '*') {
             // 保存之前的文本
             if (!buffer.empty()) {
-                elements.push_back(ftxui::text(buffer) | color(Color::White));
+                elements.push_back(ftxui::text(buffer) | color(TC("main_fg")));
                 buffer.clear();
             }
             
@@ -373,7 +374,7 @@ ftxui::Element MDTransformer::ParseInlineFormatting(const std::string& input_tex
             if (i + 1 < len) {
                 std::string bold_text = input_text.substr(start, i - start);
                 i += 2; // 跳过 **
-                elements.push_back(ftxui::text(bold_text) | color(Color::White) | bold);
+                elements.push_back(ftxui::text(bold_text) | color(TC("main_fg")) | bold);
                 continue;
             }
         }
@@ -382,7 +383,7 @@ ftxui::Element MDTransformer::ParseInlineFormatting(const std::string& input_tex
         if (p[i] == '*' && (i == 0 || p[i - 1] != '*') && (i + 1 >= len || p[i + 1] != '*')) {
             // 保存之前的文本
             if (!buffer.empty()) {
-                elements.push_back(ftxui::text(buffer) | color(Color::White));
+                elements.push_back(ftxui::text(buffer) | color(TC("main_fg")));
                 buffer.clear();
             }
             
@@ -392,7 +393,7 @@ ftxui::Element MDTransformer::ParseInlineFormatting(const std::string& input_tex
             if (i < len) {
                 std::string italic_text = input_text.substr(start, i - start);
                 i++; // 跳过 *
-                elements.push_back(ftxui::text(italic_text) | color(Color::GrayLight) | dim);
+                elements.push_back(ftxui::text(italic_text) | color(TC("dim")) | dim);
                 continue;
             }
         }
@@ -403,11 +404,11 @@ ftxui::Element MDTransformer::ParseInlineFormatting(const std::string& input_tex
     
     // 添加剩余文本
     if (!buffer.empty()) {
-        elements.push_back(ftxui::text(buffer) | color(Color::White));
+        elements.push_back(ftxui::text(buffer) | color(TC("main_fg")));
     }
     
     if (elements.empty()) {
-        return ftxui::text(input_text) | color(Color::White);
+        return ftxui::text(input_text) | color(TC("main_fg"));
     }
     
     return hbox(elements);
@@ -700,7 +701,7 @@ ftxui::Element MDTransformer::RenderTable(const std::vector<std::string>& table_
         }
     }
     top_border += "┐";
-    table_elements.push_back(ftxui::text(top_border) | color(Color::GrayLight));
+    table_elements.push_back(ftxui::text(top_border) | color(TC("dim")));
     
     // 表头行
     std::string header_display = "│";
@@ -712,7 +713,7 @@ ftxui::Element MDTransformer::RenderTable(const std::vector<std::string>& table_
         );
         header_display += " " + formatted_cell + " │";
     }
-    table_elements.push_back(ftxui::text(header_display) | color(Color::White) | bold);
+    table_elements.push_back(ftxui::text(header_display) | color(TC("main_fg")) | bold);
     
     // 分隔线
     std::string separator = "├";
@@ -725,7 +726,7 @@ ftxui::Element MDTransformer::RenderTable(const std::vector<std::string>& table_
         }
     }
     separator += "┤";
-    table_elements.push_back(ftxui::text(separator) | color(Color::GrayLight));
+    table_elements.push_back(ftxui::text(separator) | color(TC("dim")));
     
     // 数据行
     for (const auto& row : data_rows) {
@@ -739,7 +740,7 @@ ftxui::Element MDTransformer::RenderTable(const std::vector<std::string>& table_
             );
             row_display += " " + formatted_cell + " │";
         }
-        table_elements.push_back(ftxui::text(row_display) | color(Color::White));
+        table_elements.push_back(ftxui::text(row_display) | color(TC("main_fg")));
     }
     
     // 底部边框
@@ -753,7 +754,7 @@ ftxui::Element MDTransformer::RenderTable(const std::vector<std::string>& table_
         }
     }
     bottom_border += "┘";
-    table_elements.push_back(ftxui::text(bottom_border) | color(Color::GrayLight));
+    table_elements.push_back(ftxui::text(bottom_border) | color(TC("dim")));
     
     return vbox(table_elements);
 }
@@ -766,33 +767,33 @@ ftxui::Element MDTransformer::RenderHeading(const std::string& heading_text, int
     
     switch (level) {
         case 1:
-            header_color = Color::RGB(129, 161, 193);  // 青色
+            header_color = TC("syn_function");  // 青色
             return vbox({
                 ftxui::text(""),
                 ftxui::text(heading_text) | color(header_color) | bold,
                 ftxui::text("")
             });
         case 2:
-            header_color = Color::RGB(129, 161, 193);
+            header_color = TC("syn_function");
             return vbox({
                 ftxui::text(""),
                 ftxui::text(heading_text) | color(header_color) | bold,
                 ftxui::text("")
             });
         case 3:
-            header_color = Color::RGB(111, 161, 193);
+            header_color = TC("syn_function");
             return vbox({
                 ftxui::text(heading_text) | color(header_color) | bold,
                 ftxui::text("")
             });
         case 4:
-            header_color = Color::RGB(111, 161, 193);
+            header_color = TC("syn_function");
             return ftxui::text(heading_text) | color(header_color) | bold;
         case 5:
-            header_color = Color::RGB(177, 148, 193);
+            header_color = TC("syn_type");
             return ftxui::text(heading_text) | color(header_color) | bold;
         default:
-            header_color = Color::RGB(177, 148, 193);
+            header_color = TC("syn_type");
             return ftxui::text(heading_text) | color(header_color);
     }
 }
@@ -805,7 +806,7 @@ ftxui::Element MDTransformer::RenderCodeBlock(const std::vector<std::string>& li
     }
     
     Elements code_elements;
-    const size_t MAX_WIDTH = 100;
+    int MAX_WIDTH = (max_width_ > 0) ? max_width_ : 100;
     
     // 添加顶部空行
     code_elements.push_back(ftxui::text(""));
@@ -827,12 +828,12 @@ ftxui::Element MDTransformer::RenderCodeBlock(const std::vector<std::string>& li
         
         // 添加左侧边框
         Elements line_elements;
-        line_elements.push_back(ftxui::text("│ ") | color(Color::RGB(100, 100, 100)));
-        line_elements.push_back(ftxui::text(code_line) | color(Color::RGB(200, 200, 200)));
+        line_elements.push_back(ftxui::text("│ ") | color(TC("dim")));
+        line_elements.push_back(ftxui::text(code_line) | color(TC("main_fg")));
         
         code_elements.push_back(
             hbox(line_elements) | 
-            bgcolor(Color::RGB(35, 35, 35))
+            bgcolor(TC("main_bg"))
         );
     }
     
@@ -841,20 +842,20 @@ ftxui::Element MDTransformer::RenderCodeBlock(const std::vector<std::string>& li
     
     return vbox(code_elements) | 
            borderLight | 
-           color(Color::RGB(180, 180, 180));
+           color(TC("dim"));
 }
 
 // 渲染列表项
 ftxui::Element MDTransformer::RenderListItem(const std::string& item_text, int level, bool /* ordered */) {
     // 使用不同的符号表示不同层级
-    std::string bullet = "●";
+    std::string bullet = "*";
     Color bullet_color = Color::RGB(100, 180, 255);
     
     if (level == 1) {
-        bullet = "○";
+        bullet = "o";
         bullet_color = Color::RGB(150, 200, 255);
     } else if (level >= 2) {
-        bullet = "▸";
+        bullet = ">";
         bullet_color = Color::RGB(180, 210, 255);
     }
     
@@ -874,18 +875,18 @@ ftxui::Element MDTransformer::RenderListItem(const std::string& item_text, int l
 // 渲染引用块
 ftxui::Element MDTransformer::RenderQuote(const std::string& quote_text) {
     Elements quote_elements;
-    quote_elements.push_back(ftxui::text("▌") | color(Color::RGB(100, 150, 200)));
+    quote_elements.push_back(ftxui::text("|") | color(TC("syn_comment")));
     quote_elements.push_back(ftxui::text(" "));
-    quote_elements.push_back(ParseInlineFormatting(quote_text) | color(Color::RGB(160, 160, 180)));
+    quote_elements.push_back(ParseInlineFormatting(quote_text) | color(TC("syn_comment")));
     
-    return hbox(quote_elements) | bgcolor(Color::RGB(40, 40, 45));
+    return hbox(quote_elements) | bgcolor(TC("main_bg"));
 }
 
 // 渲染水平线
 ftxui::Element MDTransformer::RenderHorizontalRule() {
     return vbox({
         ftxui::text(""),
-        separator() | color(Color::GrayLight),
+        separator() | color(TC("dim")),
         ftxui::text("")
     });
 }
@@ -932,7 +933,8 @@ ftxui::Element MDTransformer::RenderLine(const std::string& line, MarkdownType t
 
 // ==================== 主要转换方法 ====================
 
-ftxui::Element MDTransformer::TransformToElement(const std::string& markdown_text) {
+ftxui::Element MDTransformer::TransformToElement(const std::string& markdown_text, int max_width) {
+    max_width_ = max_width;
     // 将文本按行分割
     std::vector<std::string> lines;
     std::istringstream stream(markdown_text);
@@ -942,20 +944,43 @@ ftxui::Element MDTransformer::TransformToElement(const std::string& markdown_tex
         lines.push_back(line);
     }
     
-    return TransformToElement(lines);
+    return TransformToElement(lines, max_width);
 }
 
-ftxui::Element MDTransformer::TransformToElement(const std::vector<std::string>& markdown_lines) {
+ftxui::Element MDTransformer::TransformToElement(const std::vector<std::string>& markdown_lines, int max_width) {
     if (markdown_lines.empty()) {
         return ftxui::text("Empty content");
     }
     
+    max_width_ = max_width;
     Elements elements;
     bool in_code_block = false;
     bool in_table = false;
     std::vector<std::string> code_block_lines;
     std::string code_language;
     std::vector<std::string> table_lines;
+    std::vector<std::string> paragraph_lines;  // collect consecutive NORMAL lines
+    
+    auto flushParagraph = [&]() {
+        if (paragraph_lines.empty()) return;
+        // Combine into a single paragraph
+        std::string para_text;
+        for (size_t pi = 0; pi < paragraph_lines.size(); ++pi) {
+            if (pi > 0 && !paragraph_lines[pi].empty() && !paragraph_lines[pi-1].empty())
+                para_text += " ";
+            para_text += paragraph_lines[pi];
+        }
+        // Wrap to width and render each line
+        if (max_width_ > 0) {
+            auto wrapped = wrapParagraph(para_text, max_width_);
+            for (const auto& wl : wrapped) {
+                elements.push_back(ParseInlineFormatting(wl));
+            }
+        } else {
+            elements.push_back(ParseInlineFormatting(para_text));
+        }
+        paragraph_lines.clear();
+    };
     
     for (size_t i = 0; i < markdown_lines.size(); ++i) {
         const std::string& line = markdown_lines[i];
@@ -964,13 +989,12 @@ ftxui::Element MDTransformer::TransformToElement(const std::vector<std::string>&
         
         // 处理代码块
         if (type == MarkdownType::CODE_BLOCK) {
+            flushParagraph();
             if (!in_code_block) {
-                // 开始代码块
                 in_code_block = true;
                 code_language = (line.length() > 3) ? line.substr(3) : "";
                 code_block_lines.clear();
             } else {
-                // 结束代码块
                 in_code_block = false;
                 if (!code_block_lines.empty()) {
                     elements.push_back(RenderCodeBlock(code_block_lines, code_language));
@@ -988,6 +1012,7 @@ ftxui::Element MDTransformer::TransformToElement(const std::vector<std::string>&
         
         // 处理表格
         if (type == MarkdownType::TABLE_ROW || type == MarkdownType::TABLE_SEPARATOR) {
+            flushParagraph();
             if (!in_table) {
                 in_table = true;
                 table_lines.clear();
@@ -995,7 +1020,7 @@ ftxui::Element MDTransformer::TransformToElement(const std::vector<std::string>&
             table_lines.push_back(line);
             continue;
         } else if (in_table) {
-            // 表格结束
+            flushParagraph();
             in_table = false;
             if (!table_lines.empty()) {
                 elements.push_back(RenderTable(table_lines));
@@ -1003,9 +1028,23 @@ ftxui::Element MDTransformer::TransformToElement(const std::vector<std::string>&
             table_lines.clear();
         }
         
-        // 渲染普通行
+        // Collect NORMAL/EMPTY lines into paragraphs
+        if (type == MarkdownType::NORMAL) {
+            paragraph_lines.push_back(line);
+            continue;
+        }
+        
+        if (type == MarkdownType::EMPTY) {
+            flushParagraph();
+            continue;
+        }
+        
+        // Other block elements: flush paragraph, then render
+        flushParagraph();
         elements.push_back(RenderLine(line, type, level));
     }
+    
+    flushParagraph();
     
     // 处理未关闭的代码块
     if (in_code_block && !code_block_lines.empty()) {
@@ -1082,6 +1121,255 @@ std::string MDTransformer::StripHtmlTags(const std::string& text) {
     }
     
     return result;
+}
+
+// ==================== 宽度感知段落换行 ====================
+
+std::vector<std::string> MDTransformer::wrapParagraph(const std::string& text, int max_width) {
+    if (max_width <= 0 || text.empty()) return {text};
+
+    // Split into words (preserve spaces as word separators)
+    struct Word { std::string text; int width; bool is_space; };
+    std::vector<Word> words;
+    std::string buf;
+    int buf_width = 0;
+
+    auto addWord = [&]() {
+        if (!buf.empty()) {
+            words.push_back({buf, buf_width, false});
+            buf.clear();
+            buf_width = 0;
+        }
+    };
+
+    for (const char* p = text.c_str(); *p; ) {
+        if (*p == ' ' || *p == '\n') {
+            addWord();
+            if (*p == '\n') {
+                words.push_back({"\n", 0, true});
+            } else {
+                words.push_back({" ", 1, true});
+            }
+            p++;
+        } else {
+            uint32_t cp;
+            int bytes = DecodeUtf8(p, &cp);
+            int cw = 1;
+            if (IsWideEmoji(cp) || IsEastAsianWide(cp)) cw = 2;
+            for (int i = 0; i < bytes; i++) buf += p[i];
+            buf_width += cw;
+            p += bytes;
+        }
+    }
+    addWord();
+
+    // Build wrapped lines
+    std::vector<std::string> result;
+    std::string cur_line;
+    int cur_width = 0;
+
+    for (const auto& w : words) {
+        if (w.text == "\n") {
+            if (!cur_line.empty()) {
+                result.push_back(cur_line);
+                cur_line.clear();
+                cur_width = 0;
+            }
+            result.push_back("");
+            continue;
+        }
+
+        if (w.is_space) {
+            if (!cur_line.empty()) {
+                cur_line += w.text;
+                cur_width += w.width;
+            }
+            continue;
+        }
+
+        // Word doesn't fit on current line
+        if (cur_width + w.width > max_width) {
+            if (!cur_line.empty()) {
+                // Trim trailing space
+                while (!cur_line.empty() && cur_line.back() == ' ')
+                    cur_line.pop_back();
+                result.push_back(cur_line);
+                cur_line.clear();
+                cur_width = 0;
+            }
+            // Hard-break if word itself exceeds max_width
+            if (w.width > max_width) {
+                std::string remaining = w.text;
+                while (!remaining.empty()) {
+                    int chunk_w = 0;
+                    int pos = 0;
+                    while (pos < static_cast<int>(remaining.size())) {
+                        uint32_t cp;
+                        int bytes = DecodeUtf8(remaining.c_str() + pos, &cp);
+                        int cw = 1;
+                        if (IsWideEmoji(cp) || IsEastAsianWide(cp)) cw = 2;
+                        if (chunk_w + cw > max_width) break;
+                        chunk_w += cw;
+                        pos += bytes;
+                    }
+                    if (pos == 0) {
+                        // Single character wider than max_width? Force it in.
+                        uint32_t cp;
+                        pos = DecodeUtf8(remaining.c_str(), &cp);
+                        result.push_back(remaining.substr(0, pos));
+                        remaining = remaining.substr(pos);
+                    } else {
+                        result.push_back(remaining.substr(0, pos));
+                        remaining = remaining.substr(pos);
+                    }
+                }
+            } else {
+                cur_line = w.text;
+                cur_width = w.width;
+            }
+        } else {
+            cur_line += w.text;
+            cur_width += w.width;
+        }
+    }
+
+    if (!cur_line.empty()) {
+        while (!cur_line.empty() && cur_line.back() == ' ')
+            cur_line.pop_back();
+        result.push_back(cur_line);
+    }
+    if (result.empty()) result.push_back("");
+
+    return result;
+}
+
+// ==================== 行数精确计数 ====================
+
+int MDTransformer::countLinesInternal(const std::vector<std::string>& markdown_lines, int max_width) {
+    if (markdown_lines.empty()) return 1;
+
+    int total = 0;
+    bool in_code_block = false;
+    bool in_table = false;
+    std::vector<std::string> code_block_lines;
+    std::vector<std::string> table_lines;
+    std::vector<std::string> paragraph_lines;
+
+    auto flushParagraph = [&]() {
+        if (paragraph_lines.empty()) return;
+        std::string para_text;
+        for (size_t pi = 0; pi < paragraph_lines.size(); ++pi) {
+            if (pi > 0 && !paragraph_lines[pi].empty() && !paragraph_lines[pi-1].empty())
+                para_text += " ";
+            para_text += paragraph_lines[pi];
+        }
+        if (max_width > 0) {
+            auto wrapped = wrapParagraph(para_text, max_width);
+            total += static_cast<int>(wrapped.size());
+        } else {
+            total += 1;
+        }
+        paragraph_lines.clear();
+    };
+
+    for (size_t i = 0; i < markdown_lines.size(); ++i) {
+        const std::string& line = markdown_lines[i];
+        int level = 0;
+        MarkdownType type = ParseLineType(line, &level);
+
+        if (type == MarkdownType::CODE_BLOCK) {
+            flushParagraph();
+            if (!in_code_block) {
+                in_code_block = true;
+                code_block_lines.clear();
+            } else {
+                in_code_block = false;
+                // Code block: top/bottom borders + blank lines + content lines + border
+                total += static_cast<int>(code_block_lines.size()) + 4;
+                code_block_lines.clear();
+            }
+            continue;
+        }
+
+        if (in_code_block) {
+            code_block_lines.push_back(line);
+            continue;
+        }
+
+        if (type == MarkdownType::TABLE_ROW || type == MarkdownType::TABLE_SEPARATOR) {
+            flushParagraph();
+            if (!in_table) {
+                in_table = true;
+                table_lines.clear();
+            }
+            table_lines.push_back(line);
+            continue;
+        } else if (in_table) {
+            flushParagraph();
+            in_table = false;
+            total += static_cast<int>(table_lines.size()) + 3;
+            table_lines.clear();
+        }
+
+        if (type == MarkdownType::NORMAL) {
+            paragraph_lines.push_back(line);
+            continue;
+        }
+
+        if (type == MarkdownType::EMPTY) {
+            flushParagraph();
+            continue;
+        }
+
+        flushParagraph();
+
+        switch (type) {
+            case MarkdownType::HEADING1:
+            case MarkdownType::HEADING2:
+                total += 3;
+                break;
+            case MarkdownType::HEADING3:
+                total += 2;
+                break;
+            case MarkdownType::HEADING4:
+            case MarkdownType::HEADING5:
+            case MarkdownType::HEADING6:
+                total += 1;
+                break;
+            case MarkdownType::LIST_ITEM:
+            case MarkdownType::LIST_ORDERED:
+            case MarkdownType::QUOTE:
+                total += 1;
+                break;
+            case MarkdownType::HR:
+                total += 3;
+                break;
+            default:
+                total += 1;
+                break;
+        }
+    }
+
+    flushParagraph();
+
+    if (in_code_block && !code_block_lines.empty()) {
+        total += static_cast<int>(code_block_lines.size()) + 4;
+    }
+    if (in_table && !table_lines.empty()) {
+        total += static_cast<int>(table_lines.size()) + 3;
+    }
+
+    return std::max(1, total);
+}
+
+int MDTransformer::GetLineCount(const std::string& markdown_text, int max_width) {
+    std::vector<std::string> lines;
+    std::istringstream stream(markdown_text);
+    std::string line;
+    while (std::getline(stream, line)) {
+        lines.push_back(line);
+    }
+    return countLinesInternal(lines, max_width);
 }
 
 } // namespace Editor

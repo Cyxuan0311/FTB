@@ -4,6 +4,7 @@
 #include <vector>
 #include <cstdint>
 #include <ftxui/dom/elements.hpp>
+#include "renderer/detail_element.hpp"
 
 namespace FTB {
 namespace Editor {
@@ -47,9 +48,12 @@ public:
     MDTransformer();
     ~MDTransformer();
 
-    // 主要转换方法
-    ftxui::Element TransformToElement(const std::string& markdown_text);
-    ftxui::Element TransformToElement(const std::vector<std::string>& markdown_lines);
+    // 主要转换方法（max_width <= 0 表示不限制宽度）
+    ftxui::Element TransformToElement(const std::string& markdown_text, int max_width = -1);
+    ftxui::Element TransformToElement(const std::vector<std::string>& markdown_lines, int max_width = -1);
+
+    // 获取 Markdown 渲染后的精确行数（用于 entry_line_heights 预计算）
+    int GetLineCount(const std::string& markdown_text, int max_width = -1);
 
     // 滚动控制
     void SetScrollOffset(int offset);
@@ -135,8 +139,15 @@ private:
     // 去除 HTML 标签
     std::string StripHtmlTags(const std::string& text);
     
+    // 宽度感知的段落换行（max_width <= 0 时不换行）
+    std::vector<std::string> wrapParagraph(const std::string& text, int max_width);
+    
+    // 内部行计数（共享解析逻辑）
+    int countLinesInternal(const std::vector<std::string>& markdown_lines, int max_width);
+    
     // 成员变量
     int scroll_offset_;
+    int max_width_;
 };
 
 } // namespace Editor
