@@ -70,14 +70,36 @@ void UpdatePathCache(MainState& state) {
 }
 
 void UpdateCurrentEntryCache(MainState& state) {
-    if (state.currentPath == state.cached_current_path_for_entries) {
+    bool force_refresh = false;
+    try {
+        auto dir_mtime = fs::last_write_time(state.currentPath);
+        if (dir_mtime != state.cached_dir_mtime) {
+            force_refresh = true;
+            state.cached_dir_mtime = dir_mtime;
+        }
+    } catch (...) {
+        force_refresh = true;
+    }
+
+    if (!force_refresh && state.currentPath == state.cached_current_path_for_entries) {
         return;
     }
     state.cached_current_path_for_entries = state.currentPath;
+
+    if (force_refresh) {
+        std::lock_guard<std::mutex> lock(FileManager::cache_mutex);
+        FileManager::lru_dir_cache->erase(state.currentPath);
+        FileManager::lru_entry_cache->erase(state.currentPath);
+    }
+
     state.cached_current_entries = FileManager::getDirectoryEntries(state.currentPath, state.currentSortMode());
     state.allContents.clear();
     for (const auto& e : state.cached_current_entries) {
         state.allContents.push_back(e.name);
+    }
+
+    if (!state.search_mode) {
+        state.filteredContents = state.allContents;
     }
 }
 

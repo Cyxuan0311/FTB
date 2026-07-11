@@ -7,6 +7,7 @@
 #include <memory>
 #include <atomic>
 #include <functional>
+#include <filesystem>
 #include <ftxui/dom/elements.hpp>
 #include <ftxui/component/event.hpp>
 #include <ftxui/component/screen_interactive.hpp>
@@ -172,6 +173,7 @@ struct MainState {
     int cached_parent_selected = -1;
     std::vector<FileManager::DirEntryInfo> cached_parent_entries;
     std::vector<FileManager::DirEntryInfo> cached_current_entries;
+    std::filesystem::file_time_type cached_dir_mtime;
 
     // 文件大小
     std::string selected_size;
