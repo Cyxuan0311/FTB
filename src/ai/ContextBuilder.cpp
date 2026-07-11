@@ -36,6 +36,15 @@ std::string ContextBuilder::buildSystemPrompt(
     ss << "CRITICAL: You MUST plan ALL necessary steps in a single response.\n";
     ss << "Do NOT split work across multiple turns. If listing then copying,\n";
     ss << "include BOTH steps in the same \"steps\" array.\n\n";
+    ss << "Use Markdown formatting in your 'thought' field for readability:\n";
+    ss << "  - **bold** for emphasis\n";
+    ss << "  - `code` for inline code\n";
+    ss << "  - ```language...``` for code blocks\n";
+    ss << "  - ## for section headings\n";
+    ss << "  - - for bullet lists, 1. for numbered lists\n";
+    ss << "  - > for blockquotes\n";
+    ss << "  - [text](url) for links\n";
+    ss << "  - Tables using | columns |\n\n";
     ss << "You MUST respond with valid JSON in one of two formats:\n\n";
     ss << "For questions (no file ops needed):\n";
     ss << "  {\"thought\": \"your answer\", \"steps\": []}\n\n";

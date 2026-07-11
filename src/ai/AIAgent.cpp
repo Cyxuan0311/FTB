@@ -3,6 +3,7 @@
 #include "core/MainUI.hpp"
 #include "config/ConfigManager.hpp"
 #include "renderer/detail_element.hpp"
+#include "utils/PerfLogger.hpp"
 
 
 namespace FTB {
@@ -154,6 +155,13 @@ void AIAgent::handleError(const std::string& error) {
 }
 
 void AIAgent::processPendingResponse() {
+    PERF_LOG("AIResp", std::string("processPendingResponse START")
+        + " entries_before=" + std::to_string(state_.ai.entries.size())
+        + " resp_len=" + std::to_string(pending_response_.size())
+        + " stream_buf_len=" + std::to_string(stream_buffer_.size())
+        + " processing=" + std::to_string(processing_)
+        + " streaming=" + std::to_string(streaming_));
+
     std::string response = pending_response_;
     pending_response_.clear();
 
@@ -162,6 +170,9 @@ void AIAgent::processPendingResponse() {
     if (!ai_resp.thought.empty()) {
         state_.ai.entries.push_back({AILogEntry::Assistant, ai_resp.thought});
         memory_.addMessage(Message::Assistant, ai_resp.thought);
+        PERF_LOG("AIResp", std::string("  added Assistant entry, thought_len=") + std::to_string(ai_resp.thought.size()));
+    } else {
+        PERF_LOG("AIResp", std::string("  thought is EMPTY, tool_calls=") + std::to_string(ai_resp.tool_calls.size()));
     }
 
     // Separate tools: allowed execute immediately, prompt tools queue for confirmation
@@ -267,6 +278,10 @@ void AIAgent::processPendingResponse() {
 
     stream_buffer_.clear();
     processing_ = false;
+    PERF_LOG("AIResp", std::string("processPendingResponse END")
+        + " entries_after=" + std::to_string(state_.ai.entries.size())
+        + " processing=" + std::to_string(processing_)
+        + " needs_auto_continue=" + std::to_string(needs_auto_continue_));
     if (state_.screen) {
         state_.screen->Post(ftxui::Event::Custom);
     }
