@@ -73,6 +73,68 @@ The software just suit the Linux now
 - sysinfo.ftb - system information collector
 - preview-external.ftb - external preview for .md/.pdf/.image files
 
+# v2.1.1
+
+## Major:
+- Refactored AI assistant as tab-based interface with fullscreen right-side status panel
+- Integrated Markdown rendering for AI responses (bold, inline code, code blocks, headings, lists, blockquotes, tables, links)
+- Added Markdown formatting instructions to system prompt for AI-generated responses
+- Fixed visible_groups calculation that skipped the last response group when conversation exceeded panel height
+- Added tool permission confirmation prompts with Registry deduplication and doom loop detection
+- Added token-count-based memory truncation for long conversations
+- Added Docker multi-stage build support
+- Added os-icon system icon plugin and enhanced preview-external with Python parsers
+- Added 8 built-in themes (sonokai, mariana, seti, ir-black, vibrant-ink, tender, breeze, selenized)
+- Added network status and speed display to sysinfo plugin
+- Added TerminalProbe and TmuxContext utility modules
+- Added image output protocols module with stb_image support
+- Added command history with ArrowUp/ArrowDown navigation
+- Added issue templates and contributing guide
+
+## Improvements:
+- Optimized DetailElement rendering logic
+- Optimized ImagePreview rendering and memory management
+- Unified image output protocols (Sixel/Kitty/iTerm2) with common interface
+- Enhanced FolderDetails dialog with file info, colors, and scroll support
+- Refactored CLI args, config manager and key bindings
+- Refactored build config, main entry and panel commands
+- Updated PerfLogger instrumentation across core modules
+- Optimized AI module by removing redundant code and simplifying executor interface
+- Updated FTB main entry point and project configuration
+
+## Fixes:
+- Fixed visible_groups off-by-N bug that skipped the last AI response group when conversation lines exceeded panel height
+- Fixed macOS crash from unused DetailColor static globals (static init order failure)
+- Fixed crash on fs::canonical() for missing directories
+- Fixed libsixel header compatibility for both flat and subdir directory structures
+- Fixed kitty graphics protocol payload chunking and image overlay cleanup
+- Fixed plugin TypeScript transpiler regex for Date.now()
+- Fixed AI stream buffer not cleared when processing ends
+- Fixed user entry group line count inaccuracy
+- Fixed build compilation warnings
+- Fixed sixel image not hidden when popup dialog is active
+- Fixed build summary table width and colorized values
+- Added bobcat and mlterm to recognized terminals for sixel/kitty support
+- Disabled optional features by default for better compatibility
+
+## Build & CI:
+- Added Docker multi-stage build (Dockerfile + docker-compose)
+- Disabled optional MySQL, SSH2, systemd features by default
+- Added __pycache__ and *.pyc to gitignore
+- Resolved compilation warnings across modules
+
+## Docs:
+- Added Docker usage guide (EN/ZH)
+- Updated PLUGINS documentation (EN/ZH)
+- Added Docker section and documentation links to README
+- Updated all documentation files
+- Added issue templates and contributing guide
+
+## Plugins:
+- os-icon.ftb - system OS icon display with WSL detection
+- sysinfo.ftb - enhanced with network status and speed test
+- preview-external.ftb - enhanced with Python-based parser support
+
 # v2.0.0
 
 ## Fix: 

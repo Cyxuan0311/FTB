@@ -4,7 +4,7 @@
 
 namespace FTB {
 
-const char* FTB_VERSION = "2.1.0";
+const char* FTB_VERSION = "2.1.1";
 
 void print_version() {
     std::cout << "FTB v" << FTB_VERSION << std::endl;

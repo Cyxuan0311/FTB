@@ -2,7 +2,7 @@
 
 # FTB Configuration Guide
 
-FTB v2.1.0 uses a JSON configuration file to customize appearance and behavior.
+FTB v2.1.1 uses a JSON configuration file to customize appearance and behavior.
 
 ## File Location
 
@@ -450,7 +450,7 @@ Press `Ctrl+R` to reload the configuration file without restarting FTB.
 | Argument | Description |
 |----------|-------------|
 | `-h`, `--help` | Show help |
-| `-v`, `--version` | Show version (v2.1.0) |
+| `-v`, `--version` | Show version (v2.1.1) |
 | `--config <PATH>` | Specify config file path |
 | `--no-icons` | Build-time option: rebuild with `-DFTB_ENABLE_ICONS=OFF` |
 | `-l` | Enable performance debug logging to `ftb_perf.log` |

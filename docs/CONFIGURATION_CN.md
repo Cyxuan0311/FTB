@@ -1,6 +1,6 @@
 # FTB 配置指南
 
-FTB v2.1.0 使用 JSON 格式的配置文件来定制外观和行为。
+FTB v2.1.1 使用 JSON 格式的配置文件来定制外观和行为。
 
 ## 文件位置
 
@@ -448,7 +448,7 @@ cp config/.ftb.template ~/.config/ftb/ftb.json
 | 参数 | 说明 |
 |----------|------|
 | `-h`、`--help` | 显示帮助 |
-| `-v`、`--version` | 显示版本（v2.1.0） |
+| `-v`、`--version` | 显示版本（v2.1.1） |
 | `--config <PATH>` | 指定配置文件路径 |
 | `--no-icons` | 构建选项：使用 `-DFTB_ENABLE_ICONS=OFF` 重新构建 |
 | `-l` | 启用性能调试日志到 `ftb_perf.log` |

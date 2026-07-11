@@ -59,7 +59,7 @@ body:
     attributes:
       label: FTB Version
       description: "Run `./FTB` and check the version shown in the status bar, or provide the git commit hash (`git log --oneline -1`)."
-      placeholder: "v2.1.0 / commit abc123"
+      placeholder: "v2.1.1 / commit abc123"
     validations:
       required: true
 
