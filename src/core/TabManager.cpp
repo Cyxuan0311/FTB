@@ -124,6 +124,20 @@ int TabManager::createAITab(const std::string& path, const std::string& session_
     return newIndex;
 }
 
+bool TabManager::isAITab(int index) const {
+    if (index < 0 || index >= static_cast<int>(tabs_.size())) return false;
+    return tabs_[index].type == TabType::AIAgent;
+}
+
+int TabManager::aiTabCount() const {
+    int count = 0;
+    for (const auto& t : tabs_) {
+        if (t.type == TabType::AIAgent) count++;
+    }
+    return count;
+}
+#endif
+
 int TabManager::createImageTab(const std::string& path, const std::string& filepath) {
     Tab tab;
     tab.type = TabType::ImagePreview;
@@ -183,20 +197,6 @@ int TabManager::editorTabCount() const {
     }
     return count;
 }
-
-bool TabManager::isAITab(int index) const {
-    if (index < 0 || index >= static_cast<int>(tabs_.size())) return false;
-    return tabs_[index].type == TabType::AIAgent;
-}
-
-int TabManager::aiTabCount() const {
-    int count = 0;
-    for (const auto& t : tabs_) {
-        if (t.type == TabType::AIAgent) count++;
-    }
-    return count;
-}
-#endif
 
 bool TabManager::closeTab(int index) {
     if (tabs_.size() <= 1) return false;
