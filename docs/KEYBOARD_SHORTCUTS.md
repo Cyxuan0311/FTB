@@ -66,10 +66,11 @@ Press `Ctrl+B` to enter command prefix mode, then type a command:
 | `open` | `op` | Open with picker dialog |
 | `openwith` | `ow` | Manual specify program |
 | `opencfg` | `oc` | Configure openers |
-| `vim` | `v`, `e`, `editor` | Open built-in editor |
+| `vim` | `v`, `e`, `editor` | Open built-in editor (full-screen tab, Esc to close) |
 | `theme` | `th` | Open theme selector |
 | `rename` | `rn` | Rename selected item |
 | `batchrename` | `br` | Batch rename with regex |
+| `extract` | `ext` | Extract archive file |
 | `newfile` | `nf` | Create new file |
 | `newfolder` | `nd` | Create new folder |
 | `preview` | `p` | Full file preview |

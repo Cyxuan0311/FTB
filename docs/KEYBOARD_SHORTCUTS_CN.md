@@ -64,10 +64,11 @@
 | `open` | `op` | 选择程序打开 |
 | `openwith` | `ow` | 手动指定程序 |
 | `opencfg` | `oc` | 配置打开器 |
-| `vim` | `v`、`e`、`editor` | 打开内置编辑器 |
+| `vim` | `v`、`e`、`editor` | 打开内置编辑器（全屏 Tab，Esc 关闭） |
 | `theme` | `th` | 打开主题选择器 |
 | `rename` | `rn` | 重命名选中项 |
 | `batchrename` | `br` | 批量正则重命名 |
+| `extract` | `ext` | 解压压缩文件 |
 | `newfile` | `nf` | 新建文件 |
 | `newfolder` | `nd` | 新建文件夹 |
 | `preview` | `p` | 完整文件预览 |
