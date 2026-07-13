@@ -91,6 +91,8 @@ std::map<std::string, KeyBindings::PanelCommand> KeyBindings::InitCommandMap() {
     m["ts"]         = PanelCommand::Tasks;
     m["batchrename"] = PanelCommand::BatchRename;
     m["br"]         = PanelCommand::BatchRename;
+    m["extract"]    = PanelCommand::Extract;
+    m["ext"]        = PanelCommand::Extract;
     m["z"]          = PanelCommand::QuitWithCwd;
     m["exit"]       = PanelCommand::QuitWithCwd;
     m["quit"]       = PanelCommand::QuitWithCwd;
@@ -578,6 +580,7 @@ std::vector<std::pair<std::string, std::string>> KeyBindings::GetCommandList() c
     list.push_back({"fdfind / fd",       "Fuzzy find files"});
     list.push_back({"rename / rn",       "Rename item"});
     list.push_back({"batchrename / br",  "Batch rename with regex"});
+    list.push_back({"extract / ext",     "Extract archive file"});
     list.push_back({"newfile / nf",      "Create new file"});
     list.push_back({"newfolder / nd",    "Create new folder"});
     list.push_back({"preview / p",       "File preview"});

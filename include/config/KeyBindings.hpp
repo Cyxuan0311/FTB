@@ -71,6 +71,7 @@ public:
         OpenConfig,
         Tasks,
         BatchRename,
+        Extract,
         QuitWithCwd,
         PluginCommand,
         ToggleProtocol,
