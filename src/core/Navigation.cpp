@@ -10,6 +10,8 @@
 #include "utils/StatusMessage.hpp"
 #include "config/ConfigManager.hpp"
 #include "ops/OpenerManager.hpp"
+#include "preview/ImagePreview.hpp"
+#include "browser/BinaryFileHandler.hpp"
 
 namespace fs = std::filesystem;
 
@@ -106,12 +108,20 @@ void NavigateIntoSelected(MainState& state) {
 
         fs::path selectedPath = fs::path(state.currentPath) / name;
         if (!FileManager::isDirectory(selectedPath.string())) {
-            auto& opener = OpenerManager::Instance();
-            auto defaultOpener = opener.GetDefaultOpener(name);
-            if (defaultOpener) {
-                opener.Execute(*defaultOpener, selectedPath.string(), state.screen);
+            std::string path = selectedPath.string();
+            // Built-in viewers for image and binary files
+            if (FTB::ImagePreview::IsImageFile(path)) {
+                // Image preview not supported
+            } else if (BinaryFileHandler::BinaryFileRestrictor::isBinaryFile(path)) {
+                OpenHexEditorForFile(state, path);
             } else {
-                StatusMessage::Show("No opener configured for this file type");
+                auto& opener = OpenerManager::Instance();
+                auto defaultOpener = opener.GetDefaultOpener(name);
+                if (defaultOpener) {
+                    opener.Execute(*defaultOpener, path, state.screen);
+                } else {
+                    StatusMessage::Show("No opener configured for this file type");
+                }
             }
             return;
         }

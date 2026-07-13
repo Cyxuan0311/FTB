@@ -12,6 +12,7 @@
 #include <ftxui/dom/elements.hpp>
 
 #include "utils/StatusMessage.hpp"
+#include "ops/ArchiveOps.hpp"
 #include "preview/MarkdownPreview.hpp"
 #include "preview/SpreadsheetPreview.hpp"
 #include "preview/MediaPreview.hpp"
@@ -19,7 +20,9 @@
 #include "preview/PdfPreview.hpp"
 #include "preview/DocPreview.hpp"
 #include "preview/HexPreview.hpp"
+#include "preview/PreviewCache.hpp"
 #include "browser/AsyncFileManager.hpp"
+#include "browser/TaskSystem.hpp"
 #include "config/ConfigManager.hpp"
 #include "browser/ClipboardManager.hpp"
 #include "browser/FileManager.hpp"
@@ -32,6 +35,10 @@
 #include "config/KeyBindings.hpp"
 #include "config/ThemeManager.hpp"
 #include "protocols/ImageOutputManager.hpp"
+#include "dialog/ImagePreviewPanel.hpp"
+#include "dialog/HexEditorPanel.hpp"
+#include "preview/ImagePreview.hpp"
+#include "browser/BinaryFileHandler.hpp"
 #ifdef FTB_ENABLE_PLUGINS
 #include "ops/PluginManager.hpp"
 #endif
@@ -197,34 +204,54 @@ bool HandlePanelEvent(MainState& state, const Event& event) {
     default:                          return true;
     }
 }
-
 void OpenEditorForFile(MainState& state, const std::string& filePath) {
-    if (state.vimEditor != nullptr) {
-        FTB::NanoEditorPool::GetInstance().release(std::move(state.vimEditor));
-    }
-    state.vimEditor = FTB::NanoEditorPool::GetInstance().acquire();
+    // Save current tab state before switching
+    state.saveTabState();
+
+    auto editor = std::make_unique<FTB::Editor::NanoEditor>();
+    auto* editor_ptr = editor.get();
+
+    // Create Editor tab (editor moves into the tab)
+    int idx = state.tabManager.createEditorTab(state.currentPath, filePath, std::move(editor));
+    state.tabManager.loadTabState(state, idx);
+
+    // Read file content asynchronously
     FTB::GlobalAsyncFileManager::getInstance().asyncReadFileContent(
         filePath, 1, 1000,
-        [&state, filePath](std::string fileContent) {
+        [editor_ptr, filePath](std::string fileContent) {
             std::vector<std::string> lines;
             std::istringstream iss(fileContent);
             std::string line;
             while (std::getline(iss, line))
                 lines.push_back(line);
-            state.vimEditor->SetContent(lines);
-            state.vimEditor->SetFilename(filePath);
-            state.vimEditor->Enter();
-            state.vimEditor->SetOnExit([&state, filePath](const std::vector<std::string>& content) {
+            editor_ptr->SetContent(lines);
+            editor_ptr->SetFilename(filePath);
+            editor_ptr->Enter();
+            editor_ptr->SetOnExit([filePath](const std::vector<std::string>& content) {
                 std::string contentStr;
                 for (size_t i = 0; i < content.size(); ++i) {
                     contentStr += content[i];
                     if (i < content.size() - 1) contentStr += "\n";
                 }
                 FileManager::writeFileContent(filePath, contentStr);
-                state.vim_mode_active = false;
             });
-            state.vim_mode_active = true;
         });
+}
+
+void OpenImagePreviewForFile(MainState& state, const std::string& filePath) {
+    state.saveTabState();
+    state.viewer_scroll_y = 0;
+    state.viewer_scroll_x = 0;
+    int idx = state.tabManager.createImageTab(state.currentPath, filePath);
+    state.tabManager.loadTabState(state, idx);
+}
+
+void OpenHexEditorForFile(MainState& state, const std::string& filePath) {
+    state.saveTabState();
+    state.viewer_scroll_y = 0;
+    state.viewer_scroll_x = 0;
+    int idx = state.tabManager.createHexTab(state.currentPath, filePath);
+    state.tabManager.loadTabState(state, idx);
 }
 
 namespace {
@@ -297,6 +324,39 @@ void HandlePanelCommand(MainState& state, FTB::KeyBindings::PanelCommand cmd) {
         state.panel_selected = 0;
         state.active_panel = ActivePanel::TaskPanel;
         break;
+    case FTB::KeyBindings::PanelCommand::Extract: {
+        if (auto* entry = FindSelectedEntry(state)) {
+            std::string fullPath = (fs::path(state.currentPath) / entry->name).string();
+            if (!IsArchiveFile(entry->name)) {
+                StatusMessage::Show("Not an archive file");
+                break;
+            }
+            auto fmt = DetectArchiveFormat(fullPath);
+            if (fmt == ArchiveFormat::Unknown) {
+                StatusMessage::Show("Unknown archive format");
+                break;
+            }
+            if (!IsExtractToolAvailable(fmt)) {
+                StatusMessage::Show("Tool not available for " + FormatName(fmt) +
+                    ". Install unzip/tar/7z/unrar");
+                break;
+            }
+            auto& ts = TaskSystem::getInstance();
+            std::string archivePath = fullPath;
+            std::string destDir = state.currentPath;
+            ts.submit({
+                .title = "Extracting " + entry->name,
+                .type = TaskType::Extract,
+                .work = [archivePath, destDir](TaskContext& ctx) -> bool {
+                    return ExtractArchive(archivePath, destDir,
+                        [&](const std::string& msg) { ctx.progress.current_file = msg; },
+                        [&]() { return ctx.cancel.load(); });
+                }
+            });
+            StatusMessage::Show("Extracting " + entry->name + " (see Tasks panel)");
+        }
+        break;
+    }
     case FTB::KeyBindings::PanelCommand::BatchRename: {
         auto items = [&]() {
             std::vector<std::string> names;
@@ -544,7 +604,14 @@ void HandlePanelCommand(MainState& state, FTB::KeyBindings::PanelCommand cmd) {
         if (state.selected >= 0 && state.selected < static_cast<int>(state.filteredContents.size())) {
             fs::path fullPath = fs::path(state.currentPath) / state.filteredContents[state.selected];
             if (!FileManager::isDirectory(fullPath.string())) {
-                OpenEditorForFile(state, fullPath.string());
+                std::string path = fullPath.string();
+                if (FTB::ImagePreview::IsImageFile(path)) {
+                    // Image preview not supported
+                } else if (BinaryFileHandler::BinaryFileRestrictor::isBinaryFile(path)) {
+                    OpenHexEditorForFile(state, path);
+                } else {
+                    OpenEditorForFile(state, path);
+                }
             }
         }
         break;
@@ -698,6 +765,7 @@ void RegisterPanelCommands(FTB::KeyBindings& keybindings, MainState& state) {
     keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::ShowClipboard, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::ShowClipboard); });
     keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::Tasks, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::Tasks); });
     keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::BatchRename, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::BatchRename); });
+    keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::Extract, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::Extract); });
     keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::MDToggleSource, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::MDToggleSource); });
     keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::XLSToggleSource, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::XLSToggleSource); });
     keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::MediaToggleSource, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::MediaToggleSource); });

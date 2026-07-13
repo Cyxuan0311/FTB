@@ -32,6 +32,9 @@
 #include "../include/ai/SessionManager.hpp"
 #include "../include/dialog/AIDialog.hpp"
 #endif
+#include "../include/dialog/EditorPanel.hpp"
+#include "../include/dialog/ImagePreviewPanel.hpp"
+#include "../include/dialog/HexEditorPanel.hpp"
 #include "../include/ops/EventHandler.hpp"
 #include "../include/dialog/TabBarRenderer.hpp"
 #include "../include/dialog/OpenerPickerDialog.hpp"
@@ -294,6 +297,20 @@ int main(int argc, char* argv[])
         int th = term_dim.dimy;
 
         Element main_body;
+        if (state.tabManager.active().type == TabType::ImagePreview) {
+            main_body = UI::RenderImagePreviewPanel(state, tw, th) | flex;
+        } else
+        if (state.tabManager.active().type == TabType::HexEditor) {
+            main_body = UI::RenderHexEditorPanel(state, tw, th) | flex;
+        } else
+        if (state.tabManager.active().type == TabType::Editor) {
+            auto& tab = state.tabManager.active();
+            if (tab.editor) {
+                main_body = UI::RenderEditorPanel(state, tw, th) | flex;
+            } else {
+                main_body = text("Editor loading...") | center;
+            }
+        } else
 #ifdef FTB_ENABLE_AI
         if (state.tabManager.active().type == TabType::AIAgent) {
             main_body = UI::RenderAIPanel(state, tw, th, true) | flex;
@@ -321,12 +338,7 @@ int main(int argc, char* argv[])
         FTB::ImageOutputManager::SetOverlayActive(state.active_panel != ActivePanel::None);
 
         Element result;
-        if (state.vim_mode_active && state.vimEditor != nullptr) {
-            result = dbox({
-                main_content | dim,
-                state.vimEditor->Render() | center | flex,
-            });
-        } else if (state.active_panel != ActivePanel::None) {
+        if (state.active_panel != ActivePanel::None) {
             bool no_dim = state.active_panel == ActivePanel::UIStyle
                        || state.active_panel == ActivePanel::StatusBarStyle;
             result = dbox({
@@ -482,42 +494,53 @@ int main(int argc, char* argv[])
             }
 #endif
 
-            int sep_w = FTB::GetColumnSeparatorWidth();
+            // Column selection and preview scroll only apply in file browser mode
+            if (state.tabManager.active().type == TabType::FileBrowser) {
+                int sep_w = FTB::GetColumnSeparatorWidth();
 
-            if (mouse.button == Mouse::Left && mouse.motion == Mouse::Pressed) {
-                auto col = GetColumnAtX(mouse.x, state.parent_width, sep_w, state.current_width);
-                SelectionPress(col, mouse.x, mouse.y);
-                return true;
-            }
-            if (mouse.button == Mouse::Left && mouse.motion == Mouse::Moved) {
-                if (g_parent_sel.active || g_current_sel.active || g_preview_sel.active) {
-                    SelectionDrag(mouse.x, mouse.y);
+                if (mouse.button == Mouse::Left && mouse.motion == Mouse::Pressed) {
+                    auto col = GetColumnAtX(mouse.x, state.parent_width, sep_w, state.current_width);
+                    SelectionPress(col, mouse.x, mouse.y);
+                    return true;
+                }
+                if (mouse.button == Mouse::Left && mouse.motion == Mouse::Moved) {
+                    if (g_parent_sel.active || g_current_sel.active || g_preview_sel.active) {
+                        SelectionDrag(mouse.x, mouse.y);
+                        return true;
+                    }
+                }
+                if (mouse.button == Mouse::Left && mouse.motion == Mouse::Released) {
+                    std::string selected = SelectionRelease();
+                    if (!selected.empty()) {
+                        StatusMessage::Show("Copied to clipboard");
+                        std::thread([selected = std::move(selected)]() {
+                            CopyToSystemClipboard(selected);
+                        }).detach();
+                    }
+                    return true;
+                }
+                if (mouse.button == Mouse::WheelUp) {
+                    if (state.preview_scroll_y > 0)
+                        state.preview_scroll_y = std::max(0, state.preview_scroll_y - 3);
+                    return true;
+                }
+                if (mouse.button == Mouse::WheelDown) {
+                    state.preview_scroll_y += 3;
                     return true;
                 }
             }
-            if (mouse.button == Mouse::Left && mouse.motion == Mouse::Released) {
-                std::string selected = SelectionRelease();
-                if (!selected.empty()) {
-                    StatusMessage::Show("Copied to clipboard");
-                    std::thread([selected = std::move(selected)]() {
-                        CopyToSystemClipboard(selected);
-                    }).detach();
-                }
-                return true;
-            }
-            if (mouse.button == Mouse::WheelUp) {
-                if (state.preview_scroll_y > 0)
-                    state.preview_scroll_y = std::max(0, state.preview_scroll_y - 3);
-                return true;
-            }
-            if (mouse.button == Mouse::WheelDown) {
-                state.preview_scroll_y += 3;
-                return true;
-            }
         }
 
-        if (state.vim_mode_active && state.vimEditor != nullptr) {
-            if (state.vimEditor->OnEvent(event))
+        if (state.tabManager.active().type == TabType::ImagePreview) {
+            if (UI::HandleImagePreviewEvent(state, event))
+                return true;
+        } else
+        if (state.tabManager.active().type == TabType::HexEditor) {
+            if (UI::HandleHexEditorEvent(state, event))
+                return true;
+        } else
+        if (state.tabManager.active().type == TabType::Editor) {
+            if (UI::HandleEditorEvent(state, event))
                 return true;
         }
 
@@ -528,8 +551,8 @@ int main(int argc, char* argv[])
             return true;
         }
 
-        // Tab switching (only when no panel/search/vim active)
-        if (state.active_panel == ActivePanel::None && !state.search_mode && !state.vim_mode_active) {
+        // Tab switching (only when no panel/search active)
+        if (state.active_panel == ActivePanel::None && !state.search_mode) {
             if (event == Event::Character(']')) {
                 state.saveTabState();
                 state.tabManager.nextTab();
@@ -547,7 +570,7 @@ int main(int argc, char* argv[])
         if (HandleNavigationEvent(state, event)) return true;
 
         // Preview panel scroll shortcuts
-        if (state.active_panel == ActivePanel::None && !state.search_mode && !state.vim_mode_active) {
+        if (state.active_panel == ActivePanel::None && !state.search_mode && state.tabManager.active().type != TabType::Editor) {
             if (event == Event::AltJ) {
                 state.preview_scroll_y += 3;
                 return true;

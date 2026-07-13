@@ -2,12 +2,15 @@
 #include <string>
 #include <vector>
 #include <set>
+#include <memory>
 #include "browser/DirectoryHistory.hpp"
 #include "browser/SortMode.hpp"
 #include "browser/FileManager.hpp"
 
 namespace FTB {
 struct MainState;
+
+namespace Editor { class NanoEditor; }
 
 struct TabClipboard {
     std::vector<std::string> items;
@@ -25,9 +28,12 @@ struct TabClipboard {
 
 enum class TabType {
     FileBrowser,
+    ImagePreview,
+    HexEditor,
 #ifdef FTB_ENABLE_AI
     AIAgent,
 #endif
+    Editor,
 };
 
 struct Tab {
@@ -58,9 +64,17 @@ struct Tab {
 
     TabClipboard clipboard;
 
+    std::string viewer_filepath;
+    int viewer_scroll_y = 0;
+    int viewer_scroll_x = 0;
+    int hex_cursor_byte = 0;
+    int hex_input_nibble = 0;
+
 #ifdef FTB_ENABLE_AI
     std::string ai_session_id;
 #endif
+    std::unique_ptr<FTB::Editor::NanoEditor> editor;
+    std::string editor_filepath;
     std::string display_name_override;
 
     std::string displayName() const;
@@ -74,9 +88,12 @@ public:
     TabManager();
 
     int createTab(const std::string& path);
+    int createImageTab(const std::string& path, const std::string& filepath);
+    int createHexTab(const std::string& path, const std::string& filepath);
 #ifdef FTB_ENABLE_AI
     int createAITab(const std::string& path, const std::string& session_id, const std::string& display_name);
 #endif
+    int createEditorTab(const std::string& path, const std::string& filepath, std::unique_ptr<FTB::Editor::NanoEditor> editor);
     bool closeTab(int index);
     void switchTo(int index);
     void nextTab();
@@ -91,6 +108,10 @@ public:
     int activeIndex() const { return activeIndex_; }
     int count() const { return static_cast<int>(tabs_.size()); }
     bool canClose() const { return tabs_.size() > 1; }
+    bool isEditorTab(int index) const;
+    bool isImageTab(int index) const;
+    bool isHexTab(int index) const;
+    int editorTabCount() const;
 #ifdef FTB_ENABLE_AI
     bool isAITab(int index) const;
     int aiTabCount() const;

@@ -3,6 +3,7 @@
 #include "config/ConfigManager.hpp"
 #include "preview/PreviewCache.hpp"
 #include "utils/FilesystemUtil.hpp"
+#include "editor/NanoEditor.hpp"
 #ifdef FTB_ENABLE_AI
 #include "ai/SessionManager.hpp"
 #endif
@@ -123,6 +124,66 @@ int TabManager::createAITab(const std::string& path, const std::string& session_
     return newIndex;
 }
 
+int TabManager::createImageTab(const std::string& path, const std::string& filepath) {
+    Tab tab;
+    tab.type = TabType::ImagePreview;
+    tab.currentPath = path;
+    tab.viewer_filepath = filepath;
+    tab.display_name_override = fs::path(filepath).filename().string() + " (image)";
+    tabs_.push_back(std::move(tab));
+    int newIndex = static_cast<int>(tabs_.size()) - 1;
+    switchTo(newIndex);
+    return newIndex;
+}
+
+int TabManager::createHexTab(const std::string& path, const std::string& filepath) {
+    Tab tab;
+    tab.type = TabType::HexEditor;
+    tab.currentPath = path;
+    tab.viewer_filepath = filepath;
+    tab.display_name_override = fs::path(filepath).filename().string() + " (hex)";
+    tabs_.push_back(std::move(tab));
+    int newIndex = static_cast<int>(tabs_.size()) - 1;
+    switchTo(newIndex);
+    return newIndex;
+}
+
+int TabManager::createEditorTab(const std::string& path, const std::string& filepath, std::unique_ptr<FTB::Editor::NanoEditor> editor) {
+    Tab tab;
+    tab.type = TabType::Editor;
+    tab.currentPath = path;
+    tab.editor_filepath = filepath;
+    tab.editor = std::move(editor);
+    tab.display_name_override = fs::path(filepath).filename().string();
+    tabs_.push_back(std::move(tab));
+    int newIndex = static_cast<int>(tabs_.size()) - 1;
+    switchTo(newIndex);
+    return newIndex;
+}
+
+bool TabManager::isEditorTab(int index) const {
+    if (index < 0 || index >= static_cast<int>(tabs_.size())) return false;
+    return tabs_[index].type == TabType::Editor;
+}
+
+bool TabManager::isImageTab(int index) const {
+    if (index < 0 || index >= static_cast<int>(tabs_.size())) return false;
+    return tabs_[index].type == TabType::ImagePreview;
+}
+
+bool TabManager::isHexTab(int index) const {
+    if (index < 0 || index >= static_cast<int>(tabs_.size())) return false;
+    return tabs_[index].type == TabType::HexEditor;
+}
+
+int TabManager::editorTabCount() const {
+    int count = 0;
+    for (const auto& t : tabs_) {
+        if (t.type == TabType::Editor) count++;
+    }
+    return count;
+}
+
 bool TabManager::isAITab(int index) const {
     if (index < 0 || index >= static_cast<int>(tabs_.size())) return false;
     return tabs_[index].type == TabType::AIAgent;
@@ -186,6 +247,24 @@ const Tab& TabManager::tabAt(int index) const {
 
 void TabManager::saveActiveTabState(MainState& state) {
     auto& tab = active();
+    if (tab.type == TabType::ImagePreview) {
+        tab.currentPath = state.currentPath;
+        tab.viewer_scroll_y = state.viewer_scroll_y;
+        tab.viewer_scroll_x = state.viewer_scroll_x;
+        return;
+    }
+    if (tab.type == TabType::HexEditor) {
+        tab.currentPath = state.currentPath;
+        tab.viewer_scroll_y = state.viewer_scroll_y;
+        tab.viewer_scroll_x = state.viewer_scroll_x;
+        tab.hex_cursor_byte = state.hex_cursor_byte;
+        tab.hex_input_nibble = state.hex_input_nibble;
+        return;
+    }
+    if (tab.type == TabType::Editor) {
+        tab.currentPath = state.currentPath;
+        return;
+    }
 #ifdef FTB_ENABLE_AI
     if (tab.type == TabType::AIAgent) {
         if (state.ai_agent) {
@@ -218,6 +297,25 @@ void TabManager::saveActiveTabState(MainState& state) {
 void TabManager::loadTabState(MainState& state, int index) {
     switchTo(index);
     const auto& tab = active();
+    if (tab.type == TabType::ImagePreview) {
+        state.currentPath = tab.currentPath;
+        state.viewer_scroll_y = tab.viewer_scroll_y;
+        state.viewer_scroll_x = tab.viewer_scroll_x;
+        return;
+    }
+    if (tab.type == TabType::HexEditor) {
+        state.currentPath = tab.currentPath;
+        state.viewer_scroll_y = tab.viewer_scroll_y;
+        state.viewer_scroll_x = tab.viewer_scroll_x;
+        state.hex_cursor_byte = tab.hex_cursor_byte;
+        state.hex_input_nibble = tab.hex_input_nibble;
+        state.hex_modified = false;
+        return;
+    }
+    if (tab.type == TabType::Editor) {
+        state.currentPath = tab.currentPath;
+        return;
+    }
 #ifdef FTB_ENABLE_AI
     if (tab.type == TabType::AIAgent) {
         if (state.ai_agent) {

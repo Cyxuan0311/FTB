@@ -150,6 +150,15 @@ struct MainState {
     int preview_scroll_y = 0;
     int preview_scroll_x = 0;
 
+    // Viewer tab state (ImagePreview / HexEditor)
+    int viewer_scroll_y = 0;
+    int viewer_scroll_x = 0;
+
+    // Hex editor cursor state
+    int hex_cursor_byte = 0;
+    int hex_input_nibble = 0;  // 0=high nibble, 1=low nibble
+    bool hex_modified = false;
+
     // 搜索
     bool search_mode = false;
     std::string searchQuery;
@@ -312,6 +321,8 @@ ftxui::Element BuildNormalStatusBar(MainState& state);
 
 // ---- 打开编辑面板 ----
 void OpenEditorForFile(MainState& state, const std::string& filePath);
+void OpenImagePreviewForFile(MainState& state, const std::string& filePath);
+void OpenHexEditorForFile(MainState& state, const std::string& filePath);
 
 // ---- 处理面板命令 ----
 void HandlePanelCommand(MainState& state, FTB::KeyBindings::PanelCommand cmd);

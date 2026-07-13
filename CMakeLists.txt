@@ -169,6 +169,7 @@ set(FTB_CORE_SOURCES
     src/config/ThemeManager.cpp
     src/config/ThreadGuard.cpp
     # ops
+    src/ops/ArchiveOps.cpp
     src/ops/EventHandler.cpp
     src/ops/OpenerManager.cpp
     src/ops/PluginManager.cpp
@@ -184,6 +185,9 @@ list(APPEND FTB_CORE_SOURCES
     src/dialog/CalendarPanel.cpp
     src/dialog/ClipboardDialog.cpp
     src/dialog/DeleteDialog.cpp
+    src/dialog/EditorPanel.cpp
+    src/dialog/ImagePreviewPanel.cpp
+    src/dialog/HexEditorPanel.cpp
     src/dialog/FilePreviewDialog.cpp
     src/dialog/FolderDetailsDialog.cpp
     src/dialog/FuzzyFinderDialog.cpp
