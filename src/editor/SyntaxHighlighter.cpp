@@ -1,6 +1,8 @@
 #include "editor/SyntaxHighlighter.hpp"
 #include "editor/SyntaxHighlighterTreeSitter.hpp"
 #include "config/ThemeManager.hpp"
+#include "utils/PerfLogger.hpp"
+#include "utils/UnicodeUtil.hpp"
 #include <algorithm>
 #include <cctype>
 #include <functional>
@@ -28,6 +30,7 @@ SyntaxHighlighter::SyntaxHighlighter() : current_language_(Language::NONE) {
 SyntaxHighlighter::~SyntaxHighlighter() {}
 
 void SyntaxHighlighter::SetLanguage(Language lang) {
+    Language old = current_language_;
     if (current_language_ != lang) {
         current_language_ = lang;
         ResetMultiLineState();
@@ -940,23 +943,35 @@ ftxui::Element SyntaxHighlighter::RenderLine(const std::string& line, bool is_cu
 
     // 光标行 + tree-sitter: 获取 tree-sitter token 用于光标渲染
     std::vector<SyntaxToken> tokens;
+    bool tokens_from_ts = false;
     if (use_tree_sitter && is_cursor_line) {
         ts_highlighter_->ParseToTokens(line, tokens);
+        tokens_from_ts = true;
     }
 
     // 无 tree-sitter token 时回退到原生解析
     if (tokens.empty() && current_language_ != Language::NONE) {
         tokens = ParseLine(line);
+        tokens_from_ts = false;
     }
 
     // 无语言 + 无 tree-sitter: 纯文本渲染（含光标）
     if (current_language_ == Language::NONE && !use_tree_sitter) {
         if (is_cursor_line && cursor_pos >= 0 && cursor_pos <= static_cast<int>(line.length())) {
             std::string left = line.substr(0, cursor_pos);
-            std::string cursor_char = (cursor_pos < static_cast<int>(line.length()))
-                ? std::string(1, line[cursor_pos]) : " ";
-            std::string right = (cursor_pos < static_cast<int>(line.length()))
-                ? line.substr(cursor_pos + 1) : "";
+            // Get the full UTF-8 character at cursor position
+            std::string cursor_char = " ";
+            if (cursor_pos < static_cast<int>(line.length())) {
+                int char_len = FTB::UnicodeUtil::Utf8CharLen(
+                    static_cast<unsigned char>(line[cursor_pos]));
+                char_len = std::min(char_len, static_cast<int>(line.length()) - cursor_pos);
+                cursor_char = line.substr(cursor_pos, char_len);
+            }
+            // Skip the current character's bytes for the right part
+            int right_start = cursor_pos + static_cast<int>(cursor_char.size());
+            if (right_start < cursor_pos) right_start = cursor_pos + 1; // safety
+            std::string right = (right_start < static_cast<int>(line.length()))
+                ? line.substr(right_start) : "";
             return hbox({
                 text(left),
                 text(cursor_char) | inverted | bold,
@@ -974,8 +989,16 @@ ftxui::Element SyntaxHighlighter::RenderLine(const std::string& line, bool is_cu
         if (is_cursor_line && token.start_pos <= cursor_pos && token.end_pos > cursor_pos) {
             int offset = cursor_pos - token.start_pos;
             std::string before = token.text.substr(0, offset);
-            std::string cursor_char = token.text.substr(offset, 1);
-            std::string after = token.text.substr(offset + 1);
+            // Get the full UTF-8 character at the cursor position
+            int char_len = 1;
+            if (offset < static_cast<int>(token.text.size())) {
+                char_len = FTB::UnicodeUtil::Utf8CharLen(
+                    static_cast<unsigned char>(token.text[offset]));
+                char_len = std::min(char_len, static_cast<int>(token.text.size()) - offset);
+            }
+            std::string cursor_char = token.text.substr(offset, char_len);
+            std::string after = (offset + char_len < static_cast<int>(token.text.size()))
+                ? token.text.substr(offset + char_len) : "";
             if (!before.empty()) {
                 elements.emplace_back(text(before) | color(GetTokenColor(token.type)));
             }

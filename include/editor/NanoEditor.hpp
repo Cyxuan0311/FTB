@@ -16,6 +16,7 @@
 #include <chrono>
 #include <ftxui/component/event.hpp>
 #include <ftxui/dom/elements.hpp>
+#include <ftxui/dom/node.hpp>
 #include "editor/SyntaxHighlighter.hpp"
 #include "editor/MD_transformer.hpp"
 
@@ -91,6 +92,16 @@ public:
 
     // Rendering
     ftxui::Element Render();
+
+    // Micro-style content-only rendering (no chrome)
+    ftxui::Element RenderContent(int width, int height);
+
+    // Micro-style status line
+    std::string GetStatusLine() const;
+
+    // File info
+    const std::string& GetFilename() const { return current_filename_; }
+    bool IsModified() const;
 
     // Event handling
     bool OnEvent(ftxui::Event event);
@@ -173,10 +184,15 @@ private:
     bool markdown_preview_mode_ = false;
     MDTransformer md_transformer_;
 
+    // ── Mouse tracking ──
+    // Captures screen-space bounding box of the content area during render,
+    // used to map mouse click coordinates to cursor line/col.
+    ftxui::Box content_box_;
+
     // ── Max visible lines ──
     static constexpr int MAX_VISIBLE_LINES = 40;
-    static constexpr int EDITOR_WIDTH = 90;    // Fixed editor content width
-    static constexpr int LINE_NUMBER_WIDTH = 6; // Width for line numbers
+    static constexpr int EDITOR_WIDTH = 90;    // Fixed editor content width (for legacy Render)
+    static constexpr int LINE_NUMBER_WIDTH = 5; // Width for line numbers
 
     // ── Internal methods ──
     void SaveState();
@@ -187,6 +203,11 @@ private:
     ftxui::Element RenderMarkdownPreview();
     void ShowStatus(const std::string& msg);
     void EnsureLineExists();
+
+    void UpdateHScroll(int content_width);
+
+    // Micro-style content line renderer
+    ftxui::Element RenderContentLine(int line_idx, int content_width, bool is_cursor_line);
 };
 
 } // namespace Editor

@@ -1,5 +1,7 @@
 #include "editor/NanoEditor.hpp"
 #include "config/ThemeManager.hpp"
+#include "utils/PerfLogger.hpp"
+#include "utils/UnicodeUtil.hpp"
 #include <algorithm>
 #include <sstream>
 
@@ -175,14 +177,104 @@ void NanoEditor::Enter() {
     ShowStatus("^O=Save ^X=Exit ^K=Cut ^U=Paste ^W=Search ^V=PageDn ^Y=PageUp ^_=GoLn ^C=Pos Alt+M=MD");
 }
 
+// ─── UTF-8 helpers ──────────────────────────────────────────────────────
+
+// Returns the byte length of the UTF-8 character ending at (byte_pos - 1)
+static int PrevCharByteLen(const std::string& s, int byte_pos) {
+    if (byte_pos <= 0) return 1;
+    int start = byte_pos - 1;
+    while (start > 0 && (static_cast<unsigned char>(s[start]) & 0xC0) == 0x80)
+        start--;
+    return byte_pos - start;
+}
+
+// Returns the byte length of the UTF-8 character starting at byte_pos
+static int CharByteLenAt(const std::string& s, int byte_pos) {
+    if (byte_pos < 0 || byte_pos >= static_cast<int>(s.size())) return 1;
+    unsigned char lead = static_cast<unsigned char>(s[byte_pos]);
+    if ((lead & 0x80) == 0) return 1;
+    int n = FTB::UnicodeUtil::Utf8CharLen(lead);
+    return std::min(n, static_cast<int>(s.size()) - byte_pos);
+}
+
 // ─── Rendering ───────────────────────────────────────────────────────
+
+static int LineNumberWidth(int total_lines) {
+    int w = 1;
+    int t = total_lines;
+    while (t >= 10) { w++; t /= 10; }
+    return std::max(w, 2);
+}
+
+Element NanoEditor::RenderContentLine(int line_idx, int content_width, bool is_cursor_line) {
+    std::string line_number = std::to_string(line_idx + 1);
+    int max_line_width = LineNumberWidth(static_cast<int>(lines_.size()));
+    line_number.resize(max_line_width, ' ');
+    line_number += "│";
+
+    std::string line_text = lines_[line_idx].GetText();
+
+    // Convert h_scroll_offset_ (byte) to visible text aligned to character boundaries
+    int start = std::min(h_scroll_offset_, static_cast<int>(line_text.size()));
+    std::string visible_text = line_text.substr(start);
+    // Truncate to content_width display columns (handles CJK double-width correctly)
+    visible_text = FTB::UnicodeUtil::Utf8Truncate(visible_text, content_width);
+
+    Element line_content;
+    if (is_cursor_line) {
+        int cursor_in_visible = cursor_col_ - start;
+        if (cursor_in_visible < 0) cursor_in_visible = 0;
+        if (cursor_in_visible > static_cast<int>(visible_text.size()))
+            cursor_in_visible = static_cast<int>(visible_text.size());
+        line_content = syntax_highlighter_.RenderLine(visible_text, true, cursor_in_visible);
+    } else {
+        line_content = syntax_highlighter_.RenderLine(visible_text, false, -1);
+    }
+
+    return hbox({
+        text(line_number) | color(is_cursor_line ? TC("syn_keyword") : Color::Grey37),
+        text(" "),
+        line_content | size(WIDTH, LESS_THAN, content_width),
+    });
+}
+
+Element NanoEditor::RenderContent(int width, int height) {
+    int total_lines = static_cast<int>(lines_.size());
+    int num_width = LineNumberWidth(total_lines);
+    int content_width = width - num_width - 1;
+    UpdateHScroll(content_width);
+    if (content_width < 10) content_width = 10;
+
+    int visible_lines = std::max(1, height);
+    int end_line = std::min(scroll_offset_ + visible_lines, total_lines);
+
+    Elements rendered_lines;
+    rendered_lines.reserve(end_line - scroll_offset_ + 1);
+
+    for (int i = scroll_offset_; i < end_line; ++i) {
+        bool is_cursor = (i == cursor_line_);
+        rendered_lines.push_back(RenderContentLine(i, content_width, is_cursor));
+    }
+
+    // Fill remaining lines
+    for (int i = end_line; i < scroll_offset_ + visible_lines; ++i) {
+        std::string blank_num = std::to_string(i + 1);
+        int max_w = num_width;
+        blank_num.resize(max_w, ' ');
+        blank_num += "│";
+        rendered_lines.push_back(
+            hbox({text(blank_num) | color(Color::Grey37), text(" ")})
+        );
+    }
+
+    return vbox(std::move(rendered_lines)) | bgcolor(TC("dialog_bg")) | size(WIDTH, EQUAL, width) | size(HEIGHT, EQUAL, height) | reflect(content_box_);
+}
 
 Element NanoEditor::Render() {
     if (markdown_preview_mode_) {
         return RenderMarkdownPreview();
     }
 
-    // Update horizontal scroll before rendering
     UpdateHScroll();
 
     int total_lines = static_cast<int>(lines_.size());
@@ -193,84 +285,56 @@ Element NanoEditor::Render() {
     rendered_lines.reserve(end_line - scroll_offset_);
 
     for (int i = scroll_offset_; i < end_line; ++i) {
-        // Line number
-        std::string line_number = std::to_string(i + 1);
-        int max_line_width = std::to_string(end_line).length();
-        line_number.resize(max_line_width, ' ');
-        line_number += " │";
-
-        // Get line text and apply horizontal scroll
-        std::string line_text = lines_[i].GetText();
-
-        // Render with syntax highlighting (only on cursor line)
-        bool is_cursor_line = (i == cursor_line_);
-        Element line_content;
-
-        if (is_cursor_line) {
-            // Render the visible portion of the line
-            int start = h_scroll_offset_;
-            int end = std::min(start + content_width, static_cast<int>(line_text.size()));
-            std::string visible_text = (start < static_cast<int>(line_text.size()))
-                ? line_text.substr(start, end - start) : "";
-            int adjusted_cursor = cursor_col_ - h_scroll_offset_;
-
-            line_content = syntax_highlighter_.RenderLine(visible_text, true, adjusted_cursor);
-        } else {
-            // Non-cursor line: just show visible portion
-            int start = h_scroll_offset_;
-            int end = std::min(start + content_width, static_cast<int>(line_text.size()));
-            std::string visible_text = (start < static_cast<int>(line_text.size()))
-                ? line_text.substr(start, end - start) : "";
-            line_content = syntax_highlighter_.RenderLine(visible_text, false, -1);
-        }
-
-        // Current line highlight
-        if (is_cursor_line) {
-            rendered_lines.push_back(
-                hbox({
-                    text(line_number) | color(Color::SkyBlue2) | bold,
-                    text(" "),
-                    line_content | size(WIDTH, LESS_THAN, content_width),
-                }) | bgcolor(TC("selection_bg"))
-            );
-        } else {
-            rendered_lines.push_back(
-                hbox({
-                    text(line_number) | color(Color::SkyBlue2),
-                    text(" "),
-                    line_content | size(WIDTH, LESS_THAN, content_width),
-                })
-            );
-        }
+        rendered_lines.push_back(RenderContentLine(i, content_width, i == cursor_line_));
     }
 
     // Fill remaining lines with empty space
+    int num_width = LineNumberWidth(scroll_offset_ + MAX_VISIBLE_LINES);
     for (int i = end_line; i < scroll_offset_ + MAX_VISIBLE_LINES; ++i) {
-        std::string line_number = std::to_string(i + 1);
-        int max_line_width = std::to_string(scroll_offset_ + MAX_VISIBLE_LINES).length();
-        line_number.resize(max_line_width, ' ');
-        line_number += " │";
+        std::string blank_num = std::to_string(i + 1);
+        blank_num.resize(num_width, ' ');
+        blank_num += "│";
         rendered_lines.push_back(
-            hbox({text(line_number) | color(Color::Grey37), text(" ")})
+            hbox({text(blank_num) | color(Color::Grey37), text(" ")})
         );
     }
 
-    // Build the editor layout with fixed width
     return vbox({
-        // Title bar
         hbox({
             text(" FTB Editor") | color(TC("main_bg")) | bold | bgcolor(TC("syn_keyword")),
             text(" " + current_filename_ + " ") | color(TC("status_fg")) | bgcolor(TC("status_bg")),
             filler() | bgcolor(TC("status_bg")),
             text(" " + std::to_string(cursor_line_ + 1) + "," + std::to_string(cursor_col_ + 1) + " ") | color(TC("status_fg")) | bgcolor(TC("status_bg")),
         }) | size(WIDTH, EQUAL, EDITOR_WIDTH),
-        // Content area
         vbox(rendered_lines) | flex | size(WIDTH, EQUAL, EDITOR_WIDTH) | bgcolor(TC("dialog_bg")),
-        // Status message
         RenderStatusBar(),
-        // Shortcut bar
         RenderShortcutBar(),
     }) | borderRounded | size(WIDTH, EQUAL, EDITOR_WIDTH + 2);
+}
+
+std::string NanoEditor::GetStatusLine() const {
+    int total = static_cast<int>(lines_.size());
+    int line_num = cursor_line_ + 1;
+    int col_num = cursor_col_ + 1;
+    int pct = (total > 0) ? (line_num * 100 / total) : 0;
+
+    std::string fn = current_filename_.empty() ? "untitled" : current_filename_;
+    std::string modified = IsModified() ? " (+)" : "";
+    fn += modified;
+
+    return " " + fn + "  " +
+           std::to_string(line_num) + "/" + std::to_string(total) + "  " +
+           std::to_string(pct) + "%  " +
+           "Ln:" + std::to_string(line_num) + "  " +
+           "Col:" + std::to_string(col_num) + "  ";
+}
+
+bool NanoEditor::IsModified() const {
+    if (lines_.size() != original_lines_.size()) return true;
+    for (size_t i = 0; i < lines_.size(); ++i) {
+        if (lines_[i].GetText() != original_lines_[i].GetText()) return true;
+    }
+    return false;
 }
 
 Element NanoEditor::RenderStatusBar() const {
@@ -406,17 +470,39 @@ bool NanoEditor::OnEvent(Event event) {
         return true;
     }
 
-    // Mouse scroll
+    // Mouse events
     if (event.is_mouse()) {
-        if (event.mouse().button == Mouse::WheelUp) {
+        auto& me = event.mouse();
+        if (me.button == Mouse::WheelUp) {
             if (scroll_offset_ > 0)
                 scroll_offset_ = std::max(0, scroll_offset_ - 3);
             return true;
         }
-        if (event.mouse().button == Mouse::WheelDown) {
+        if (me.button == Mouse::WheelDown) {
             int max_scroll = std::max(0, static_cast<int>(lines_.size()) - MAX_VISIBLE_LINES);
             if (scroll_offset_ < max_scroll)
                 scroll_offset_ = std::min(max_scroll, scroll_offset_ + 3);
+            return true;
+        }
+        // Left click: reposition cursor
+        if (me.button == Mouse::Left && me.motion == Mouse::Pressed) {
+            // Map screen-space click to content coordinates
+            int line_num_width = LineNumberWidth(static_cast<int>(lines_.size()));
+            int click_line = me.y + scroll_offset_ - content_box_.y_min;
+            // Layout: [line_num│] [space] [content]
+            // offset = line_num_width(digits) + 1("│") + 1(space) = line_num_width + 2
+            int click_display_col = me.x - content_box_.x_min - line_num_width - 2;
+            if (click_line >= 0 && click_line < static_cast<int>(lines_.size())) {
+                cursor_line_ = click_line;
+                std::string line_text = lines_[cursor_line_].GetText();
+                if (click_display_col <= 0) {
+                    cursor_col_ = 0;
+                } else {
+                    cursor_col_ = static_cast<int>(FTB::UnicodeUtil::ByteOffsetFromDisplayColumn(line_text, click_display_col));
+                }
+                desired_col_ = cursor_col_;
+                UpdateScrollOffset();
+            }
             return true;
         }
     }
@@ -606,7 +692,9 @@ bool NanoEditor::OnEvent(Event event) {
     // Arrow keys
     if (event == Event::ArrowLeft) {
         if (cursor_col_ > 0) {
-            cursor_col_--;
+            std::string line_text = lines_[cursor_line_].GetText();
+            int char_len = PrevCharByteLen(line_text, cursor_col_);
+            cursor_col_ = std::max(0, cursor_col_ - char_len);
             desired_col_ = cursor_col_;
             lines_[cursor_line_].MoveGapTo(cursor_col_);
         } else if (cursor_line_ > 0) {
@@ -619,9 +707,11 @@ bool NanoEditor::OnEvent(Event event) {
     }
 
     if (event == Event::ArrowRight) {
-        int line_len = static_cast<int>(lines_[cursor_line_].GetText().size());
+        std::string line_text = lines_[cursor_line_].GetText();
+        int line_len = static_cast<int>(line_text.size());
         if (cursor_col_ < line_len) {
-            cursor_col_++;
+            int char_len = CharByteLenAt(line_text, cursor_col_);
+            cursor_col_ = std::min(line_len, cursor_col_ + char_len);
             desired_col_ = cursor_col_;
         } else if (cursor_line_ < static_cast<int>(lines_.size()) - 1) {
             cursor_line_++;
@@ -684,9 +774,12 @@ bool NanoEditor::OnEvent(Event event) {
     if (event == Event::Backspace) {
         SaveState();
         if (cursor_col_ > 0) {
+            std::string line_text = lines_[cursor_line_].GetText();
+            int char_len = PrevCharByteLen(line_text, cursor_col_);
             lines_[cursor_line_].MoveGapTo(cursor_col_);
-            lines_[cursor_line_].DeleteBack();
-            cursor_col_--;
+            for (int i = 0; i < char_len; i++)
+                lines_[cursor_line_].DeleteBack();
+            cursor_col_ = std::max(0, cursor_col_ - char_len);
             desired_col_ = cursor_col_;
         } else if (cursor_line_ > 0) {
             std::string current_text = lines_[cursor_line_].GetText();
@@ -705,10 +798,13 @@ bool NanoEditor::OnEvent(Event event) {
     // Delete
     if (event == Event::Delete) {
         SaveState();
-        int line_len = static_cast<int>(lines_[cursor_line_].GetText().size());
+        std::string line_text = lines_[cursor_line_].GetText();
+        int line_len = static_cast<int>(line_text.size());
         if (cursor_col_ < line_len) {
+            int char_len = CharByteLenAt(line_text, cursor_col_);
             lines_[cursor_line_].MoveGapTo(cursor_col_);
-            lines_[cursor_line_].DeleteForward();
+            for (int i = 0; i < char_len; i++)
+                lines_[cursor_line_].DeleteForward();
         } else if (cursor_line_ < static_cast<int>(lines_.size()) - 1) {
             std::string next_text = lines_[cursor_line_ + 1].GetText();
             lines_[cursor_line_].MoveGapTo(line_len);
@@ -793,6 +889,7 @@ Language NanoEditor::GetLanguage() const {
 void NanoEditor::SetFilename(const std::string& filename) {
     current_filename_ = filename;
     Language detected = SyntaxHighlighter::DetectLanguage(filename);
+    PERF_LOG("SynHL", "NanoEditor::SetFilename: \"" + filename + "\" detected=" + SyntaxHighlighter::GetLanguageName(detected));
     syntax_highlighter_.SetLanguage(detected);
 }
 
@@ -978,18 +1075,30 @@ void NanoEditor::UpdateScrollOffset() {
     }
 }
 
-void NanoEditor::UpdateHScroll() {
-    int content_width = EDITOR_WIDTH - LINE_NUMBER_WIDTH - 2;  // -2 for padding
-    int margin = 5;  // Keep 5 chars visible margin
+ void NanoEditor::UpdateHScroll(int content_width) {
+     if (content_width <= 0) content_width = EDITOR_WIDTH - LINE_NUMBER_WIDTH - 2;
+     int margin = 5;  // Keep 5 chars visible margin
 
-    // Scroll right if cursor is past visible area
-    if (cursor_col_ >= h_scroll_offset_ + content_width - margin) {
-        h_scroll_offset_ = cursor_col_ - content_width + margin + 1;
-    }
-    // Scroll left if cursor is before visible area
-    if (cursor_col_ < h_scroll_offset_ + margin) {
-        h_scroll_offset_ = std::max(0, cursor_col_ - margin);
-    }
+     std::string line_text = lines_[cursor_line_].GetText();
+     int cursor_display = FTB::UnicodeUtil::CalculateDisplayWidth(line_text.substr(0, cursor_col_));
+     int h_scroll_display = FTB::UnicodeUtil::CalculateDisplayWidth(line_text.substr(0, h_scroll_offset_));
+
+     // Scroll right if cursor is past visible area
+     if (cursor_display >= h_scroll_display + content_width - margin) {
+         int target_display = std::max(0, cursor_display - content_width + margin + 1);
+         h_scroll_offset_ = static_cast<int>(
+             FTB::UnicodeUtil::ByteOffsetFromDisplayColumn(line_text, target_display));
+     }
+     // Scroll left if cursor is before visible area
+     if (cursor_display < h_scroll_display + margin) {
+         int target_display = std::max(0, cursor_display - margin);
+         h_scroll_offset_ = static_cast<int>(
+             FTB::UnicodeUtil::ByteOffsetFromDisplayColumn(line_text, target_display));
+     }
+ }
+
+void NanoEditor::UpdateHScroll() {
+    UpdateHScroll(EDITOR_WIDTH - LINE_NUMBER_WIDTH - 2);
 }
 
 void NanoEditor::ShowStatus(const std::string& msg) {
