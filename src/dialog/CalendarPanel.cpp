@@ -96,7 +96,7 @@ Element RenderCalendarPanel(MainState& /*state*/, int tw, int /*th*/) {
     const char* day_names[] = {"Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"};
     for (int i = 0; i < 7; ++i) {
         Color dc = (i == 0 || i == 6) ? weekend_c : dim_c;
-        week_header.push_back(text(std::string(" ") + day_names[i] + " ") | color(dc));
+        week_header.push_back(text(std::string(" ") + day_names[i]) | color(dc));
     }
     content.push_back(hbox(week_header));
 
