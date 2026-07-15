@@ -1,5 +1,6 @@
 #include "browser/AsyncFileManager.hpp"
 #include "browser/FileManager.hpp"
+#include "utils/PerfLogger.hpp"
 
 namespace FTB {
 
@@ -79,8 +80,10 @@ void AsyncFileManager::asyncWriteFileContent(const std::string& file_path,
 void AsyncFileManager::asyncDeleteFileOrDirectory(const std::string& path,
                                                    std::function<void(bool)> callback) {
     enqueueTask([path, callback]() {
+        PERF_LOG("AsyncFM", "asyncDeleteFileOrDirectory path=" + path);
         try {
             bool success = FileManager::deleteFileOrDirectory(path);
+            PERF_LOG("AsyncFM", "asyncDeleteFileOrDirectory result=" + std::to_string(success));
             callback(success);
         } catch (const std::exception&) {
             callback(false);

@@ -5,6 +5,7 @@
 #include "../include/browser/SortMode.hpp"
 #include "../include/config/ConfigManager.hpp"
 #include "../include/utils/FilesystemUtil.hpp"
+#include "../include/utils/PerfLogger.hpp"
 #include <filesystem>                         // C++17 文件系统库，用于路径操作和遍历
 #include <fstream>                            // 文件读写
 #include <iostream>                           // 标准输出
@@ -475,26 +476,34 @@ bool createDirectory(const std::string & dirPath) {
  * 3. 捕获所有异常并返回false
  */
 bool deleteFileOrDirectory(const std::string & path) {
+    PERF_LOG("FileMgr", "deleteFileOrDirectory path=" + path);
     try {
         // 检查路径是否为目录
         if (fs::is_directory(path)) {
             // 递归删除目录及其所有内容，返回删除的条目数>0表示成功
-            return fs::remove_all(path) > 0;
+            bool ok = fs::remove_all(path) > 0;
+            PERF_LOG("FileMgr", "deleteFileOrDirectory result=" + std::to_string(ok) + " type=dir");
+            return ok;
         }
         // 检查路径是否为普通文件
         else if (fs::is_regular_file(path)) {
             // 删除单个文件
-            return fs::remove(path);
+            bool ok = fs::remove(path);
+            PERF_LOG("FileMgr", "deleteFileOrDirectory result=" + std::to_string(ok) + " type=file");
+            return ok;
         }
     } catch (...) {
         // 捕获所有可能的异常（如权限不足、路径不存在等）
+        PERF_LOG("FileMgr", "deleteFileOrDirectory EXCEPTION path=" + path);
         return false;
     }
     // 如果不是目录也不是普通文件，返回失败
+    PERF_LOG("FileMgr", "deleteFileOrDirectory result=false type=unknown path=" + path);
     return false;
 }
 
 bool moveToTrash(const std::string & path) {
+    PERF_LOG("FileMgr", "moveToTrash path=" + path);
     try {
         const char* home = std::getenv("HOME");
         if (!home) return false;

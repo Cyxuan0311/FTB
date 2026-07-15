@@ -2,6 +2,7 @@
 #include "browser/ClipboardManager.hpp"
 #include "browser/FileManager.hpp"
 #include "config/ConfigManager.hpp"
+#include "utils/PerfLogger.hpp"
 #include "utils/StatusMessage.hpp"
 
 #include <filesystem>
@@ -14,6 +15,13 @@ namespace FTB {
 using namespace ftxui;
 
 static std::vector<std::string> GetBatchPaths(MainState& state) {
+    PERF_LOG("EventHandler", "GetBatchPaths selected=" + std::to_string(state.selected)
+        + " batch_sz=" + std::to_string(state.batch_selected.size())
+        + " filtered=" + std::to_string(state.filteredContents.size())
+        + " currentPath=" + state.currentPath
+        + " selected_name=" + (state.selected >= 0
+            && state.selected < static_cast<int>(state.filteredContents.size())
+            ? state.filteredContents[state.selected] : std::string("?")));
     std::vector<std::string> paths;
     if (!state.batch_selected.empty()) {
         for (int idx : state.batch_selected) {
@@ -33,7 +41,15 @@ static std::vector<std::string> GetBatchPaths(MainState& state) {
 bool HandleFileOperationEvent(MainState& state, const Event& event) {
     // d: 移入回收站
     if (event == Event::Character('d')) {
+        PERF_LOG("EventHandler", "d-branch: event.is_char=" + std::to_string(event.is_character())
+            + " selected=" + std::to_string(state.selected)
+            + " selected_name=" + (state.selected >= 0
+                && state.selected < static_cast<int>(state.filteredContents.size())
+                ? state.filteredContents[state.selected] : std::string("?"))
+            + " batch_sz=" + std::to_string(state.batch_selected.size()));
         auto paths = GetBatchPaths(state);
+        PERF_LOG("EventHandler", "moveToTrash key='d' count=" + std::to_string(paths.size())
+            + " first=" + (paths.empty() ? "none" : paths[0]));
         if (!paths.empty()) {
             size_t success = 0;
             for (const auto& p : paths) {
@@ -119,6 +135,8 @@ bool HandleFileOperationEvent(MainState& state, const Event& event) {
     // Delete / Ctrl+D: 打开删除确认对话框
     if (event == Event::Delete || event == Event::CtrlD) {
         auto paths = GetBatchPaths(state);
+        PERF_LOG("EventHandler", "ConfirmDelete key count=" + std::to_string(paths.size())
+            + " first=" + (paths.empty() ? "none" : paths[0]));
         if (!paths.empty()) {
             state.active_panel = ActivePanel::DeleteConfirm;
             state.panel_message.clear();
