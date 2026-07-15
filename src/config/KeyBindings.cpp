@@ -72,6 +72,7 @@ std::map<std::string, KeyBindings::PanelCommand> KeyBindings::InitCommandMap() {
     m["gh"]         = PanelCommand::GoHome;
     m["gd"]         = PanelCommand::GoDownloads;
     m["gc"]         = PanelCommand::GoConfig;
+    m["gt"]         = PanelCommand::GoTrash;
     m["newtab"]     = PanelCommand::NewTab;
     m["nt"]         = PanelCommand::NewTab;
     m["closetab"]   = PanelCommand::CloseTab;
@@ -493,6 +494,13 @@ KeyBindings::PanelCommand KeyBindings::ExecuteCommand() {
     std::string lower_input = command_input_;
     std::transform(lower_input.begin(), lower_input.end(), lower_input.begin(), ::tolower);
 
+    if (!lower_input.empty() && lower_input[0] == '!') {
+        current_command_ = PanelCommand::ShellCommand;
+        command_payload_ = command_input_.substr(1);
+        SaveToHistory(command_input_);
+        return current_command_;
+    }
+
     auto it = command_map_.find(lower_input);
     if (it != command_map_.end()) {
         current_command_ = it->second;
@@ -607,6 +615,7 @@ std::vector<std::pair<std::string, std::string>> KeyBindings::GetCommandList() c
     list.push_back({"gh",                        "Go to home directory"});
     list.push_back({"gd",                   "Go to downloads directory"});
     list.push_back({"gc",                   "Go to config directory"});
+    list.push_back({"gt",                   "Go to trash directory"});
     list.push_back({"newtab / nt",          "Create new tab"});
     list.push_back({"closetab / ct",        "Close current tab"});
     list.push_back({"nexttab / nx",         "Next tab"});
@@ -614,6 +623,8 @@ std::vector<std::pair<std::string, std::string>> KeyBindings::GetCommandList() c
     list.push_back({"open / op",           "Open with picker"});
     list.push_back({"openwith / ow",       "Manual open with"});
     list.push_back({"opencfg / oc",        "Configure openers"});
+    list.push_back({"!<cmd>",           "Run shell command (quick, non-blocking)"});
+    list.push_back({"!!<cmd>",          "Run shell command (blocking, full terminal with confirmation)"});
     list.push_back({"z / exit / quit",     "Quit and change shell directory"});
     list.push_back({"pcmd / pc / plugincmd", "Execute plugin command"});
     list.push_back({"toggleprotocol / protocol / imgproto", "Toggle terminal image protocol (Kitty/iTerm2/Sixel)"});

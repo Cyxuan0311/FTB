@@ -62,6 +62,7 @@ public:
         GoHome,
         GoDownloads,
         GoConfig,
+        GoTrash,
         NewTab,
         CloseTab,
         NextTab,
@@ -74,6 +75,7 @@ public:
         Extract,
         QuitWithCwd,
         PluginCommand,
+        ShellCommand,
         ToggleProtocol,
 #ifdef FTB_ENABLE_SSH
         SSH,
