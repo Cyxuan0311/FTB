@@ -163,12 +163,15 @@ int main(int argc, char* argv[])
     }
 #endif
 
-#ifdef FTB_ENABLE_PLUGINS
     {
         if (cli_args.log_enabled) {
             FTB::PerfLogger::GetInstance().Enable();
         }
+        PERF_LOG("Init", "PerfLogger enabled=" + std::to_string(cli_args.log_enabled));
+    }
 
+#ifdef FTB_ENABLE_PLUGINS
+    {
         std::string config_dir = std::string(getenv("HOME") ? getenv("HOME") : "/tmp") + "/.config/ftb";
         FTB::PluginManager::GetInstance()->Initialize(config_dir);
 
@@ -371,8 +374,16 @@ int main(int argc, char* argv[])
     // ---- 事件处理 ----
 
     auto final_component = CatchEvent(renderer, [&](Event event) {
+        if (event != Event::Custom) {
+            PERF_LOG("EventTrace", event.DebugString());
+        }
         if (event == Event::Custom) {
             screen.SetCursor(Screen::Cursor{0, 0, Screen::Cursor::Hidden});
+            if (state.refresh_pending.exchange(false)) {
+                RefreshDirectoryContents(state);
+                if (state.selected >= static_cast<int>(state.filteredContents.size()))
+                    state.selected = std::max(0, static_cast<int>(state.filteredContents.size()) - 1);
+            }
             std::ostringstream oss;
             oss << std::this_thread::get_id();
             static auto last_custom = std::chrono::steady_clock::now();
@@ -664,6 +675,9 @@ int main(int argc, char* argv[])
 
     config_manager->SaveConfig();
     std::cout << "\033[?25h" << std::flush;
+
+    // 清理终端图像残留（Kitty/iTerm2/Sixel）
+    FTB::ImageOutputManager::ClearCurrent();
 
     if (state.quit_with_cwd && !state.exit_path.empty()) {
         const char* cwd_file_env = std::getenv("FTB_CWD_FILE");

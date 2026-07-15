@@ -204,6 +204,7 @@ bool HandlePanelEvent(MainState& state, const Event& event) {
     default:                          return true;
     }
 }
+
 void OpenEditorForFile(MainState& state, const std::string& filePath) {
     // Save current tab state before switching
     state.saveTabState();
@@ -537,6 +538,31 @@ void HandlePanelCommand(MainState& state, FTB::KeyBindings::PanelCommand cmd) {
         }
         break;
     }
+    case FTB::KeyBindings::PanelCommand::GoTrash: {
+        const char* home_env = std::getenv("HOME");
+        std::string home = home_env ? home_env : "";
+        if (!home.empty()) {
+#ifdef __APPLE__
+            std::string trash_path = (fs::path(home) / ".Trash").string();
+#else
+            std::string trash_path = (fs::path(home) / ".local/share/Trash/files").string();
+#endif
+            fs::create_directories(trash_path);
+            state.directoryHistory.push(state.currentPath);
+            state.currentPath = fs::canonical(trash_path).string();
+            state.cached_canonical_path.clear();
+            state.cached_current_path_for_entries.clear();
+            InvalidatePreviewCache();
+            state.allContents = FileManager::getDirectoryContents(state.currentPath);
+            state.filteredContents = state.allContents;
+            state.selected = 0;
+            state.current_page = 0;
+            state.batch_selected.clear();
+            state.searchQuery.clear();
+            StatusMessage::Show("Go to trash");
+        }
+        break;
+    }
     case FTB::KeyBindings::PanelCommand::Sort:
         state.panel_selected = 0;
         state.active_panel = ActivePanel::Sort; break;
@@ -687,6 +713,34 @@ void HandlePanelCommand(MainState& state, FTB::KeyBindings::PanelCommand cmd) {
         break;
     }
 #endif
+    case FTB::KeyBindings::PanelCommand::ShellCommand: {
+        std::string full = FTB::KeyBindings::GetInstance().GetCommandInput();
+        if (full.size() < 2 || full[0] != '!') break;
+        bool blocking = (full[1] == '!');
+        std::string cmd = blocking ? full.substr(2) : full.substr(1);
+        if (cmd.empty()) break;
+        if (blocking) {
+            if (state.screen) {
+                state.screen->WithRestoredIO([&]() {
+                    int _ = std::system(cmd.c_str());
+                    (void)_;
+                    printf("\nPress Enter to continue...\n");
+                    fflush(stdout);
+                    int c;
+                    while ((c = getchar()) != '\n' && c != EOF) {}
+                })();
+            }
+            RefreshDirectoryContents(state);
+        } else {
+            if (state.screen) {
+                state.screen->WithRestoredIO([&]() {
+                    int _ = std::system(cmd.c_str());
+                    (void)_;
+                })();
+            }
+        }
+        break;
+    }
     case FTB::KeyBindings::PanelCommand::ToggleProtocol: {
         bool now = !FTB::ImageOutputManager::IsProtocolEnabled();
         FTB::ImageOutputManager::SetProtocolEnabled(now);
@@ -777,6 +831,7 @@ void RegisterPanelCommands(FTB::KeyBindings& keybindings, MainState& state) {
     keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::GoHome, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::GoHome); });
     keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::GoDownloads, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::GoDownloads); });
     keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::GoConfig, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::GoConfig); });
+    keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::GoTrash, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::GoTrash); });
     keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::NewTab, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::NewTab); });
     keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::CloseTab, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::CloseTab); });
     keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::NextTab, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::NextTab); });
@@ -784,6 +839,7 @@ void RegisterPanelCommands(FTB::KeyBindings& keybindings, MainState& state) {
     keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::OpenPicker, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::OpenPicker); });
     keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::OpenManual, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::OpenManual); });
     keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::OpenConfig, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::OpenConfig); });
+    keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::ShellCommand, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::ShellCommand); });
     keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::QuitWithCwd, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::QuitWithCwd); });
     keybindings.RegisterCallback(FTB::KeyBindings::PanelCommand::ToggleProtocol, [&]() { HandlePanelCommand(state, FTB::KeyBindings::PanelCommand::ToggleProtocol); });
 #ifdef FTB_ENABLE_PLUGINS
