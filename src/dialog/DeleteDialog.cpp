@@ -1,6 +1,9 @@
 #include "../../include/dialog/DeleteDialog.hpp"
 #include "../../include/browser/FileManager.hpp"
+#include "../../include/browser/TaskSystem.hpp"
+#include "../../include/utils/StatusMessage.hpp"
 #include <filesystem>
+#include <thread>
 
 namespace fs = std::filesystem;
 
@@ -82,47 +85,112 @@ Element RenderDeleteConfirmPanel(MainState& state, int tw, int /*th*/) {
            size(WIDTH, EQUAL, pw) | center;
 }
 
-static void RefreshDir(MainState& state) {
-    state.cached_current_path_for_entries.clear();
-    InvalidatePreviewCache();
-    {
-        std::lock_guard<std::mutex> lock(FileManager::cache_mutex);
-        FileManager::lru_dir_cache->erase(state.currentPath);
-        FileManager::lru_entry_cache->erase(state.currentPath);
-    }
-    state.allContents = FileManager::getDirectoryContents(state.currentPath);
-    state.filteredContents = state.allContents;
-    if (state.selected >= static_cast<int>(state.filteredContents.size())) {
-        state.selected = std::max(0, static_cast<int>(state.filteredContents.size()) - 1);
-    }
-}
-
 bool HandleDeleteConfirmEvent(MainState& state, const Event& event) {
     if (event == Event::Return) {
-        try {
-            if (!state.batch_selected.empty()) {
-                for (int idx : state.batch_selected) {
-                    if (idx >= 0 && idx < static_cast<int>(state.filteredContents.size())) {
-                        fs::path item_path = fs::path(state.currentPath) / state.filteredContents[idx];
-                        if (fs::is_directory(item_path))
-                            fs::remove_all(item_path);
-                        else
-                            fs::remove(item_path);
-                    }
+        auto paths = std::make_shared<std::vector<fs::path>>();
+        if (!state.batch_selected.empty()) {
+            for (int idx : state.batch_selected) {
+                if (idx >= 0 && idx < static_cast<int>(state.filteredContents.size())) {
+                    paths->push_back(fs::path(state.currentPath) / state.filteredContents[idx]);
                 }
-                state.batch_selected.clear();
-            } else if (state.selected >= 0 && state.selected < static_cast<int>(state.filteredContents.size())) {
-                fs::path item_path = fs::path(state.currentPath) / state.filteredContents[state.selected];
-                if (fs::is_directory(item_path))
-                    fs::remove_all(item_path);
-                else
-                    fs::remove(item_path);
             }
-            RefreshDir(state);
-        } catch (const std::exception& e) {
-            state.panel_message = " Delete failed: " + std::string(e.what());
+            state.batch_selected.clear();
+        } else if (state.selected >= 0 &&
+                   state.selected < static_cast<int>(state.filteredContents.size())) {
+            paths->push_back(fs::path(state.currentPath) / state.filteredContents[state.selected]);
+        }
+
+        if (paths->empty()) {
+            state.active_panel = ActivePanel::None;
+            state.panel_message.clear();
             return true;
         }
+
+        std::string parent = paths->at(0).parent_path().string();
+        int64_t total = static_cast<int64_t>(paths->size());
+        StatusMessage::Show("Deleting " + std::to_string(total) + " item(s)... (t: Tasks)");
+
+        TaskRequest req;
+        req.title = "Delete " + std::to_string(total) + " item(s)";
+        req.type = TaskType::Delete;
+        req.priority = Priority::High;
+        req.work = [paths, parent](TaskContext& ctx) -> bool {
+            int item_count = 0;
+            for (const auto& p : *paths) {
+                std::error_code ec;
+                if (fs::is_directory(p)) {
+                    ++item_count;
+                    for (auto it = fs::recursive_directory_iterator(
+                             p, fs::directory_options::skip_permission_denied, ec);
+                         it != fs::recursive_directory_iterator(); it.increment(ec)) {
+                        ++item_count;
+                    }
+                } else {
+                    ++item_count;
+                }
+            }
+            ctx.progress.total_files = item_count;
+
+            bool ok = true;
+            std::error_code ec;
+            for (const auto& p : *paths) {
+                if (ctx.cancel.load()) return false;
+                while (ctx.pause.load()) {
+                    if (ctx.cancel.load()) return false;
+                    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                }
+                ctx.progress.current_file = p.filename().string();
+
+                if (fs::is_directory(p)) {
+                    std::vector<fs::path> files;
+                    std::vector<fs::path> subdirs;
+                    for (auto it = fs::recursive_directory_iterator(
+                             p, fs::directory_options::skip_permission_denied, ec);
+                         it != fs::recursive_directory_iterator(); it.increment(ec)) {
+                        if (ctx.cancel.load()) return false;
+                        if (fs::is_regular_file(it->path()) || fs::is_symlink(it->path()))
+                            files.push_back(it->path());
+                        else if (fs::is_directory(it->path()))
+                            subdirs.push_back(it->path());
+                    }
+                    for (const auto& f : files) {
+                        if (ctx.cancel.load()) return false;
+                        fs::remove(f, ec);
+                        ++ctx.progress.files_processed;
+                    }
+                    for (auto it = subdirs.rbegin(); it != subdirs.rend(); ++it) {
+                        if (ctx.cancel.load()) return false;
+                        fs::remove(*it, ec);
+                        ++ctx.progress.files_processed;
+                    }
+                    fs::remove(p, ec);
+                    ++ctx.progress.files_processed;
+                    if (ec) ok = false;
+                } else if (fs::is_regular_file(p) || fs::is_symlink(p)) {
+                    fs::remove(p, ec);
+                    ++ctx.progress.files_processed;
+                    if (ec) ok = false;
+                }
+            }
+
+            {
+                std::lock_guard<std::mutex> lock(FileManager::cache_mutex);
+                FileManager::lru_dir_cache->erase(parent);
+                FileManager::lru_entry_cache->erase(parent);
+            }
+            return ok;
+        };
+        req.callback = [&state](const std::string&, TaskState ts) {
+            if (ts == TaskState::Completed || ts == TaskState::Failed ||
+                ts == TaskState::Cancelled) {
+                state.refresh_pending.store(true);
+                if (state.screen)
+                    state.screen->Post(ftxui::Event::Custom);
+            }
+        };
+
+        TaskSystem::getInstance().submit(std::move(req));
+
         state.active_panel = ActivePanel::None;
         state.panel_message.clear();
         return true;
