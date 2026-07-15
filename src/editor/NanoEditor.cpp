@@ -2,7 +2,9 @@
 #include "config/ThemeManager.hpp"
 #include "utils/PerfLogger.hpp"
 #include "utils/UnicodeUtil.hpp"
+#include "utils/SystemClipboard.hpp"
 #include <algorithm>
+#include <climits>
 #include <sstream>
 
 namespace FTB {
@@ -206,6 +208,26 @@ static int LineNumberWidth(int total_lines) {
     return std::max(w, 2);
 }
 
+static bool LineHasSelection(int line_idx, int sl, int sc, int el, int ec) {
+    if (sl < 0) return false;
+    return line_idx >= sl && line_idx <= el;
+}
+
+static void GetLineSelRange(int line_idx, int sl, int sc, int el, int ec,
+                            int& out_start, int& out_end) {
+    out_start = -1; out_end = -1;
+    if (!LineHasSelection(line_idx, sl, sc, el, ec)) return;
+    if (line_idx == sl && line_idx == el) {
+        out_start = sc; out_end = ec;
+    } else if (line_idx == sl) {
+        out_start = sc; out_end = INT_MAX;
+    } else if (line_idx == el) {
+        out_start = 0; out_end = ec;
+    } else {
+        out_start = 0; out_end = INT_MAX;
+    }
+}
+
 Element NanoEditor::RenderContentLine(int line_idx, int content_width, bool is_cursor_line) {
     std::string line_number = std::to_string(line_idx + 1);
     int max_line_width = LineNumberWidth(static_cast<int>(lines_.size()));
@@ -221,11 +243,63 @@ Element NanoEditor::RenderContentLine(int line_idx, int content_width, bool is_c
     visible_text = FTB::UnicodeUtil::Utf8Truncate(visible_text, content_width);
 
     Element line_content;
+    int cursor_in_visible = -1;
     if (is_cursor_line) {
-        int cursor_in_visible = cursor_col_ - start;
+        cursor_in_visible = cursor_col_ - start;
         if (cursor_in_visible < 0) cursor_in_visible = 0;
         if (cursor_in_visible > static_cast<int>(visible_text.size()))
             cursor_in_visible = static_cast<int>(visible_text.size());
+    }
+
+    // Check if this line has selection — if so, use character-by-character render
+    if (HasSelection()) {
+        int sl, sc, el, ec;
+        GetSelectionRange(sl, sc, el, ec);
+        if (LineHasSelection(line_idx, sl, sc, el, ec)) {
+            int sel_start, sel_end;
+            GetLineSelRange(line_idx, sl, sc, el, ec, sel_start, sel_end);
+            // Shift to visible_text coordinates
+            int vs = std::max(0, sel_start - start);
+            int ve = std::max(0, std::min(sel_end, start + static_cast<int>(visible_text.size())) - start);
+            // Parse full line for token colors
+            auto tokens = syntax_highlighter_.ParseLine(line_text);
+            // Character-by-character render (like detail_element.cpp RenderLineWithSelection)
+            Elements parts;
+            size_t pos = 0;
+            while (pos < visible_text.size()) {
+                size_t clen = static_cast<size_t>(std::max(1, UnicodeUtil::Utf8CharLen(
+                    static_cast<unsigned char>(visible_text[pos]))));
+                if (pos + clen > visible_text.size()) clen = 1;
+                std::string ch = visible_text.substr(pos, clen);
+                // Determine token color using full-line byte position
+                int full_pos = start + static_cast<int>(pos);
+                Color fg = TC("main_fg");
+                for (const auto& t : tokens) {
+                    if (full_pos >= t.start_pos && full_pos < t.end_pos) {
+                        fg = SyntaxHighlighter::GetTokenColor(t.type);
+                        break;
+                    }
+                }
+                Element el = text(ch) | color(fg);
+                // Apply selection background
+                int ch_start = static_cast<int>(pos);
+                int ch_end = static_cast<int>(pos + clen);
+                if (ch_start < ve && ch_end > vs)
+                    el = el | bgcolor(TC("selection_bg"));
+                // Apply block cursor
+                if (cursor_in_visible >= 0 && ch_start <= cursor_in_visible && cursor_in_visible < ch_end)
+                    el = el | inverted | bold;
+                parts.push_back(std::move(el));
+                pos += clen;
+            }
+            // Cursor at end of line
+            if (cursor_in_visible >= 0 && cursor_in_visible == static_cast<int>(visible_text.size()))
+                parts.push_back(text(" ") | inverted | bold | color(TC("main_fg")) | bgcolor(TC("selection_bg")));
+            line_content = hbox(std::move(parts));
+        } else {
+            line_content = syntax_highlighter_.RenderLine(visible_text, is_cursor_line, cursor_in_visible);
+        }
+    } else if (is_cursor_line) {
         line_content = syntax_highlighter_.RenderLine(visible_text, true, cursor_in_visible);
     } else {
         line_content = syntax_highlighter_.RenderLine(visible_text, false, -1);
@@ -484,7 +558,7 @@ bool NanoEditor::OnEvent(Event event) {
                 scroll_offset_ = std::min(max_scroll, scroll_offset_ + 3);
             return true;
         }
-        // Left click: reposition cursor
+        // Left click: reposition cursor + start selection
         if (me.button == Mouse::Left && me.motion == Mouse::Pressed) {
             // Map screen-space click to content coordinates
             int line_num_width = LineNumberWidth(static_cast<int>(lines_.size()));
@@ -501,13 +575,49 @@ bool NanoEditor::OnEvent(Event event) {
                     cursor_col_ = static_cast<int>(FTB::UnicodeUtil::ByteOffsetFromDisplayColumn(line_text, click_display_col));
                 }
                 desired_col_ = cursor_col_;
+                // Start selection anchor
+                sel_anchor_line_ = sel_active_line_ = click_line;
+                sel_anchor_col_ = sel_active_col_ = cursor_col_;
                 UpdateScrollOffset();
             }
+            return true;
+        }
+        // Left drag: extend selection
+        if (me.button == Mouse::Left && me.motion == Mouse::Moved && sel_anchor_line_ >= 0) {
+            int line_num_width = LineNumberWidth(static_cast<int>(lines_.size()));
+            int drag_line = me.y + scroll_offset_ - content_box_.y_min;
+            int drag_display_col = me.x - content_box_.x_min - line_num_width - 2;
+            drag_line = std::max(0, std::min(drag_line, static_cast<int>(lines_.size()) - 1));
+            if (drag_line >= 0) {
+                sel_active_line_ = drag_line;
+                std::string line_text = lines_[drag_line].GetText();
+                if (drag_display_col <= 0) {
+                    sel_active_col_ = 0;
+                } else {
+                    sel_active_col_ = static_cast<int>(FTB::UnicodeUtil::ByteOffsetFromDisplayColumn(line_text, drag_display_col));
+                }
+            }
+            return true;
+        }
+        // Left release: copy selection to clipboard + clear
+        if (me.button == Mouse::Left && me.motion == Mouse::Released && sel_anchor_line_ >= 0) {
+            std::string sel = GetSelectedText();
+            if (!sel.empty()) {
+                clipboard_ = sel;
+                if (CopyToSystemClipboard(sel))
+                    ShowStatus("Copied to clipboard (" + std::to_string(sel.size()) + " bytes)");
+                else
+                    ShowStatus("Copy failed: no clipboard tool found");
+            }
+            ClearSelection();
             return true;
         }
     }
 
     // ── Nano-style Ctrl shortcuts ──
+
+    // Any keyboard event clears text selection
+    ClearSelection();
 
     // Ctrl+A: Move to beginning of line
     if (event == Event::CtrlA) {
@@ -1104,6 +1214,48 @@ void NanoEditor::UpdateHScroll() {
 void NanoEditor::ShowStatus(const std::string& msg) {
     status_message_ = msg;
     status_timeout_ = 300;  // Show for ~300 frames (~5 seconds at 60fps)
+}
+
+bool NanoEditor::HasSelection() const {
+    return sel_anchor_line_ >= 0 && sel_active_line_ >= 0 &&
+           (sel_anchor_line_ != sel_active_line_ || sel_anchor_col_ != sel_active_col_);
+}
+
+void NanoEditor::ClearSelection() {
+    sel_anchor_line_ = -1;
+    sel_anchor_col_ = -1;
+    sel_active_line_ = -1;
+    sel_active_col_ = -1;
+}
+
+void NanoEditor::GetSelectionRange(int& sl, int& sc, int& el, int& ec) const {
+    if (sel_anchor_line_ < sel_active_line_ ||
+        (sel_anchor_line_ == sel_active_line_ && sel_anchor_col_ <= sel_active_col_)) {
+        sl = sel_anchor_line_; sc = sel_anchor_col_;
+        el = sel_active_line_; ec = sel_active_col_;
+    } else {
+        sl = sel_active_line_; sc = sel_active_col_;
+        el = sel_anchor_line_; ec = sel_anchor_col_;
+    }
+}
+
+std::string NanoEditor::GetSelectedText() const {
+    if (!HasSelection()) return "";
+    int sl, sc, el, ec;
+    GetSelectionRange(sl, sc, el, ec);
+
+    if (sl == el) {
+        std::string line = lines_[sl].GetText();
+        return line.substr(sc, ec - sc);
+    }
+
+    std::string result;
+    result += lines_[sl].GetText().substr(sc) + "\n";
+    for (int i = sl + 1; i < el; ++i) {
+        result += lines_[i].GetText() + "\n";
+    }
+    result += lines_[el].GetText().substr(0, ec);
+    return result;
 }
 
 void NanoEditor::EnsureLineExists() {

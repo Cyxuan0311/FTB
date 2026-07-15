@@ -153,6 +153,12 @@ private:
     int h_scroll_offset_ = 0;     // Horizontal scroll offset
     int desired_col_ = 0;  // Remember column for vertical movement
 
+    // ── Mouse selection ──
+    int sel_anchor_line_ = -1;
+    int sel_anchor_col_ = -1;
+    int sel_active_line_ = -1;
+    int sel_active_col_ = -1;
+
     // ── State ──
     bool search_mode_ = false;
     std::string search_query_;
@@ -203,6 +209,10 @@ private:
     ftxui::Element RenderMarkdownPreview();
     void ShowStatus(const std::string& msg);
     void EnsureLineExists();
+    bool HasSelection() const;
+    void ClearSelection();
+    std::string GetSelectedText() const;
+    void GetSelectionRange(int& start_line, int& start_col, int& end_line, int& end_col) const;
 
     void UpdateHScroll(int content_width);
 
