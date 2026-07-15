@@ -21,6 +21,7 @@
 #include "preview/ArchivePreview.hpp"
 #include "preview/ImagePreview.hpp"
 #include "protocols/ImageOutputManager.hpp"
+#include "utils/PerfLogger.hpp"
 #include "preview/MarkdownPreview.hpp"
 #include "preview/SpreadsheetPreview.hpp"
 #include "preview/MediaPreview.hpp"
@@ -34,6 +35,7 @@
 #include "editor/SyntaxHighlighter.hpp"
 #include "renderer/TextSelection.hpp"
 #include "utils/UnicodeUtil.hpp"
+
 
 namespace fs = std::filesystem;
 
@@ -121,6 +123,84 @@ static std::string FormatFileSize(uintmax_t size) {
     return std::to_string(size / (1024 * 1024)) + " MB";
 }
 
+static std::string SanitizePreviewLine(const std::string& line) {
+    std::string out;
+    out.reserve(line.size());
+    for (size_t i = 0; i < line.size();) {
+        unsigned char c = static_cast<unsigned char>(line[i]);
+        if (c == 0x00) { ++i; continue; }
+        if (c == 0x1B) {
+            if (i + 1 < line.size() && line[i + 1] == '[') {
+                i += 2;
+                while (i < line.size()) {
+                    c = line[i];
+                    ++i;
+                    if (isalpha(c) || c == '~') break;
+                }
+                continue;
+            }
+            ++i;
+            continue;
+        }
+        out += line[i];
+        ++i;
+    }
+    return out;
+}
+
+static std::vector<std::string> SplitLines(const std::string& s) {
+    std::vector<std::string> lines;
+    std::istringstream iss(s);
+    std::string line;
+    while (std::getline(iss, line))
+        lines.push_back(line);
+    return lines;
+}
+
+// Unified scrollable content inserter.
+// Takes a vector of per-line Elements, applies scroll_y skip/max_show limit,
+// and pushes scroll indicator(s) + content to info_elements.
+// If total lines <= max_show, scroll is forcibly disabled (skip=0, no indicators).
+static void PushScrollableContent(Elements& info_elements,
+                                   Elements content_lines,
+                                   int scroll_y, int max_show) {
+    int total = static_cast<int>(content_lines.size());
+    if (total == 0) return;
+
+    bool needs_scroll = total > max_show;
+    int skip = needs_scroll ? std::min(scroll_y, total) : 0;
+    int show = needs_scroll ? std::min(total - skip, max_show) : total;
+
+    if (skip > 0) {
+        info_elements.push_back(
+            text("  ... " + std::to_string(skip) + " lines above (Alt+K to scroll up)") | color(TC("dim")) | dim
+        );
+    }
+    Elements visible;
+    for (int i = skip; i < skip + show; i++)
+        visible.push_back(std::move(content_lines[i]));
+    info_elements.push_back(vbox(std::move(visible)) | flex);
+
+    int remaining = total - skip - show;
+    if (remaining > 0) {
+        info_elements.push_back(
+            text("  ... " + std::to_string(remaining) + " more lines (Alt+J to scroll down)") | color(TC("dim")) | dim
+        );
+    }
+}
+
+// Convenience: split ANSI text into lines, convert each, then call PushScrollableContent.
+static void PushAnsiScrollable(Elements& info_elements,
+                                const std::string& ansi_output,
+                                int scroll_y, int max_show) {
+    auto lines = SplitLines(ansi_output);
+    if (lines.empty()) return;
+    Elements content;
+    for (const auto& l : lines)
+        content.push_back(FTB::AnsiStringToElement(l));
+    PushScrollableContent(info_elements, std::move(content), scroll_y, max_show);
+}
+
 Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
                             int selected,
                             const std::string& currentPath,
@@ -139,6 +219,7 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
     auto& cfg_preview = FTB::ConfigManager::GetInstance()->GetConfig().preview;
     int preview_panel_width = std::max(20, static_cast<int>(term_dim.dimx * cfg.layout.preview_ratio));
     int usable_line_width = std::max(20, preview_panel_width - 6);
+    int preview_max_lines = std::max(5, term_dim.dimy - 14);
 
     std::string ext;
     bool is_md_file_preview = false;
@@ -162,7 +243,8 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
 
     std::string preview_label = " Preview";
     if (HexPreview::IsBinaryFile(data.selectedName) && HexPreview::IsEnabled()
-        && !is_spreadsheet && !is_media && !is_audio && !is_pdf && !is_doc)
+        && !is_spreadsheet && !is_media && !is_audio && !is_pdf && !is_doc
+        && !FTB::ImagePreview::IsImageFile(data.selectedName))
         preview_label += " (hex)";
     if (is_audio && AudioPreview::IsEnabled()) preview_label += " (aud)";
     if (is_md_file_preview && MarkdownPreview::ShowSource()) preview_label += " (src)";
@@ -239,12 +321,15 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
                 std::string fp = (fs::path(currentPath) / data.selectedName).string();
 
                 static std::string s_plugin_cache_key;
-                static ftxui::Element s_plugin_cached_element;
+                static std::vector<std::string> s_plugin_cached_lines;
                 std::string plugin_cache_key = plugin_name + ":" + fp;
 
                 if (plugin_cache_key == s_plugin_cache_key) {
                     info_elements.push_back(separator() | color(TC("main_border")));
-                    info_elements.push_back(s_plugin_cached_element);
+                    Elements plugin_lines;
+                    for (const auto& l : s_plugin_cached_lines)
+                        plugin_lines.push_back(FTB::AnsiStringToElement(l));
+                    PushScrollableContent(info_elements, std::move(plugin_lines), scroll_y, preview_max_lines);
                     plugin_preview_handled = true;
                 } else {
                     FTB::PluginContext pctx;
@@ -261,17 +346,14 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
                     if (pm->PollPluginPreview(plugin_name, ppr)) {
                         if (ppr.completed) {
                             if (!ppr.failed && !ppr.output.empty()) {
-                                std::vector<ftxui::Element> lines;
-                                std::istringstream stream(ppr.output);
-                                std::string line;
-                                while (std::getline(stream, line)) {
-                                    lines.push_back(FTB::AnsiStringToElement(line));
-                                }
-                                s_plugin_cached_element = vbox(std::move(lines)) | ftxui::flex;
+                                s_plugin_cached_lines = SplitLines(ppr.output);
                                 s_plugin_cache_key = std::move(plugin_cache_key);
 
                                 info_elements.push_back(separator() | color(TC("main_border")));
-                                info_elements.push_back(s_plugin_cached_element);
+                                Elements plugin_lines;
+                                for (const auto& l : s_plugin_cached_lines)
+                                    plugin_lines.push_back(FTB::AnsiStringToElement(l));
+                                PushScrollableContent(info_elements, std::move(plugin_lines), scroll_y, preview_max_lines);
                                 plugin_preview_handled = true;
                             }
                         } else {
@@ -307,39 +389,34 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
             }
         } else {
             int max_dir = cfg_preview.max_dir_entries;
-            int show_count = (max_dir > 0)
-                ? std::min(static_cast<int>(data.dir_contents.size()), max_dir)
-                : static_cast<int>(data.dir_contents.size());
-            int panel_usable = std::max(5, term_dim.dimy - 20);
-            show_count = std::min(show_count, panel_usable);
-            for (int i = 0; i < show_count; ++i) {
+            int total_dir = static_cast<int>(data.dir_contents.size());
+            int limit = total_dir;
+            if (max_dir > 0) limit = std::min(limit, max_dir);
+            Elements dir_lines;
+            for (int i = 0; i < limit; ++i) {
                 const auto& entry = data.dir_contents[i];
-
-                std::string branch = (i == show_count - 1) ? u8"\u2514\u2500\u2500 " : u8"\u251C\u2500\u2500 ";
-
+                bool is_last = (i == limit - 1);
+                std::string branch = is_last ? u8"\u2514\u2500\u2500 " : u8"\u251C\u2500\u2500 ";
                 Element name_el;
                 if (entry.is_dir) {
                     name_el = text(" " + entry.icon + entry.name) | bgcolor(TC("directory")) | color(TC("main_bg")) | bold;
                 } else {
                     name_el = text(" " + entry.icon + entry.name) | color(GetEntryColor(entry));
                 }
-
-                info_elements.push_back(
+                dir_lines.push_back(
                     hbox({
                         text("  " + branch) | color(TC("dim")),
                         name_el
                     })
                 );
             }
-            if (static_cast<int>(data.dir_contents.size()) > show_count) {
-                info_elements.push_back(
-                    text("    \u2514\u2500\u2500 +" + std::to_string(data.dir_contents.size() - show_count) + " more") | color(TC("dim")) | dim
-                );
-            }
+            PushScrollableContent(info_elements, std::move(dir_lines), scroll_y, preview_max_lines);
         }
     }
 
     std::string filePath = (fs::path(currentPath) / data.selectedName).string();
+    PERF_LOG("DetailEl", "filePath=" + filePath + " cwd=" + currentPath
+        + " selected=" + data.selectedName + " is_dir=" + std::to_string(data.is_dir));
     bool is_image = false;
 #ifdef FTB_ENABLE_SSH
     bool ssh_mode = (FileManager::getSSHConnection() != nullptr);
@@ -349,10 +426,14 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
 #else
     is_image = !data.is_dir && FTB::ImagePreview::IsImageFile(filePath);
 #endif
-    if (is_image && is_media && MediaPreview::IsEnabled()) {
+    bool use_proto_for_gif = is_image && is_media && MediaPreview::IsEnabled()
+        && FTB::ImageOutputManager::ActiveProtocol();
+    if (is_image && is_media && MediaPreview::IsEnabled() && !use_proto_for_gif) {
         is_image = false;
     }
-
+    if (use_proto_for_gif) {
+        is_media = false;
+    }
     if (is_image) {
         int img_w = std::max(20, preview_panel_width - 4);
         int img_h = std::max(10, term_dim.dimy - 12);
@@ -407,6 +488,18 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
                 FTB::ImageOutputManager::SetPending(
                     filePath, img_data, panel_start_row, preview_start_col,
                     img_rows, max_chars_h, preview_panel_width, render_w, render_h);
+
+                {
+                    auto gif_ext = std::filesystem::path(filePath).extension();
+                    if (gif_ext == ".gif" || gif_ext == ".GIF") {
+                        PERF_LOG("DetailEl", "trigger GIF anim path=" + filePath
+                            + " row=" + std::to_string(panel_start_row)
+                            + " isAnimating="
+                            + std::to_string(FTB::ImageOutputManager::IsAnimating()));
+                        FTB::ImageOutputManager::StartGifAnimation(
+                            filePath, panel_start_row, preview_start_col);
+                    }
+                }
 
                 std::string proto_note = "  [" +
                     FTB::ImageOutputManager::ProtocolName() + "] " +
@@ -466,6 +559,7 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
     } else {
         // Not an image - clear any active image
         if (FTB::ImageOutputManager::IsActive()) {
+            PERF_LOG("DetailEl", "non-image ClearCurrent path=" + filePath);
             FTB::ImageOutputManager::ClearCurrent();
         }
     }
@@ -539,15 +633,12 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
                 }
             }
 
-            int effective_max = (max_archive_lines > 0) ? max_archive_lines
-                : std::max(200, term_dim.dimy * 5);
-            int remaining = effective_max;
-            std::function<void(const std::vector<TreeNode>&, const std::string&)> render_tree;
-            render_tree = [&](const std::vector<TreeNode>& nodes, const std::string& prefix) {
-                for (size_t i = 0; i < nodes.size() && remaining > 0; i++) {
-                    bool is_last = (i == nodes.size() - 1);
+            Elements arch_lines;
+            std::function<void(const std::vector<TreeNode>&, const std::string&)> flatten_tree;
+            flatten_tree = [&](const std::vector<TreeNode>& nodes, const std::string& prefix) {
+                for (size_t i = 0; i < nodes.size(); i++) {
                     const auto& node = nodes[i];
-
+                    bool is_last = (i == nodes.size() - 1);
                     std::string branch = is_last ? u8"\u2514\u2500\u2500 " : u8"\u251C\u2500\u2500 ";
                     std::string child_prefix = prefix + (is_last ? "    " : u8"\u2502   ");
 
@@ -568,23 +659,20 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
                         row.push_back(text(" " + FormatFileSize(node.size)) | color(TC("syn_number")));
                     }
 
-                    info_elements.push_back(hbox(std::move(row)));
-                    remaining--;
+                    arch_lines.push_back(hbox(std::move(row)));
 
                     if (!node.children.empty())
-                        render_tree(node.children, child_prefix);
+                        flatten_tree(node.children, child_prefix);
                 }
             };
 
-            render_tree(roots, "");
+            flatten_tree(roots, "");
 
-            if (max_archive_lines > 0 && static_cast<int>(data.archive_contents.size()) > max_archive_lines) {
-                info_elements.push_back(
-                    text("    \u2514\u2500\u2500 +" +
-                         std::to_string(data.archive_contents.size() - max_archive_lines) +
-                         " more entries") | color(TC("dim")) | dim
-                );
+            if (max_archive_lines > 0 && static_cast<int>(arch_lines.size()) > max_archive_lines) {
+                arch_lines.resize(max_archive_lines);
             }
+
+            PushScrollableContent(info_elements, std::move(arch_lines), scroll_y, preview_max_lines);
         }
     }
 
@@ -599,7 +687,7 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
             if (SpreadsheetPreview::GetCached(fp, sc)) {
                 if (!sc.output.empty()) {
                     info_elements.push_back(separator() | color(TC("main_border")));
-                    info_elements.push_back(FTB::AnsiStringToElement(sc.output) | flex);
+                    PushAnsiScrollable(info_elements, sc.output, scroll_y, preview_max_lines);
                     xleak_used = true;
                 }
             } else {
@@ -622,7 +710,7 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
         if (MediaPreview::GetCached(fp, mc)) {
             if (!mc.output.empty()) {
                 info_elements.push_back(separator() | color(TC("main_border")));
-                info_elements.push_back(FTB::AnsiStringToElement(mc.output) | flex);
+                PushAnsiScrollable(info_elements, mc.output, scroll_y, preview_max_lines);
             } else {
                 info_elements.push_back(separator() | color(TC("main_border")));
                 info_elements.push_back(text("  Media file (use Ctrl+B timg to play)") | color(TC("dim")) | dim);
@@ -640,7 +728,7 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
         if (AudioPreview::GetCached(fp, ac)) {
             if (!ac.output.empty()) {
                 info_elements.push_back(separator() | color(TC("main_border")));
-                info_elements.push_back(FTB::AnsiStringToElement(ac.output) | flex);
+                PushAnsiScrollable(info_elements, ac.output, scroll_y, preview_max_lines);
             } else {
                 info_elements.push_back(separator() | color(TC("main_border")));
                 info_elements.push_back(text("  Audio file (use Ctrl+B aud to toggle)") | color(TC("dim")) | dim);
@@ -661,7 +749,7 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
             if (DocPreview::GetCached(fp, dc)) {
                 if (!dc.output.empty()) {
                     info_elements.push_back(separator() | color(TC("main_border")));
-                    info_elements.push_back(FTB::AnsiStringToElement(dc.output) | flex);
+                    PushAnsiScrollable(info_elements, dc.output, scroll_y, preview_max_lines);
                     pandoc_used = true;
                 }
             } else {
@@ -687,7 +775,7 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
             if (PdfPreview::GetCached(fp, pc)) {
                 if (!pc.output.empty()) {
                     info_elements.push_back(separator() | color(TC("main_border")));
-                    info_elements.push_back(FTB::AnsiStringToElement(pc.output) | flex);
+                    PushAnsiScrollable(info_elements, pc.output, scroll_y, preview_max_lines);
                     hygg_used = true;
                 }
             } else {
@@ -711,11 +799,11 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
             if (HexPreview::GetCached(fp, hc)) {
                 if (!hc.output.empty()) {
                     info_elements.push_back(separator() | color(TC("main_border")));
-                    std::istringstream iss(hc.output);
-                    std::string line;
-                    while (std::getline(iss, line)) {
-                        info_elements.push_back(text("  " + line) | color(TC("main_fg")));
-                    }
+                    auto hex_lines = SplitLines(hc.output);
+                    Elements hex_elements;
+                    for (const auto& l : hex_lines)
+                        hex_elements.push_back(text("  " + l) | color(TC("main_fg")));
+                    PushScrollableContent(info_elements, std::move(hex_elements), scroll_y, preview_max_lines);
                 }
             } else {
                 info_elements.push_back(separator() | color(TC("main_border")));
@@ -743,7 +831,7 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
             if (MarkdownPreview::GetCached(fp, mc)) {
                 if (!mc.output.empty()) {
                     info_elements.push_back(separator() | color(TC("main_border")));
-                    info_elements.push_back(FTB::AnsiStringToElement(mc.output) | flex);
+                    PushAnsiScrollable(info_elements, mc.output, scroll_y, preview_max_lines);
                     glow_used = true;
                 }
             } else {
@@ -797,6 +885,7 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
                 int sel_y2 = g_preview_sel.active ? std::max(g_preview_sel.anchor_y, g_preview_sel.current_y) : -1;
 
                 while (std::getline(iss, line)) {
+                    line = SanitizePreviewLine(line);
                     if (line_num <= scroll_y) {
                         g_preview_sel.lines.push_back(line);
                         line_num++;
@@ -870,8 +959,6 @@ Element CreateDetailElement(const std::vector<DirEntryInfo>& entries,
             }
         }
     }
-
-    info_elements.push_back(separator() | color(TC("main_border")));
 
     return vbox(info_elements) | bgcolor(TC("main_bg")) | flex | yframe;
 }
