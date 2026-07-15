@@ -74,6 +74,15 @@ Element RenderImagePreviewPanel(MainState& state, int term_width, int term_heigh
             FTB::ImageOutputManager::SetPending(
                 filePath, img_data, preview_start_row, preview_start_col,
                 img_rows, max_chars_h, term_width, render_w, render_h);
+
+            {
+                auto gif_ext = std::filesystem::path(filePath).extension();
+                if (gif_ext == ".gif" || gif_ext == ".GIF") {
+                    FTB::ImageOutputManager::StartGifAnimation(
+                        filePath, preview_start_row, preview_start_col);
+                }
+            }
+
             lines.push_back(text("  [" + FTB::ImageOutputManager::ProtocolName()
                 + "] " + std::to_string(img_rows) + " rows (press Esc to close)")
                 | color(TC("dim")) | dim | size(WIDTH, EQUAL, term_width));

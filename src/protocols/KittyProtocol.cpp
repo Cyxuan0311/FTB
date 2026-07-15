@@ -1,5 +1,5 @@
 #include "../../include/protocols/KittyProtocol.hpp"
-
+#include "../../include/utils/WebpDecoder.hpp"
 #include "../../include/protocols/base64_util.hpp"
 #include "../../include/utils/TerminalProbe.hpp"
 #include "../../include/utils/TmuxContext.hpp"
@@ -10,10 +10,10 @@
 #include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
+#include <sys/stat.h>
 #include <iostream>
 #include <sstream>
 #include <string>
-#include <thread>
 #include <unistd.h>
 #include <vector>
 
@@ -24,9 +24,6 @@
 namespace FTB {
 
 bool KittyProtocol::IsSupported() const {
-    // Protocol selection is now handled by TerminalProbe in ImageOutputManager.
-    // This method is kept for interface compatibility but should not be used
-    // as the primary detection mechanism.
     auto& info = TerminalProbe::Detect();
     return info.kitty;
 }
@@ -41,6 +38,36 @@ static void png_write_callback(void* context, void* data, int size) {
     ctx->buffer->insert(ctx->buffer->end(), bytes, bytes + size);
 }
 
+static std::string rgba_to_png_base64(const unsigned char* rgba, int w, int h) {
+    std::vector<unsigned char> png_data;
+    PngWriteContext ctx = {&png_data};
+    int ok = stbi_write_png_to_func(png_write_callback, &ctx,
+                                    w, h, 3, rgba, 0);
+    if (!ok) return {};
+    return detail::Base64Encode(png_data.data(), png_data.size());
+}
+
+struct StbOrWebpData {
+    unsigned char* data = nullptr;
+    std::vector<unsigned char> webp_owned;
+
+    ~StbOrWebpData() {
+        if (data && webp_owned.empty()) stbi_image_free(data);
+    }
+
+    bool load(const std::string& path, int& w, int& h, int& ch) {
+        data = stbi_load(path.c_str(), &w, &h, &ch, 3);
+        if (data) return true;
+        auto result = WebpDecoder::Decode(path);
+        if (!result.success) return false;
+        w = result.width;
+        h = result.height;
+        webp_owned = std::move(result.pixels);
+        data = webp_owned.data();
+        return true;
+    }
+};
+
 std::string KittyProtocol::Encode(
     const std::string& path,
     int max_width,
@@ -54,10 +81,11 @@ std::string KittyProtocol::Encode(
     out_render_h = 0;
 
     int img_w, img_h, channels;
-    unsigned char* data = stbi_load(path.c_str(), &img_w, &img_h, &channels, 3);
-    if (!data) {
+    StbOrWebpData img;
+    if (!img.load(path, img_w, img_h, channels)) {
         return {};
     }
+    unsigned char* data = img.data;
 
     double target_ratio = static_cast<double>(img_w) / img_h;
     int render_w, render_h;
@@ -74,7 +102,6 @@ std::string KittyProtocol::Encode(
         scaled = static_cast<unsigned char*>(std::malloc(
             static_cast<size_t>(render_w) * render_h * 3));
         if (!scaled) {
-            stbi_image_free(data);
             return {};
         }
         stbir_resize_uint8_srgb(data, img_w, img_h, 0,
@@ -94,14 +121,12 @@ std::string KittyProtocol::Encode(
                                         render_w, render_h, 3,
                                         scaled, 0);
     if (scaled != data) std::free(scaled);
-    stbi_image_free(data);
 
     if (!png_ok) {
         return {};
     }
 
-    std::string b64 = detail::Base64Encode(png_data.data(), png_data.size());
-    return b64;
+    return detail::Base64Encode(png_data.data(), png_data.size());
 }
 
 void KittyProtocol::WriteToTerminal(const std::string& data,
@@ -213,8 +238,6 @@ void KittyProtocol::ClearArea(int start_row, int num_rows,
     int row_off = use_direct_tty ? tmux.PaneTop() : 0;
     int col_off = use_direct_tty ? tmux.PaneLeft() : 0;
 
-    // Delete any overlaid images from kitty's graphics layer.
-    // When using direct TTY, must write to outer TTY; otherwise tmux won't forward.
     if (use_direct_tty) {
         int fd = ::open(tmux.OuterTty().c_str(), O_WRONLY);
         if (fd == -1) fd = ::open(tmux.OuterTty().c_str(), O_RDWR);
@@ -230,10 +253,7 @@ void KittyProtocol::ClearArea(int start_row, int num_rows,
         (void)unused_unused;
     }
 
-    // Space-fill the cleared area
     if (width > 0) {
-        // When using direct TTY, write to outer TTY with pane offsets
-        // Also write to /dev/tty for tmux screen consistency
         std::string blank(static_cast<size_t>(width), ' ');
 
         if (use_direct_tty) {
@@ -253,7 +273,6 @@ void KittyProtocol::ClearArea(int start_row, int num_rows,
             }
         }
 
-        // Also clear on tmux's virtual screen (no pane offset)
         int fd = ::open("/dev/tty", O_WRONLY);
         if (fd == -1) fd = ::open("/dev/tty", O_RDWR);
         if (fd != -1) {
@@ -274,6 +293,10 @@ void KittyProtocol::ClearArea(int start_row, int num_rows,
         }
         std::cout << std::flush;
     }
+}
+
+bool KittyProtocol::StartGifAnimation(int term_row, int term_col) {
+    return false;
 }
 
 }  // namespace FTB

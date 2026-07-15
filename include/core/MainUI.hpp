@@ -228,6 +228,7 @@ struct MainState {
 
     // 刷新控制
     std::atomic<bool>* refresh_ui = nullptr;
+    std::atomic<bool> refresh_pending{false};
     ftxui::ScreenInteractive* screen = nullptr;
 
     // 计算布局回调

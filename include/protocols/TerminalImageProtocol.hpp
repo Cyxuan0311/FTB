@@ -1,6 +1,9 @@
 #pragma once
 
 #include <string>
+#include <vector>
+
+#include "utils/GifFrameDecoder.hpp"
 
 namespace FTB {
 
@@ -30,6 +33,14 @@ public:
                             int start_col = 1, int width = 0) = 0;
 
     virtual bool NeedsSkipArea() const { return true; }
+
+    // Optional: protocol-specific display path hint (for timg fallback, etc.)
+    virtual void SetDisplayPath(const std::string& /*path*/) {}
+
+    // GIF animation support
+    virtual bool StartGifAnimation(int term_row, int term_col) { return false; }
+    virtual void StopGifAnimation() {}
+    virtual bool IsGifAnimating() const { return false; }
 };
 
 }  // namespace FTB

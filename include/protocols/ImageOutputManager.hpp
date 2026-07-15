@@ -55,6 +55,12 @@ public:
     static bool HasFailed(const std::string& path);
     static bool IsEncoding(const std::string& path);
 
+    // --- GIF Animation ---
+    static void StartGifAnimation(const std::string& path,
+                                  int term_row, int term_col);
+    static void StopAnimation();
+    static bool IsAnimating();
+
 private:
     static std::unique_ptr<TerminalImageProtocol> s_protocol;
 

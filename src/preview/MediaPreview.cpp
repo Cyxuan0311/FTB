@@ -30,7 +30,7 @@ bool MediaPreview::IsMediaFile(const std::string& filename) {
     if (dot == std::string::npos) return false;
     std::string ext = filename.substr(dot);
     for (auto& c : ext) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return (ext == ".gif" || ext == ".mp4" || ext == ".mov" || ext == ".webm" || ext == ".avi" || ext == ".webp");
+    return (ext == ".gif" || ext == ".mp4" || ext == ".mov" || ext == ".webm" || ext == ".avi");
 }
 
 bool MediaPreview::IsEnabled() {

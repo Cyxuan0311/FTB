@@ -1,4 +1,6 @@
 #include "../../include/preview/ImagePreview.hpp"
+#include "../../include/utils/WebpDecoder.hpp"
+#include "../../include/utils/PerfLogger.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -48,10 +50,24 @@ std::vector<ImageLine> ImagePreview::RenderWithStbImage(
     int max_height
 ) {
     int img_w, img_h, channels;
+    std::vector<unsigned char> webp_owned;
     unsigned char* data = stbi_load(path.c_str(), &img_w, &img_h, &channels, 3);
 
     if (!data) {
-        return {};
+        auto webp = WebpDecoder::Decode(path);
+        if (!webp.success) {
+            PERF_LOG("ImgPreview", "stb+webp both FAIL path=" + path);
+            return {};
+        }
+        img_w = webp.width;
+        img_h = webp.height;
+        webp_owned = std::move(webp.pixels);
+        data = webp_owned.data();
+        PERF_LOG("ImgPreview", "webp decoder used path=" + path
+            + " w=" + std::to_string(img_w) + " h=" + std::to_string(img_h));
+    } else {
+        PERF_LOG("ImgPreview", "stb decoder used path=" + path
+            + " w=" + std::to_string(img_w) + " h=" + std::to_string(img_h));
     }
 
     double target_ratio = 2.0 * img_w / img_h;
@@ -72,7 +88,7 @@ std::vector<ImageLine> ImagePreview::RenderWithStbImage(
         scaled.data(), render_w, pixel_h, 0,
         STBIR_RGB);
 
-    stbi_image_free(data);
+    if (webp_owned.empty()) stbi_image_free(data);
 
     std::vector<ImageLine> lines;
     lines.reserve(render_h);
@@ -114,8 +130,16 @@ std::vector<ImageLine> ImagePreview::RenderWithChafa(
     int max_height
 ) {
     int img_w, img_h, channels;
+    std::vector<unsigned char> webp_owned;
     unsigned char* data = stbi_load(path.c_str(), &img_w, &img_h, &channels, 3);
-    if (!data) return {};
+    if (!data) {
+        auto webp = WebpDecoder::Decode(path);
+        if (!webp.success) return {};
+        img_w = webp.width;
+        img_h = webp.height;
+        webp_owned = std::move(webp.pixels);
+        data = webp_owned.data();
+    }
 
     double target_ratio = 2.0 * img_w / img_h;
     int render_w, render_h;
@@ -175,7 +199,7 @@ std::vector<ImageLine> ImagePreview::RenderWithChafa(
     chafa_canvas_unref(canvas);
     chafa_canvas_config_unref(config);
     chafa_symbol_map_unref(sym_map);
-    stbi_image_free(data);
+    if (webp_owned.empty()) stbi_image_free(data);
 
     return lines;
 }
@@ -209,6 +233,10 @@ void ImagePreview::LoadAsync(const std::string& path, int max_width, int max_hei
         std::lock_guard<std::mutex> lock(s_cache_mutex);
         auto it = s_cache_map.find(path);
         if (it != s_cache_map.end() && it->second->loaded) {
+            PERF_LOG("LoadAsync", "cache HIT path=" + path
+                + " loaded=" + std::to_string(it->second->loaded)
+                + " failed=" + std::to_string(it->second->failed)
+                + " lines=" + std::to_string(it->second->image_lines.size()));
             if (it->second->failed) {
                 return;
             }
@@ -218,8 +246,11 @@ void ImagePreview::LoadAsync(const std::string& path, int max_width, int max_hei
         if (it != s_cache_map.end() && it->second->failed) {
             return;
         }
+        PERF_LOG("LoadAsync", "cache MISS path=" + path
+            + " cacheSize=" + std::to_string(s_cache_map.size()));
         if (s_cache_map.size() >= static_cast<size_t>(kImageCacheMaxEntries)) {
             auto oldest = std::prev(s_lru_list.end());
+            PERF_LOG("LoadAsync", "evicting " + oldest->key);
             s_cache_map.erase(oldest->key);
             s_lru_list.erase(oldest);
         }
@@ -230,10 +261,12 @@ void ImagePreview::LoadAsync(const std::string& path, int max_width, int max_hei
     }
 
     std::thread([path, max_width, max_height]() {
+        PERF_LOG("LoadAsync", "thread start path=" + path);
         auto lines = RenderToPixels(path, max_width, max_height);
         std::lock_guard<std::mutex> lock(s_cache_mutex);
         auto it = s_cache_map.find(path);
         if (it == s_cache_map.end()) {
+            PERF_LOG("LoadAsync", "thread evicted path=" + path);
             return;
         }
         it->second->image_lines = std::move(lines);
@@ -244,6 +277,9 @@ void ImagePreview::LoadAsync(const std::string& path, int max_width, int max_hei
             it->second->width = static_cast<int>(it->second->image_lines[0].pixels.size());
             it->second->height = static_cast<int>(it->second->image_lines.size());
         }
+        PERF_LOG("LoadAsync", "thread done path=" + path
+            + " lines=" + std::to_string(it->second->image_lines.size())
+            + " failed=" + std::to_string(it->second->failed));
         s_lru_list.splice(s_lru_list.begin(), s_lru_list, it->second);
     }).detach();
 }

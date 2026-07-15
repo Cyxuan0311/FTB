@@ -1,4 +1,5 @@
 #include "../../include/protocols/ImageOutputManager.hpp"
+#include "../../include/utils/PerfLogger.hpp"
 
 #include "../../include/protocols/KittyProtocol.hpp"
 #include "../../include/protocols/ITerm2Protocol.hpp"
@@ -66,7 +67,6 @@ static std::mutex s_encode_mutex;
 // ---- Protocol management ----
 
 void ImageOutputManager::DetectProtocol() {
-    // Use TerminalProbe for reliable terminal detection
     auto& info = TerminalProbe::Detect();
 
     if (!s_protocol_enabled_) {
@@ -74,7 +74,6 @@ void ImageOutputManager::DetectProtocol() {
         return;
     }
 
-    // Select protocol based on probe results (priority: Kitty > iTerm2 > Sixel)
     if (info.kitty) {
         s_protocol = std::make_unique<KittyProtocol>();
         return;
@@ -192,6 +191,8 @@ void ImageOutputManager::ClearCurrent() {
         std::lock_guard<std::mutex> lock(s_manager_mutex);
         path_at_clear = s_cached_path;
     }
+    PERF_LOG("AnimMgr", "ClearCurrent path=" + path_at_clear);
+    StopAnimation();
     {
         std::lock_guard<std::mutex> lock(s_encode_mutex);
         s_failed_path.clear();
@@ -228,7 +229,6 @@ void ImageOutputManager::ClearCurrent() {
         s_pending_render_w = 0;
         s_pending_render_h = 0;
 
-        // Reset last-flushed so next image will be re-flushed
         s_last_flushed_path.clear();
         s_last_flushed_render_w = 0;
         s_last_flushed_render_h = 0;
@@ -247,12 +247,10 @@ void ImageOutputManager::SetOverlayActive(bool active) {
     std::lock_guard<std::mutex> lock(s_manager_mutex);
 
     if (active && !s_overlay_active) {
-        // Panel just opened: clear sixel display from terminal so popup text shows through
         if (s_image_rows > 0 && s_panel_width > 0) {
             s_protocol->ClearArea(s_term_rows, s_image_rows, s_term_cols, s_panel_width);
         }
     } else if (!active && s_overlay_active) {
-        // Panel just closed: force re-flush on next FlushPendingIfDirty()
         s_last_flushed_path.clear();
         s_last_flushed_render_w = 0;
         s_last_flushed_render_h = 0;
@@ -298,6 +296,12 @@ bool ImageOutputManager::HasPending() {
 void ImageOutputManager::FlushPendingIfDirty() {
     if (!s_protocol) return;
 
+    {
+        std::lock_guard<std::mutex> lock(s_manager_mutex);
+        PERF_LOG("AnimMgr", "FlushPending path=" + s_pending_path
+            + " last_flushed=" + s_last_flushed_path);
+    }
+
     std::string path;
     std::string data;
     int rows = 0, col = 0, image_rows = 0, max_rows = 0;
@@ -319,11 +323,9 @@ void ImageOutputManager::FlushPendingIfDirty() {
         render_w = s_pending_render_w;
         render_h = s_pending_render_h;
 
-        // Skip flush if same image (path + geometry) was already flushed
         if (path == s_last_flushed_path &&
             render_w == s_last_flushed_render_w &&
             render_h == s_last_flushed_render_h) {
-            // Still update the active cache for downstream queries
             s_cached_path = path;
             s_cached_data = data;
             s_term_rows = rows;
@@ -336,7 +338,6 @@ void ImageOutputManager::FlushPendingIfDirty() {
             return;
         }
 
-        // Also update the active cache so IsActive() etc. work
         s_cached_path = path;
         s_cached_data = data;
         s_term_rows = rows;
@@ -348,9 +349,10 @@ void ImageOutputManager::FlushPendingIfDirty() {
         s_render_h = render_h;
     }
 
+    PERF_LOG("AnimMgr", "WriteToTTY path=" + path + " render_w="
+        + std::to_string(render_w) + " render_h=" + std::to_string(render_h));
     s_protocol->WriteToTTY(data, render_w, render_h, rows, col);
 
-    // Record what was flushed so redundant flushes are skipped
     {
         std::lock_guard<std::mutex> lock(s_manager_mutex);
         s_last_flushed_path = path;
@@ -378,6 +380,7 @@ void ImageOutputManager::EncodeAsync(const std::string& path,
     if (!s_protocol) return;
 
     uint64_t my_version;
+    std::string proto_name;
     {
         std::lock_guard<std::mutex> lock(s_encode_mutex);
         if (s_encoding_path == path) {
@@ -388,6 +391,7 @@ void ImageOutputManager::EncodeAsync(const std::string& path,
         }
         s_encoding_path = path;
         my_version = ++s_encode_version;
+        proto_name = s_protocol ? s_protocol->Name() : "?";
     }
 
     std::thread([path, pixel_w, pixel_h, my_version]() {
@@ -398,7 +402,6 @@ void ImageOutputManager::EncodeAsync(const std::string& path,
         }
         std::string encoded = proto->Encode(path, pixel_w, pixel_h,
                                             term_rows, render_w, render_h);
-
         bool stale = false;
         bool failed = encoded.empty() || term_rows <= 0;
         {
@@ -419,6 +422,32 @@ void ImageOutputManager::EncodeAsync(const std::string& path,
             Cache(path, encoded, term_rows, render_w, render_h);
         }
     }).detach();
+}
+
+// ---- GIF Animation ----
+
+void ImageOutputManager::StartGifAnimation(const std::string& path,
+                                            int term_row, int term_col) {
+    if (!s_protocol) return;
+    if (path.empty()) return;
+
+    bool already = s_protocol->IsGifAnimating();
+    PERF_LOG("AnimMgr", "StartGifAnimation path=" + path
+        + " row=" + std::to_string(term_row) + " col=" + std::to_string(term_col)
+        + " already_animating=" + std::to_string(already));
+    if (already) return;
+
+    s_protocol->StartGifAnimation(term_row, term_col);
+}
+
+void ImageOutputManager::StopAnimation() {
+    if (s_protocol) {
+        s_protocol->StopGifAnimation();
+    }
+}
+
+bool ImageOutputManager::IsAnimating() {
+    return s_protocol && s_protocol->IsGifAnimating();
 }
 
 }  // namespace FTB

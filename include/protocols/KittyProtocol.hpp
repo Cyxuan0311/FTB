@@ -1,5 +1,8 @@
 #pragma once
 
+#include <string>
+#include <vector>
+
 #include "protocols/TerminalImageProtocol.hpp"
 
 namespace FTB {
@@ -22,6 +25,13 @@ public:
     void ClearArea(int start_row, int num_rows,
                     int start_col = 1, int width = 0) override;
     bool NeedsSkipArea() const override { return false; }
+
+    // GIF animation (reserved, currently disabled)
+    bool StartGifAnimation(int term_row, int term_col) override;
+    void StopGifAnimation() override {}
+    bool IsGifAnimating() const override { return false; }
+
+private:
 };
 
 }  // namespace FTB
