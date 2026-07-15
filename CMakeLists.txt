@@ -157,9 +157,11 @@ set(FTB_CORE_SOURCES
     src/renderer/TextSelection.cpp
     src/renderer/detail_element.cpp
     # utils
+    src/utils/GifFrameDecoder.cpp
     src/utils/UnicodeUtil.cpp
     src/utils/TerminalProbe.cpp
     src/utils/TmuxContext.cpp
+    src/utils/WebpDecoder.cpp
     # config
     src/config/CLIArgs.cpp
     src/config/ConfigManager.cpp
@@ -347,6 +349,14 @@ if(FTB_ENABLE_TREE_SITTER)
         target_link_libraries(FTB_core PUBLIC ${_ts_libs})
     endif()
 endif()
+
+# 内建 libwebp 解码库
+add_subdirectory(third_party/libwebp)
+target_link_libraries(FTB_core PUBLIC webpdecoder)
+
+# 内建 giflib 解码库（替换 stb_image GIF 解码）
+add_subdirectory(third_party/giflib)
+target_link_libraries(FTB_core PUBLIC giflib)
 
 # 构建主程序
 add_executable(FTB src/FTB/main.cpp)

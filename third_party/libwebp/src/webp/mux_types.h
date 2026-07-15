@@ -1,0 +1,7 @@
+#ifndef WEBP_WEBP_MUX_TYPES_H_
+#define WEBP_WEBP_MUX_TYPES_H_
+
+#define ALPHA_FLAG     0x00000010
+#define ANIMATION_FLAG 0x00000002
+
+#endif
