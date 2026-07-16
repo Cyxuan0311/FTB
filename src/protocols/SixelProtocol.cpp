@@ -426,7 +426,7 @@ std::string SixelProtocol::Encode(const std::string&, int, int, int&, int&, int&
 void SixelProtocol::WriteToTerminal(const std::string&, int, int, int, int) {}
 void SixelProtocol::WriteToTTY(const std::string&, int, int, int, int) {}
 void SixelProtocol::ClearArea(int, int, int, int) {}
-bool SixelProtocol::StartGifAnimation(const std::vector<DecodedFrame>&, int, int, int, int) { return false; }
+bool SixelProtocol::StartGifAnimation(int, int) { return false; }
 void SixelProtocol::StopGifAnimation() {}
 
 #endif
